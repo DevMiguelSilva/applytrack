@@ -6,7 +6,7 @@ import { ScrollToTopButton } from './ScrollToTopButton'
 export function Layout() {
   const { pathname } = useLocation()
   const showTabs = pathname !== '/login'
-  const onBoard = pathname === '/'
+  const onBoard = pathname === '/' || pathname === '/login'
 
   return (
     <div

@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { AppLogo } from '../components/AppLogo'
 import { useAuth } from '../hooks/useAuth'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { btnPrimaryClass, pageCardClass, sectionLabelClass } from '../lib/appUi'
+import { boardLook } from '../components/BoardLook'
+
+const focusClass = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2'
+const inputClass = 'mt-1.5 w-full rounded-lg border border-brand-line bg-white px-3 py-2.5 text-sm text-brand-ink outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/25 disabled:bg-brand-mist disabled:text-brand-muted'
 
 export function AuthPage() {
   const { signIn, signUp } = useAuth()
@@ -15,6 +18,7 @@ export function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
     setLoading(true)
     setError(null)
     setMessage(null)
@@ -35,86 +39,95 @@ export function AuthPage() {
 
   if (!isSupabaseConfigured) {
     return (
-      <div className="mx-auto max-w-md px-6 py-20 text-center">
-        <h1 className="font-display text-2xl font-bold text-slate-900">Cloud sync not configured</h1>
-        <p className="mt-3 text-sm text-slate-500">
-          Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env to enable login and cloud backup.
-        </p>
-        <a href="/" className="mt-6 inline-block font-medium text-sky-600 hover:underline">
-          Continue with local storage →
-        </a>
+      <div className="mx-auto max-w-md py-6 sm:py-10">
+        <div className={`${boardLook.card} p-6 text-center sm:p-8`}>
+          <div className="mb-4 flex justify-center"><AppLogo tone="brand" /></div>
+          <p className={`mb-2 ${boardLook.label}`}>ApplyTrack</p>
+          <h1 className={boardLook.headline}>Your workspace is ready</h1>
+          <p className={`mt-3 ${boardLook.body}`}>Track your applications on this device. Your changes are saved locally.</p>
+          <a href="/" className={`mt-6 ${boardLook.button} ${focusClass}`}>Continue to Board</a>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-10">
-      <div className={`relative overflow-hidden ${pageCardClass} p-8 shadow-glow`}>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/50" />
-        <div className="relative">
+    <div className="mx-auto max-w-md py-6 font-sans text-brand-ink sm:py-10">
+      <div className={`${boardLook.card} p-6 sm:p-8`}>
+        <div>
           <div className="mb-6 flex items-center gap-3">
-            <AppLogo />
+            <AppLogo tone="brand" />
             <div>
-              <p className={sectionLabelClass}>ApplyTrack</p>
-              <h1 className="font-display text-2xl font-bold text-slate-900">Welcome back</h1>
-              <p className="text-sm text-slate-500">Sign in to sync across devices</p>
+              <p className={`mb-1 ${boardLook.label}`}>ApplyTrack</p>
+              <h1 className={boardLook.headline}>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
+              <p className="mt-2 text-sm text-brand-muted">{mode === 'signin' ? 'Sign in to sync across devices' : 'Keep your job search in sync across devices'}</p>
             </div>
           </div>
 
-          <div className="flex rounded-full bg-slate-100 p-1">
+          <div className="flex gap-1 rounded-xl bg-brand-mist p-1" role="group" aria-label="Account access">
             <button
               type="button"
-              onClick={() => setMode('signin')}
-              className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
-                mode === 'signin' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              disabled={loading}
+              aria-pressed={mode === 'signin'}
+              onClick={() => { setMode('signin'); setError(null); setMessage(null) }}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition disabled:opacity-60 ${focusClass} ${
+                mode === 'signin' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-muted hover:text-brand-ink'
               }`}
             >
               Sign in
             </button>
             <button
               type="button"
-              onClick={() => setMode('signup')}
-              className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
-                mode === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              disabled={loading}
+              aria-pressed={mode === 'signup'}
+              onClick={() => { setMode('signup'); setError(null); setMessage(null) }}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition disabled:opacity-60 ${focusClass} ${
+                mode === 'signup' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-muted hover:text-brand-ink'
               }`}
             >
               Sign up
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4" aria-busy={loading}>
             {error && (
-              <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>
+              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{error}</p>
             )}
             {message && (
-              <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p>
+              <p role="status" className="rounded-lg border border-brand-primary/25 bg-brand-mist p-3 text-sm text-brand-ink">{message}</p>
             )}
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Email</span>
+              <span className="text-sm font-medium text-brand-muted">Email</span>
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className={inputClass}
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Password</span>
+              <span className="text-sm font-medium text-brand-muted">Password</span>
               <input
                 type="password"
+                name="password"
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                disabled={loading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                className={inputClass}
               />
             </label>
 
-            <button type="submit" disabled={loading} className={`w-full ${btnPrimaryClass} py-2.5`}>
-              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            <button type="submit" disabled={loading} className={`w-full ${boardLook.button} ${focusClass} disabled:cursor-wait disabled:opacity-60`}>
+              {loading ? (mode === 'signin' ? 'Signing in…' : 'Creating account…') : mode === 'signin' ? 'Sign in' : 'Create account'}
             </button>
           </form>
         </div>
