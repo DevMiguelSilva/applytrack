@@ -54,7 +54,7 @@ If using Supabase, run [`supabase/schema.sql`](supabase/schema.sql) in the SQL e
 ### 3. Install & run
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -69,7 +69,7 @@ Open [http://localhost:5173](http://localhost:5173). Local `/api/*` is handled b
 
 ## Deploy (Vercel)
 
-1. Root Directory: `job-tracker`
+1. Connect `DevMiguelSilva/applytrack` to the existing Vercel project `job-tracker`; leave Root Directory empty (repository root).
 2. Env vars: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, plus Supabase if used
 3. Deploy (API routes under `api/` + Vite `dist`)
 
@@ -88,3 +88,7 @@ supabase/schema.sql  # v2 tables + RLS
 ## License
 
 MIT — portfolio/educational use.
+
+## Standalone deployment
+
+See [DEPLOY.md](DEPLOY.md). The frontend, serverless `api/`, and Supabase SQL stay in this repository. Production: [ApplyTrack](https://applytrack-board.vercel.app).
