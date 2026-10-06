@@ -91,6 +91,6 @@ MIT — portfolio/educational use.
 
 ## Standalone deployment
 
-See [DEPLOY.md](DEPLOY.md). The frontend, serverless `api/`, and Supabase SQL stay in this repository. Production: [ApplyTrack](https://applytrack-board.vercel.app).
+See [DEPLOY.md](DEPLOY.md). The frontend, serverless `api/`, and Supabase SQL stay in this repository. Production: [ApplyTrack](https://applytrack.miguelcode.dev). Existing Vercel addresses remain available.
 
 Local standalone workspace: `C:\Dev\Projects\applytrack`. Commands run from this repository root.
