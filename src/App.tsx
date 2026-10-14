@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { TailoringProvider } from './hooks/useTailoring'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -36,6 +37,7 @@ function AppRoutes() {
             <PortalFeedsProvider>
               <InboxProvider>
                 <BrowserRouter>
+                  <TailoringProvider>
                   <Routes>
                     <Route element={<Layout />}>
                       <Route path="login" element={<LoginRoute />} />
@@ -49,6 +51,7 @@ function AppRoutes() {
                       </Route>
                     </Route>
                   </Routes>
+                  </TailoringProvider>
                 </BrowserRouter>
               </InboxProvider>
             </PortalFeedsProvider>

@@ -214,3 +214,12 @@ html { scrollbar-gutter: stable; }
     gap: 1rem;
   }
 }
+
+@keyframes copy-confirmation {
+  0%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.copy-confirmation { animation: copy-confirmation 2s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .copy-confirmation { animation: none; }
+}

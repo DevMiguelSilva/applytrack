@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
+import { TailoringProgress } from './TailoringProgress'
 import { Header } from './Header'
 import { MobileTabBar } from './MobileTabBar'
 import { ScrollToTopButton } from './ScrollToTopButton'
@@ -23,6 +24,7 @@ export function Layout() {
       </footer>
       {showTabs && <MobileTabBar />}
       <ScrollToTopButton />
+      {showTabs && <TailoringProgress />}
     </div>
   )
 }

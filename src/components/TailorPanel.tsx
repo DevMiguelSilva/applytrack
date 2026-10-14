@@ -1,22 +1,21 @@
+import { CopyFeedback } from '../lib/copyFeedback'
 import { resolveJobCv } from '../lib/cvLibrary'
-import { Fragment, useMemo, useRef, useState } from 'react'
-import { explainSkill, tailorMasterCv } from '../api/gemini'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { explainSkill } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
 import { getErrorMessage } from '../lib/errorMessage'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
-import type { GapReport, GapSkill, MasterCv, TailoredDocument } from '../types/cv'
+import type { GapReport, GapSkill, MasterCv } from '../types/cv'
 import {
   EMPTY_GAP_REPORT,
-  lockSkillGroupsToMaster,
   masterCvSearchText,
   masterCvSkillList,
-  mergeClaimedSkillsIntoGroups,
 } from '../types/cv'
 import type { JobApplication } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
-import { masterCvToProfile } from '../lib/cvProfile'
+import { useTailoring } from '../hooks/useTailoring'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { LoadingSpinner } from './LoadingSpinner'
 
@@ -122,14 +121,17 @@ export function TailorPanel({ job }: TailorPanelProps) {
 
 function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps & { masterCv: MasterCv; templateLabel: string }) {
   const { updateJob } = useJobs()
-  const profile = masterCvToProfile(masterCv)
-  const { getForJob, saveDoc } = useTailoredDocs()
+  const { getForJob } = useTailoredDocs()
+  const { tasks, start, retrySave } = useTailoring()
+  const task = tasks[job.id]
+  const generating = task?.phase === 'running' || task?.phase === 'saving'
   const existing = getForJob(job.id)
 
-  const [loading, setLoading] = useState<string | null>(null)
+  const [actionLoading, setLoading] = useState<string | null>(null)
+  const loading = generating ? 'tailor' : actionLoading
   const [error, setError] = useState<string | null>(null)
-  const [tailoredCv, setTailoredCv] = useState<MasterCv | null>(existing?.tailoredCv ?? null)
-  const [coverLetter, setCoverLetter] = useState(existing?.coverLetter ?? '')
+  const tailoredCv = existing?.tailoredCv ?? null
+  const coverLetter = existing?.coverLetter ?? ''
   const [gapReport, setGapReport] = useState<GapReport>(() => ({
     ...EMPTY_GAP_REPORT,
     ...(existing?.gapReport ?? {}),
@@ -137,7 +139,16 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   }))
   /** Panels start collapsed even when saved results exist. */
   const [openPanels, setOpenPanels] = useState<Set<PanelId>>(() => new Set())
-  const [liteDraft, setLiteDraft] = useState(false)
+  useEffect(() => {
+    if (existing?.gapReport) setGapReport(existing.gapReport)
+  }, [existing])
+  const [copied, setCopied] = useState(0)
+  const feedback = useMemo(() => new CopyFeedback(
+    id => { setCopied(id); if (id) setError(null) },
+    err => setError(getErrorMessage(err, 'Could not copy the cover letter'))
+  ), [])
+  useEffect(() => () => feedback.dispose(), [feedback])
+  const copyLetter = () => feedback.copy(coverLetter, text => navigator.clipboard.writeText(text))
 
   const claimedSkills = job.claimedSkills ?? []
   const skillsLocked = job.status !== 'saved' || Boolean(job.deletedAt)
@@ -164,7 +175,6 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   const run = async (action: string, fn: () => Promise<void>) => {
     setLoading(action)
     setError(null)
-    if (action === 'tailor') setLiteDraft(false)
     try {
       await fn()
     } catch (err) {
@@ -174,26 +184,10 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
     }
   }
 
-  const persist = async (cv: MasterCv, letter: string, gap: GapReport) => {
-    const doc: TailoredDocument = {
-      id: existing?.id ?? crypto.randomUUID(),
-      jobApplicationId: job.id,
-      masterCvSnapshot: masterCv,
-      tailoredCv: cv,
-      coverLetter: letter,
-      gapReport: gap,
-      matchScore: gap.coveragePercent,
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    await saveDoc(doc)
-  }
-
   const runGap = () =>
     run('gap', async () => {
       const gap = computeGap(claimedSkills)
       await updateJob(job.id, { matchScore: gap.coveragePercent })
-      if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
       setGapReport(gap)
       setPanelOpen('gap', true)
     })
@@ -212,46 +206,18 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
         claimedSkills: nextClaimed,
         matchScore: gap.coveragePercent,
       })
-      if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to save claimed skill'))
     }
   }
 
-  const runTailor = () =>
-    run('tailor', async () => {
-      if (skillsLocked && tailoredCv) return
-      if (!masterCv.contact.name.trim() && !masterCv.summary.trim()) {
-        throw new Error('Fill in your Master CV first')
-      }
-      const jobForAi: JobApplication = { ...job, claimedSkills }
-      const result = await tailorMasterCv(jobForAi, masterCv, profile)
-      const locked = lockSkillGroupsToMaster(masterCv.skills, result.skills)
-      const next: MasterCv = {
-        ...masterCv,
-        headline: result.headline || masterCv.headline,
-        summary: result.summary || masterCv.summary,
-        skills: mergeClaimedSkillsIntoGroups(locked, claimedSkills),
-        experience: result.experience?.length ? result.experience : masterCv.experience,
-        projects: result.projects?.length ? result.projects : masterCv.projects,
-        education: masterCv.education,
-        certifications: masterCv.certifications ?? [],
-        updatedAt: new Date().toISOString(),
-      }
-      const gap = computeGap(claimedSkills)
-      const letter = (result.coverLetter || '').trim()
-      if (!letter) {
-        throw new Error('Tailor did not return a cover letter — try Re-run.')
-      }
-      setLiteDraft(Boolean(result.tailorModel?.includes('flash-lite')))
-      setTailoredCv(next)
-      setGapReport(gap)
-      setCoverLetter(letter)
-      setPanelOpen('tailor', true)
-      setPanelOpen('cover', true)
-      await updateJob(job.id, { matchScore: gap.coveragePercent })
-      await persist(next, letter, gap)
-    })
+  const runTailor = () => {
+    if (skillsLocked) return
+    setError(null)
+    setPanelOpen('tailor', true)
+    setPanelOpen('cover', true)
+    return start(job.id)
+  }
 
   /** Fresh check on open, so an older saved report cannot hide languages or role requirements. */
   const onGapClick = () => {
@@ -466,12 +432,11 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
           {error}
         </p>
       )}
-      {liteDraft && !error && (
-        <p className="text-sm text-[#8a6230]">
-          Draft written with the lighter model because the main models were busy. Tailor again in a
-          minute for a stronger version.
-        </p>
-      )}
+      {task?.phase === 'failed' && <div role="alert" className="space-y-2 text-sm text-red-700">
+        <p>{task.error}</p>
+        {!skillsLocked && <button type="button" className={quietBtn} onClick={() => void (task.output ? retrySave(job.id) : runTailor())}>{task.output ? 'Retry save' : 'Retry tailoring'}</button>}
+      </div>}
+      {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border border-brand-line bg-white px-4 py-3 text-sm font-medium text-brand-ink shadow-sm sm:bottom-6">Cover letter copied</div>}
 
       {showGap && hasGapContent(gapReport) && (
         <div className={nested}>
@@ -693,7 +658,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
                 <button
                   type="button"
                   className={quietBtn}
-                  onClick={() => navigator.clipboard.writeText(coverLetter)}
+                  onClick={() => void copyLetter()}
                 >
                   Copy
                 </button>

@@ -5,8 +5,10 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from 'react'
+import { mergeTailoredDocument } from '../lib/documentPersistence'
 import { rowToTailoredDocument, tailoredDocumentToRow } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { TailoredDocument } from '../types/cv'
@@ -18,7 +20,7 @@ interface TailoredDocsContextValue {
   docs: TailoredDocument[]
   loading: boolean
   getForJob: (jobId: string) => TailoredDocument | undefined
-  saveDoc: (doc: TailoredDocument) => Promise<void>
+  saveDoc: (doc: TailoredDocument, validate?: () => boolean) => Promise<void>
 }
 
 const TailoredDocsContext = createContext<TailoredDocsContextValue | null>(null)
@@ -38,64 +40,83 @@ function writeLocal(docs: TailoredDocument[]) {
 
 export function TailoredDocsProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
+  const userId = user?.id
   const [docs, setDocs] = useState<TailoredDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const isCloudSync = isCloudEnabled && Boolean(user)
+  const docsRef = useRef(docs)
+  docsRef.current = docs
+  const owner = isCloudEnabled ? userId ?? 'signed-out' : 'local'
+  const loadedOwner = useRef(owner)
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const saves = useRef<Promise<unknown>>(Promise.resolve())
+  const isCloudSync = isCloudEnabled && Boolean(userId)
 
   const load = useCallback(async () => {
+    const account = owner
+    loadedOwner.current = account
     setLoading(true)
+    setDocs([])
+    docsRef.current = []
     try {
-      if (!isCloudSync || !supabase || !user) {
+      if (!isCloudSync || !supabase || !userId) {
         setDocs(readLocal())
         return
       }
       const { data, error } = await supabase
         .from('tailored_documents')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('updated_at', { ascending: false })
       if (error) throw error
-      setDocs((data ?? []).map(rowToTailoredDocument))
+      if (ownerRef.current === account) { docsRef.current = (data ?? []).map(rowToTailoredDocument); setDocs(docsRef.current) }
     } catch (err) {
       console.error('Failed to load tailored docs:', err)
-      setDocs(readLocal())
+      if (ownerRef.current === account) setDocs(isCloudSync ? [] : readLocal())
     } finally {
-      setLoading(false)
+      if (ownerRef.current === account) setLoading(false)
     }
-  }, [isCloudSync, user])
+  }, [isCloudSync, userId, owner])
 
   useEffect(() => {
     load()
   }, [load])
 
   const saveDoc = useCallback(
-    async (doc: TailoredDocument) => {
-      const nextDoc = { ...doc, updatedAt: new Date().toISOString() }
-      const without = docs.filter((d) => d.jobApplicationId !== nextDoc.jobApplicationId)
-      const next = [nextDoc, ...without]
-
-      if (isCloudSync && supabase && user) {
-        const row = tailoredDocumentToRow(nextDoc, user.id)
-        const { error } = await supabase.from('tailored_documents').upsert(row, {
-          onConflict: 'user_id,job_application_id',
-        })
-        if (error) throw error
-      } else {
-        writeLocal(next)
-      }
-      setDocs(next)
+    (doc: TailoredDocument, validate: () => boolean = () => true) => {
+      const account = owner
+      const operation = saves.current.catch(() => {}).then(async () => {
+        const check = () => {
+          if (ownerRef.current !== account || account === 'signed-out') throw new Error('Account changed')
+          if (!validate()) throw new Error('This job or its CV changed. Restart tailoring.')
+        }
+        check()
+        const nextDoc = { ...doc, updatedAt: new Date().toISOString() }
+        if (isCloudSync && supabase && userId) {
+          const { error } = await supabase.from('tailored_documents').upsert(tailoredDocumentToRow(nextDoc, userId), { onConflict: 'user_id,job_application_id' })
+          if (error) throw error
+        }
+        check()
+        const next = mergeTailoredDocument(docsRef.current, nextDoc)
+        if (!isCloudSync) writeLocal(next)
+        docsRef.current = next
+        setDocs(next)
+      })
+      saves.current = operation
+      return operation
     },
-    [docs, isCloudSync, user]
+    [isCloudSync, userId, owner]
   )
 
+  const accountDocs = useMemo(() => loadedOwner.current === owner ? docs : [], [docs, owner])
   const getForJob = useCallback(
-    (jobId: string) => docs.find((d) => d.jobApplicationId === jobId),
-    [docs]
+    (jobId: string) => accountDocs.find((d) => d.jobApplicationId === jobId),
+    [accountDocs]
   )
 
   const value = useMemo(
-    () => ({ docs, loading, getForJob, saveDoc }),
-    [docs, loading, getForJob, saveDoc]
+    () => ({ docs: accountDocs, loading, getForJob, saveDoc }),
+    [accountDocs, loading, getForJob, saveDoc]
   )
 
   return <TailoredDocsContext.Provider value={value}>{children}</TailoredDocsContext.Provider>

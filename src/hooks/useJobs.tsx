@@ -1,3 +1,4 @@
+import { changedJobColumns } from '../lib/documentPersistence'
 import { CV_LIBRARY_EVENT, recoverCvTransaction } from '../lib/cvLibrary'
 import {
   createContext,
@@ -6,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from 'react'
 import { resolveAppliedDate } from '../lib/appliedDate'
@@ -28,7 +30,7 @@ interface JobsContextValue {
   trashedJobs: JobApplication[]
   loading: boolean
   addJob: (job: JobApplication) => Promise<void>
-  updateJob: (id: string, updates: Partial<JobApplication>) => Promise<void>
+  updateJob: (id: string, updates: Partial<JobApplication>, validate?: () => boolean) => Promise<void>
   /** Soft-delete → Trash (recoverable). */
   deleteJob: (id: string) => Promise<void>
   restoreJob: (id: string) => Promise<void>
@@ -39,6 +41,7 @@ interface JobsContextValue {
   moveJob: (id: string, status: JobStatus) => Promise<void>
   getJob: (id: string) => JobApplication | undefined
   isCloudSync: boolean
+  withJobLock: (id: string, validate: () => boolean, operation: () => Promise<void>) => Promise<void>
 }
 
 const JobsContext = createContext<JobsContextValue | null>(null)
@@ -100,14 +103,24 @@ function writeLocalJobs(jobs: JobApplication[]) {
 
 export function JobsProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
+  const userId = user?.id
   const [jobs, setJobs] = useState<JobApplication[]>([])
   const [loading, setLoading] = useState(true)
-  const isCloudSync = isCloudEnabled && Boolean(user)
+  const jobsRef = useRef(jobs)
+  jobsRef.current = jobs
+  const owner = isCloudEnabled ? userId ?? 'signed-out' : 'local'
+  const loadedOwner = useRef(owner)
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const updatesQueue = useRef<Promise<unknown>>(Promise.resolve())
+  const isCloudSync = isCloudEnabled && Boolean(userId)
 
   const loadJobs = useCallback(async () => {
+    const account = owner
+    if (loadedOwner.current !== account) { jobsRef.current = []; setJobs([]); loadedOwner.current = account }
     setLoading(true)
     try {
-      if (!isCloudSync || !supabase || !user) {
+      if (!isCloudSync || !supabase || !userId) {
         setJobs(readLocalJobs())
         return
       }
@@ -115,48 +128,49 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('job_applications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('updated_at', { ascending: false })
 
       if (error) throw error
 
+      if (ownerRef.current !== account) return
       let cloudJobs = (data ?? []).map(rowToJob)
 
       const localJobs = readLocalJobs()
-      const alreadyMigrated = localStorage.getItem(MIGRATED_KEY) === user.id
+      const alreadyMigrated = localStorage.getItem(MIGRATED_KEY) === userId
 
       if (!alreadyMigrated && localJobs.length > 0) {
-        const rows = localJobs.map((job) => jobToRow(job, user.id))
+        const rows = localJobs.map((job) => jobToRow(job, userId))
         const { error: insertError } = await supabase.from('job_applications').upsert(rows)
         if (!insertError) {
-          localStorage.setItem(MIGRATED_KEY, user.id)
+          localStorage.setItem(MIGRATED_KEY, userId)
           cloudJobs = [...localJobs, ...cloudJobs.filter((j) => !localJobs.some((l) => l.id === j.id))]
         }
       }
 
       const normalized = cloudJobs.map(normalizeJob)
       // Persist applied-date repairs (UTC evening skew → wrong calendar day)
-      if (supabase && user) {
+      if (supabase && userId) {
         const repairs = normalized.filter((job, i) => {
           const raw = cloudJobs[i]
           return raw && job.appliedDate !== (raw.appliedDate ?? '')
         })
         if (repairs.length > 0) {
           const rows = repairs.map((job) => ({
-            ...jobToRow(job, user.id),
+            ...jobToRow(job, userId),
             updated_at: new Date().toISOString(),
           }))
           void supabase.from('job_applications').upsert(rows)
         }
       }
-      setJobs(normalized)
+      if (ownerRef.current === account) { jobsRef.current = normalized; setJobs(normalized) }
     } catch (err) {
       console.error('Failed to load jobs:', err)
-      setJobs(readLocalJobs())
+      if (ownerRef.current === account) setJobs(isCloudSync ? [] : readLocalJobs())
     } finally {
-      setLoading(false)
+      if (ownerRef.current === account) setLoading(false)
     }
-  }, [isCloudSync, user])
+  }, [isCloudSync, userId, owner])
 
   useEffect(() => {
     void loadJobs()
@@ -173,8 +187,8 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   const addJob = useCallback(
     async (job: JobApplication) => {
       const normalized = normalizeJob({ ...job, deletedAt: null })
-      if (isCloudSync && supabase && user) {
-        const row = { ...jobToRow(normalized, user.id), updated_at: new Date().toISOString() }
+      if (isCloudSync && supabase && userId) {
+        const row = { ...jobToRow(normalized, userId), updated_at: new Date().toISOString() }
         const { error } = await supabase.from('job_applications').insert(row)
         if (error) throw error
         setJobs((prev) => [normalized, ...prev])
@@ -182,29 +196,51 @@ export function JobsProvider({ children }: { children: ReactNode }) {
         persistLocal([normalized, ...jobs])
       }
     },
-    [isCloudSync, user, jobs, persistLocal]
+    [isCloudSync, userId, jobs, persistLocal]
   )
 
   const updateJob = useCallback(
-    async (id: string, updates: Partial<JobApplication>) => {
-      const updatedAt = new Date().toISOString()
-      const nextJobs = jobs.map((job) =>
-        job.id === id ? normalizeJob({ ...job, ...updates, updatedAt }) : job
-      )
-      const updated = nextJobs.find((j) => j.id === id)
-      if (!updated) return
-
-      if (isCloudSync && supabase && user) {
-        const row = { ...jobToRow(updated, user.id), updated_at: updatedAt }
-        const { error } = await supabase.from('job_applications').upsert(row)
-        if (error) throw error
-      } else {
-        writeLocalJobs(nextJobs)
-      }
-      setJobs(nextJobs)
+    (id: string, updates: Partial<JobApplication>, validate: () => boolean = () => true) => {
+      const account = owner
+      const operation = updatesQueue.current.catch(() => {}).then(async () => {
+        if (ownerRef.current !== account) throw new Error('Account changed')
+        if (!validate()) throw new Error('This job or its CV changed. Restart tailoring.')
+        const current = jobsRef.current.find((job) => job.id === id)
+        if (!current) throw new Error('Application no longer exists')
+        const updatedAt = new Date().toISOString()
+        const updated = normalizeJob({ ...current, ...updates, updatedAt })
+        if (isCloudSync && supabase && userId) {
+          // Patch changed columns only: a score update must never upsert an old full job.
+          const before = jobToRow(current, userId)
+          const after = jobToRow(updated, userId)
+          const patch = changedJobColumns(before, after)
+          const { error } = await supabase.from('job_applications').update({ ...patch, updated_at: updatedAt }).eq('id', id).eq('user_id', userId)
+          if (error) throw error
+        }
+        if (ownerRef.current !== account) throw new Error('Account changed')
+        const next = jobsRef.current.map((job) => job.id === id ? normalizeJob({ ...job, ...updates, updatedAt }) : job)
+        if (!isCloudSync) writeLocalJobs(next)
+        jobsRef.current = next
+        setJobs(next)
+      })
+      updatesQueue.current = operation
+      return operation
     },
-    [isCloudSync, user, jobs]
+    [isCloudSync, userId, owner]
   )
+
+  // Keep a dispatched document save ordered before a subsequent status/input edit.
+  const withJobLock = useCallback((id: string, validate: () => boolean, operation: () => Promise<void>) => {
+    const account = owner
+    const pending = updatesQueue.current.catch(() => {}).then(async () => {
+      if (ownerRef.current !== account || !jobsRef.current.some(job => job.id === id) || !validate()) {
+        throw new Error('This job or its CV changed. Restart tailoring.')
+      }
+      await operation()
+    })
+    updatesQueue.current = pending
+    return pending
+  }, [owner])
 
   const deleteJob = useCallback(
     async (id: string) => {
@@ -269,19 +305,21 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     [jobs, updateJob]
   )
 
-  const getJob = useCallback((id: string) => jobs.find((job) => job.id === id), [jobs])
+  const accountJobs = useMemo(() => loadedOwner.current === owner ? jobs : [], [jobs, owner])
+  const getJob = useCallback((id: string) => accountJobs.find((job) => job.id === id), [accountJobs])
 
-  const activeJobs = useMemo(() => jobs.filter((j) => !j.deletedAt), [jobs])
-  const trashedJobs = useMemo(() => jobs.filter((j) => Boolean(j.deletedAt)), [jobs])
+  const activeJobs = useMemo(() => accountJobs.filter((j) => !j.deletedAt), [accountJobs])
+  const trashedJobs = useMemo(() => accountJobs.filter((j) => Boolean(j.deletedAt)), [accountJobs])
 
   const value = useMemo(
     () => ({
-      jobs,
+      jobs: accountJobs,
       activeJobs,
       trashedJobs,
       loading,
       addJob,
       updateJob,
+      withJobLock,
       deleteJob,
       restoreJob,
       purgeJob,
@@ -291,12 +329,13 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       isCloudSync,
     }),
     [
-      jobs,
+      accountJobs,
       activeJobs,
       trashedJobs,
       loading,
       addJob,
       updateJob,
+      withJobLock,
       deleteJob,
       restoreJob,
       purgeJob,
