@@ -72,7 +72,7 @@ function useTailoringState() {
     if (!task) return
     await manager.retry(id, () => validate(id, task.fingerprint), (doc, valid) => save(doc, task.fingerprint, valid))
   }
-  return { tasks: account === 'signed-out' ? {} : manager.tasks, start, retrySave, canStart: (id: string) => Boolean(snapshot(id)), dismiss: (id: string) => manager.dismiss(id) }
+  return { tasks: account === 'signed-out' ? {} : manager.tasks, start, retrySave, canStart: (id: string) => Boolean(snapshot(id)), hideNotification: (id: string) => manager.hideNotification(id), dismiss: (id: string) => manager.dismiss(id) }
 }
 
 const Context = createContext<ReturnType<typeof useTailoringState> | null>(null)

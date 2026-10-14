@@ -6,6 +6,7 @@ export interface BackgroundTask<T> {
   error?: string
   output?: T
   fingerprint: string
+  notificationHidden?: boolean
 }
 
 /** In-memory work only. Each run belongs to one account epoch and one input snapshot. */
@@ -13,8 +14,15 @@ export class BackgroundTasks<T> {
   tasks: Record<string, BackgroundTask<T>> = {}
   private epoch = 0
   private versions = new Map<string, number>()
+  private hiddenNotifications = new Set<string>()
   constructor(private notify: () => void) {}
-  reset() { this.epoch++; this.tasks = {}; this.notify() }
+  reset() { this.epoch++; this.tasks = {}; this.hiddenNotifications.clear(); this.notify() }
+  hideNotification(id: string) {
+    const task = this.tasks[id]
+    if (!task) return
+    this.hiddenNotifications.add(id)
+    this.publish(task)
+  }
   dismiss(id: string) {
     if (this.tasks[id]?.phase === 'running' || this.tasks[id]?.phase === 'saving') return
     delete this.tasks[id]; this.notify()
@@ -25,10 +33,11 @@ export class BackgroundTasks<T> {
     this.versions.set(id, (this.versions.get(id) ?? 0) + 1)
     this.publish({ ...task, output: undefined, phase: 'failed', error: 'This job or its CV changed. Restart tailoring to use the latest information.' })
   }
-  private publish(task: BackgroundTask<T>) { this.tasks = { ...this.tasks, [task.jobId]: task }; this.notify() }
+  private publish(task: BackgroundTask<T>) { this.tasks = { ...this.tasks, [task.jobId]: { ...task, notificationHidden: this.hiddenNotifications.has(task.jobId) } }; this.notify() }
   async start(jobId: string, label: string, fingerprint: string, generate: () => Promise<T>, validate: () => boolean, save: (output: T, valid: () => boolean) => Promise<void>) {
     const previous = this.tasks[jobId]
     if (previous?.phase === 'running' || previous?.phase === 'saving') return
+    this.hiddenNotifications.delete(jobId)
     const epoch = this.epoch
     const version = (this.versions.get(jobId) ?? 0) + 1
     this.versions.set(jobId, version)

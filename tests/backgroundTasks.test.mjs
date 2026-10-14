@@ -121,3 +121,22 @@ test('captured inputs are immutable, allow unrelated edits, and reject deleted/s
   job.claimedSkills.push('New'); library.cvs.cv.summary = 'Edited'
   assert.deepEqual(captured.job.claimedSkills, ['SQL']); assert.equal(captured.cv.summary, 'Original')
 })
+
+test('viewing an application hides its notification without losing work or save retry', async () => {
+  const manager = new BackgroundTasks(() => {})
+  const ai = deferred()
+  const work = manager.start('a', 'A', 'v1', () => ai.promise, () => true, async () => { throw new Error('Offline') })
+  manager.hideNotification('a')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  assert.equal(manager.tasks.a.phase, 'running')
+  ai.resolve('generated files'); await work
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  assert.equal(manager.tasks.a.output, 'generated files')
+  await manager.retry('a', () => true, async () => {})
+  assert.equal(manager.tasks.a.phase, 'completed')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  const next = deferred()
+  const rerun = manager.start('a', 'A', 'v1', () => next.promise, () => true, async () => {})
+  assert.equal(manager.tasks.a.notificationHidden, false)
+  next.resolve('new files'); await rerun
+})
