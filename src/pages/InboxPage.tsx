@@ -1,3 +1,4 @@
+import { InboxRefreshSummary } from '../components/InboxRefreshSummary'
 import { TrashIcon } from '../components/TrashIcon'
 import { useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -47,6 +48,9 @@ export function InboxPage() {
     loading,
     refreshing,
     refreshError,
+    refreshReport,
+    retryFailedSearches,
+    retryInboxSave,
     newCount,
     refreshInbox,
     clearReviewList,
@@ -155,7 +159,7 @@ export function InboxPage() {
     }
   }
 
-  /** Pause other searches, clear the review list, refresh only this query. */
+  /** Pause other searches; replace review rows only after this query succeeds. */
   const handleRunAlone = async (searchId: string) => {
     setError(null)
     setRunningAloneId(searchId)
@@ -301,6 +305,8 @@ export function InboxPage() {
           {error || refreshError}
         </p>
       )}
+
+      {refreshReport && <InboxRefreshSummary report={refreshReport} busy={refreshing} retryFailed={retryFailedSearches} retrySave={retryInboxSave} />}
 
       {showSearches && (
         <section className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>

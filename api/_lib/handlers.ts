@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { AdzunaError } from '../../shared/adzunaErrors.js'
 import { searchAdzuna } from './adzuna.js'
 import type { ServerEnv } from './env.js'
 import {
@@ -22,6 +24,7 @@ function fail(status: number, message: string): ApiResult {
 }
 
 export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise<ApiResult> {
+  const requestId = randomUUID()
   try {
     const input = (body ?? {}) as {
       query?: string
@@ -34,8 +37,7 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
       page?: number
       resultsPerPage?: number
     }
-    const query = (input.query ?? input.what ?? '').trim()
-    if (!query) return fail(400, 'query is required')
+    const query = input.query ?? input.what ?? ''
 
     const results = await searchAdzuna(
       {
@@ -44,15 +46,16 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
         country: input.country,
         maxDaysOld: input.maxDaysOld,
         excludeTerms: input.excludeTerms,
-        requireRemote: Boolean(input.requireRemote),
+        requireRemote: input.requireRemote,
         page: input.page,
         resultsPerPage: input.resultsPerPage,
       },
-      env
+      env, requestId
     )
-    return ok({ results })
+    return ok({ results, requestId })
   } catch (err) {
-    return fail(500, err instanceof Error ? err.message : 'Adzuna search failed')
+    const failure = err instanceof AdzunaError ? err : new AdzunaError('upstream', 502, requestId)
+    return { status: failure.status, body: failure.envelope() }
   }
 }
 

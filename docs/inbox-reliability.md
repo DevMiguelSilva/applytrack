@@ -1,0 +1,34 @@
+# Inbox search reliability
+
+## Findings (October 15, 2026)
+
+Confirmed in the previous implementation: Adzuna error bodies were interpolated into user-visible errors; requests were unbounded; all upstream errors became HTTP 500; a single failed location discarded prior successes; pruning and persistence used refresh-start Inbox arrays.
+
+The iPhone-specific cause is unproven. The authenticated Vercel dashboard showed no runtime entries in the available last-hour window. Longer windows require an upgrade. Adzuna's usage dashboard was signed out. No evidence established a particular provider status, exhausted quota window, or Wi-Fi/cellular issue. No real Adzuna refreshes were made during this verification.
+
+Adzuna's [published default limits](https://developer.adzuna.com/docs/terms_of_service) currently include 25 hits/minute, 250/day, 1,000/week and 2,500/month. Actual account limits and usage were not inspected. The app must not promise a one-minute reset.
+
+## Request behavior
+
+- Errors use fixed safe messages and codes, request IDs, retryability and an optional provider retry delay. Validation, configuration/auth, quota, network, upstream, timeout and malformed responses are distinct. Raw provider messages, HTML, stack traces and credential setup instructions are never returned by the Adzuna handler.
+- Requests explicitly accept JSON and validate response structure. Missing optional listing values remain valid; an empty results array means no matches.
+- Each upstream attempt is bounded at eight seconds including response reading. There is at most one retry for network/timeout/502/503/504, with short jitter or valid Retry-After and a twenty-second total server budget. Quota/auth/validation/malformed responses have no automatic retry. Long Retry-After delays are returned instead of waiting beyond the budget.
+- Only the Adzuna function receives a thirty-second Vercel max duration. Its browser path has a twenty-five-second timeout and safely handles intermediary non-JSON failures and unexpected success formats. Gemini's existing request policy remains unchanged.
+- Structured server logs record request ID, attempt count, duration, upstream status, normalized content type and failure category. Failed attempts and the final outcome are logged, without raw URLs, credentials, search filters or response bodies.
+
+## Refresh and persistence
+
+Requests run sequentially, with identical filters deduplicated within a refresh and overlapping starts blocked. Outcomes are tracked by saved search and location. Successful partial results merge without pruning prior review jobs or touching approval/dismissal history. A complete nonempty refresh may remove absent review jobs; Run alone only replaces the prior review set after full success. Empty or all-failed refreshes preserve the Inbox.
+
+Failed-only retry retains prior successful outcomes and requests only failed/not-run combinations with unchanged filters and selected tracks. Quota/auth/configuration failure stops remaining requests, explaining which locations were not run. A valid quota retry delay also blocks further calls during that in-session cooldown; no unknown reset time is invented.
+
+Inbox writes are serialized and merged against current state, preserving approvals/dismissals made during requests. Cloud writes upsert changed rows before pruning and only delete review rows. A persistence failure retains fetched rows for save-only retry in memory; leaving the mounted app or refreshing the browser loses unsaved batches. Account changes and edited/deleted search filters invalidate work and retries. These safeguards coordinate this app session, not other devices, and cannot recall an already-dispatched database request.
+
+## Verification
+
+- All 27 Node tests passed, including eight new request/refresh tests for HTML/malformed JSON/empty data, optional null values, retry bounds, timeouts, safe logs, quota cooldowns, proxy headers, partial locations, deduplication, overlapping starts, invalidation and current-state merging.
+- Production build passed. Full lint retains the same five existing errors and twelve existing warnings; no new lint findings in this change.
+- Isolated local browser checks used synthetic records and mocked API responses: duplicate filters, partial results, failed-only retry, simulated storage failure and save-only retry, empty responses, intermediary HTML errors, slow refresh, concurrent dismissal and approval, and a 390px mobile layout without horizontal overflow. The fixture server was separate from existing app origins and no production records were changed.
+- Real iPhone Safari, work Wi-Fi versus cellular, actual offline mode, historical provider failures, real quota/auth failures and cloud persistence failure recovery remain unverified end to end. Network/timeout/provider failure behavior was covered with controlled mocks. Supabase persistence ordering was inspected, with local storage failure exercised in the browser.
+
+No database migration, worker or new server endpoint was added. Not pushed, merged or deployed as part of this task.

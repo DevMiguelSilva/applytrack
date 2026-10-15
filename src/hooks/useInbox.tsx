@@ -9,7 +9,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { fetchAdzunaJobs } from '../api/client'
+import { InboxRefresh, RefreshInvalidated, searchFingerprint, searchRequests, mergeInboxResults, type RefreshReport, type SearchOutcome } from '../lib/inboxRefresh'
+import { fetchAdzunaSearch } from '../api/client'
 import { parseJobPosting } from '../api/gemini'
 import { inboxJobToRow, rowToInboxJob } from '../lib/database'
 import {
@@ -21,7 +22,6 @@ import {
   type MatchResult,
   type DualTrackMatch,
 } from '../lib/matchScore'
-import { expandSearchLocations } from '../lib/searchLocations'
 import { supabase } from '../lib/supabase'
 import { type CvTrack, type MasterCv } from '../types/cv'
 import type { InboxJob, SavedSearch, SearchTrack } from '../types/job'
@@ -36,7 +36,7 @@ const LOCAL_KEY = 'applytrack-inbox'
 export interface RefreshInboxOptions {
   /** Run only this saved search (ignores other active flags for this refresh). */
   onlySearchId?: string
-  /** Park current "new" rows before fetching so results are only from this run. */
+  /** Replace old review rows only after this search completes successfully with matches. */
   clearReviewFirst?: boolean
   /**
    * Use this list instead of context searches (avoids stale state right after
@@ -50,6 +50,9 @@ interface InboxContextValue {
   loading: boolean
   refreshing: boolean
   refreshError: string | null
+  refreshReport: RefreshReport | null
+  retryFailedSearches: () => Promise<void>
+  retryInboxSave: () => Promise<void>
   newCount: number
   refreshInbox: (options?: RefreshInboxOptions) => Promise<void>
   /** Remove current review cards so the next refresh can show them as new again. */
@@ -104,6 +107,8 @@ function pickMatch(
 
 export function InboxProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
+  const userId = user?.id
+  const account = isCloudEnabled ? userId ?? 'signed-out' : 'local'
   const { searches } = useSavedSearches()
   const { library } = useMasterCv()
   const live = useRef({ library, searches })
@@ -113,7 +118,36 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
-  const isCloudSync = isCloudEnabled && Boolean(user)
+  const isCloudSync = isCloudEnabled && Boolean(userId)
+  const inboxRef = useRef(inbox)
+  inboxRef.current = inbox
+  const current = useRef({ account, searches, jobs })
+  current.current = { account, searches, jobs }
+  const mutations = useRef<Promise<unknown>>(Promise.resolve())
+  const loadedOwner = useRef(account)
+  const manager = useMemo(() => { void account; return new InboxRefresh() }, [account])
+  const [refreshReport, setRefreshReport] = useState<RefreshReport | null>(null)
+  type PendingRefresh = { account: string; outcomes: SearchOutcome[]; rows: InboxJob[]; started: number; runAlone: boolean; valid: () => boolean }
+  const pending = useRef<PendingRefresh | null>(null)
+  const session = useRef<{ account: string; requests: SearchOutcome[]; started: number; runAlone: boolean; baseline: Map<string, InboxJob> } | null>(null)
+  const refreshBusy = useRef(false)
+  const validRequests = useCallback((requests: SearchOutcome[], owner: string) => current.current.account === owner && requests.every(request => {
+    const search = current.current.searches.find(entry => entry.id === request.search.id)
+    return search && searchFingerprint(search) === searchFingerprint(request.search)
+  }), [])
+  useEffect(() => {
+    manager.invalidate()
+    pending.current = null; session.current = null; refreshBusy.current = false
+    setRefreshing(false); setRefreshReport(null); setRefreshError(null)
+    return () => manager.invalidate()
+  }, [manager])
+  useEffect(() => {
+    if (session.current && !validRequests(session.current.requests, session.current.account)) {
+      manager.invalidate(); pending.current = null; session.current = null
+      setRefreshReport(null)
+      setRefreshError('A saved search changed or was deleted. Refresh again to use the latest filters.')
+    }
+  }, [searches, account, manager, validRequests])
 
   const cvsByTrack = library.cvs
   const matchJob = useMemo(() => {
@@ -130,26 +164,29 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   }, [cvsByTrack])
 
   const load = useCallback(async () => {
+    const owner = account
+    loadedOwner.current = account
     setLoading(true)
+    setInbox([]); inboxRef.current = []
     try {
-      if (!isCloudSync || !supabase || !user) {
+      if (!isCloudSync || !supabase || !userId) {
         setInbox(readLocal())
         return
       }
       const { data, error } = await supabase
         .from('job_inbox')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('match_score', { ascending: false })
       if (error) throw error
-      setInbox((data ?? []).map(rowToInboxJob))
+      if (current.current.account === owner) { inboxRef.current = (data ?? []).map(rowToInboxJob); setInbox(inboxRef.current) }
     } catch (err) {
       console.error('Failed to load inbox:', err)
-      setInbox(readLocal())
+      if (current.current.account === owner) setInbox(isCloudSync ? [] : readLocal())
     } finally {
-      setLoading(false)
+      if (current.current.account === owner) setLoading(false)
     }
-  }, [isCloudSync, user])
+  }, [isCloudSync, userId, account])
 
   useEffect(() => {
     void load()
@@ -158,268 +195,116 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
   }, [load])
 
-  const persistAll = useCallback(
-    async (next: InboxJob[]) => {
-      if (!isCloudSync || !supabase || !user) {
-        writeLocal(next)
-        setInbox(next)
-        return
-      }
-
-      // Drop rows removed from memory (auto-park / clear-review-first), keep dismiss/approve history.
-      const nextIds = new Set(next.map((item) => item.id))
-      const removedIds = inbox.filter((item) => !nextIds.has(item.id)).map((item) => item.id)
-      if (removedIds.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('job_inbox')
-          .delete()
-          .eq('user_id', user.id)
-          .in('id', removedIds)
-        if (deleteError) throw deleteError
-      }
-
-      if (next.length > 0) {
-        const rows = next.map((item) => inboxJobToRow(item, user.id))
-        const { error } = await supabase.from('job_inbox').upsert(rows)
-        if (error) throw error
-      }
-      setInbox(next)
-    },
-    [isCloudSync, user, inbox]
-  )
+  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true) => {
+    const owner = account
+    const operation = mutations.current.catch(() => {}).then(async () => {
+      const check = () => { if (current.current.account !== owner || owner === 'signed-out' || !valid()) throw new RefreshInvalidated('Searches or account changed. Refresh again.') }
+      check()
+      const before = inboxRef.current
+      const next = transform(before)
+      if (isCloudSync && supabase && userId) {
+        const oldById = new Map(before.map(item => [item.id, item]))
+        const changed = next.filter(item => JSON.stringify(item) !== JSON.stringify(oldById.get(item.id)))
+        // Save new results before pruning. A failed upsert must not erase review jobs.
+        if (changed.length) {
+          const { error } = await supabase.from('job_inbox').upsert(changed.map(item => inboxJobToRow(item, userId)))
+          if (error) throw error
+        }
+        check()
+        const nextIds = new Set(next.map(item => item.id))
+        const removed = before.filter(item => item.status === 'new' && !nextIds.has(item.id)).map(item => item.id)
+        if (removed.length) {
+          const { error } = await supabase.from('job_inbox').delete().eq('user_id', userId).eq('status', 'new').in('id', removed)
+          if (error) throw error
+        }
+      } else writeLocal(next)
+      check()
+      inboxRef.current = next; setInbox(next)
+    })
+    mutations.current = operation
+    return operation
+  }, [isCloudSync, userId, account])
 
   const clearReviewList = useCallback(async () => {
-    // Drop "new" rows only — do not mark dismissed (that would block Run alone / Refresh).
-    const next = inbox.filter((item) => item.status !== 'new')
-    await persistAll(next)
-  }, [inbox, persistAll])
+    await persistAll(items => items.filter(item => item.status !== 'new'))
+  }, [persistAll])
 
-  const refreshInbox = useCallback(async (options?: RefreshInboxOptions) => {
-    setRefreshing(true)
-    setRefreshError(null)
-    try {
-      const list = options?.searchesOverride ?? searches
-      const active = options?.onlySearchId
-        ? list
-            .filter((s) => s.id === options.onlySearchId && s.query.trim())
-            .map((s) => ({ ...s, active: true }))
-        : list.filter((s) => s.active && s.query.trim())
-
-      if (active.length === 0) {
-        throw new Error(
-          options?.onlySearchId
-            ? 'That saved search was not found or has an empty query.'
-            : 'Add at least one active saved search before refreshing.'
-        )
-      }
-
-      const approvedExternal = new Set(
-        jobs.filter((j) => j.externalId && !j.deletedAt).map((j) => j.externalId)
-      )
-
-      // Run alone: drop current "new" rows from this refresh's working set (not permanent dismiss).
-      const startingInbox = options?.clearReviewFirst
-        ? inbox.filter((item) => item.status !== 'new')
-        : inbox
-
-      const existingByExternal = new Map(startingInbox.map((item) => [item.externalId, item]))
-
-      const merged = new Map<string, InboxJob>()
-      // Keep approved/dismissed history; "new" rows may be dropped below if Adzuna no longer returns them.
-      for (const item of startingInbox) {
-        merged.set(item.externalId, item)
-      }
-      const refreshStartedMs = Date.now()
-
-      /** seenCount increments once per refresh per listing (not once per matching search). */
-      const seenCountForRefresh = new Map<string, number>()
-      const nextSeenCount = (externalId: string, existing?: InboxJob) => {
-        const cached = seenCountForRefresh.get(externalId)
-        if (cached != null) return cached
-        const count = existing ? (existing.seenCount > 0 ? existing.seenCount : 1) + 1 : 1
-        seenCountForRefresh.set(externalId, count)
-        return count
-      }
-
-      /** Every Adzuna hit this refresh (including already-approved), for empty/park guards. */
-      const apiReturnedIds = new Set<string>()
-      const skippedApprovedIds = new Set<string>()
-      const skippedDismissedIds = new Set<string>()
-
-      for (const search of active) {
-        const legs = expandSearchLocations(search.location)
-        const resultsById = new Map<
-          string,
-          Awaited<ReturnType<typeof fetchAdzunaJobs>>[number]
-        >()
-
-        for (const leg of legs) {
-          const results = await fetchAdzunaJobs({
-            query: search.query,
-            location: leg.location || undefined,
-            country: search.country,
-            maxDaysOld: search.maxDaysOld,
-            excludeTerms: search.excludeTerms,
-            // Keep "remote" out of what_phrase so "Power Apps" stays an exact phrase.
-            requireRemote:
-              leg.isRemote && !/\bremote\b/i.test(search.query),
-          })
-
-          for (const result of results) {
-            const prev = resultsById.get(result.externalId)
-            if (!prev) {
-              resultsById.set(result.externalId, result)
-              continue
-            }
-            if (!prev.location && result.location) {
-              resultsById.set(result.externalId, result)
-            }
-          }
-        }
-
-        for (const result of resultsById.values()) {
-          apiReturnedIds.add(result.externalId)
-          const existing = existingByExternal.get(result.externalId)
-          const now = new Date().toISOString()
-
-          // Already on the board (or approved in inbox) — keep history, don't resurface as new
-          if (existing?.status === 'approved' || approvedExternal.has(result.externalId)) {
-            skippedApprovedIds.add(result.externalId)
-            if (existing?.status === 'approved') {
-              merged.set(result.externalId, {
-                ...existing,
-                description: result.description || existing.description,
-                fetchedAt: now,
-              })
-            }
-            continue
-          }
-
-          // Explicit dismiss (or parked from clear review) — never show again
-          if (existing?.status === 'dismissed') {
-            skippedDismissedIds.add(result.externalId)
-            merged.set(result.externalId, {
-              ...existing,
-              description: result.description || existing.description,
-              fetchedAt: now,
-            })
-            continue
-          }
-
-          const jobText = `${result.role}\n${result.description}`
-          const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack, library.names, matchJob)
-          const prevMerged = merged.get(result.externalId)
-          const seenCount = nextSeenCount(result.externalId, existing)
-
-          // Already have a better/equal hit this refresh — keep it, but mark as returned
-          if (prevMerged?.status === 'new' && prevMerged.matchScore >= match.score) {
-            merged.set(result.externalId, {
-              ...prevMerged,
-              seenCount,
-              fetchedAt: now,
-              updatedAt: now,
-            })
-            continue
-          }
-
-          merged.set(result.externalId, {
-            id: existing?.id ?? prevMerged?.id ?? crypto.randomUUID(),
-            externalId: result.externalId,
-            source: 'adzuna',
-            company: result.company,
-            role: result.role,
-            location: result.location,
-            jobUrl: result.jobUrl,
-            salary: result.salary,
-            description: result.description,
-            matchScore: match.score,
-            matchReasons: match.reasons,
-            matchedTrack: match.track,
-            status: 'new',
-            savedSearchId: search.id,
-            seenCount,
-            fetchedAt: now,
-            createdAt: existing?.createdAt ?? prevMerged?.createdAt ?? now,
-            updatedAt: now,
-          })
-        }
-      }
-
-      // Adzuna sometimes returns an empty page (outage / rate / flaky). Never wipe the inbox.
-      if (apiReturnedIds.size === 0) {
-        setRefreshError(
-          'Adzuna returned 0 jobs for your active searches. Inbox left unchanged — try again shortly, or widen query/location.'
-        )
-        return
-      }
-
-      // Previous "new" rows Adzuna did not return this round → remove (not dismiss).
-      // Only explicit Dismiss permanently blocks resurfacing.
-      // Only do this when Adzuna actually returned hits, so an empty response can't clear the list.
-      for (const [externalId, item] of [...merged.entries()]) {
-        if (item.status !== 'new') continue
-        if (apiReturnedIds.has(externalId)) continue
-        if (new Date(item.fetchedAt).getTime() >= refreshStartedMs) continue
-        merged.delete(externalId)
-      }
-
-      const next = [...merged.values()].sort((a, b) => b.matchScore - a.matchScore)
-      await persistAll(next)
-
-      const visibleNew = next.filter((i) => i.status === 'new').length
-      if (visibleNew === 0) {
-        const onBoard = skippedApprovedIds.size
-        const dismissed = skippedDismissedIds.size
-        const total = apiReturnedIds.size
-        if (onBoard > 0 && dismissed === 0) {
-          setRefreshError(
-            `Adzuna returned ${total} listing(s), but all were already approved / on your board — nothing new to review.`
-          )
-        } else if (dismissed > 0 && onBoard === 0) {
-          setRefreshError(
-            `Adzuna returned ${total} listing(s), but all were previously dismissed — nothing new to review.`
-          )
-        } else if (onBoard > 0 && dismissed > 0) {
-          setRefreshError(
-            `Adzuna returned ${total} listing(s): ${onBoard} already on your board, ${dismissed} previously dismissed — nothing new to review.`
-          )
-        } else {
-          setRefreshError(
-            `Adzuna returned ${total} listing(s), but none are left to review.`
-          )
-        }
-      }
-    } catch (err) {
-      setRefreshError(err instanceof Error ? err.message : 'Refresh failed')
-      throw err
-    } finally {
-      setRefreshing(false)
+  const saveFetched = async (batch: PendingRefresh) => {
+    if (!batch.valid()) throw new RefreshInvalidated('Searches changed. Refresh again.')
+    const complete = batch.outcomes.every(outcome => outcome.state === 'success')
+    if (!batch.rows.length) {
+      pending.current = null
+      setRefreshReport({ outcomes: batch.outcomes, persistence: 'unchanged' })
+      return
     }
-  }, [searches, inbox, jobs, cvsByTrack, library.names, matchJob, persistAll])
+    try {
+      await persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), batch.valid)
+      pending.current = null
+      setRefreshReport({ outcomes: batch.outcomes, persistence: 'saved' })
+    } catch (error) {
+      if (error instanceof RefreshInvalidated || !batch.valid()) throw new RefreshInvalidated()
+      // Retain fetched rows for save-only retry; keep the previous review list visible.
+      pending.current = batch
+      setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed' })
+    }
+  }
 
-  const updateInboxItem = useCallback(
-    async (id: string, updates: Partial<InboxJob>) => {
-      const next = inbox.map((item) =>
-        item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
-      )
-      const updated = next.find((i) => i.id === id)
-      if (!updated) return
-
-      if (isCloudSync && supabase && user) {
-        const row = inboxJobToRow(updated, user.id)
-        const { error } = await supabase.from('job_inbox').upsert(row)
-        if (error) throw error
-      } else {
-        writeLocal(next)
+  const collect = async (retry: boolean, options?: RefreshInboxOptions) => {
+    if (refreshBusy.current || loading || account === 'signed-out') return
+    refreshBusy.current = true
+    setRefreshing(true); setRefreshError(null); setRefreshReport(null)
+    const owner = account
+    try {
+      if (!retry) {
+        const list = options?.searchesOverride ?? current.current.searches
+        const selected = options?.onlySearchId ? list.filter(search => search.id === options.onlySearchId && search.query.trim()) : list.filter(search => search.active && search.query.trim())
+        if (!selected.length) { setRefreshError('Add an active saved search with a search phrase before refreshing.'); return }
+        session.current = { account: owner, requests: searchRequests(selected), started: Date.now(), runAlone: Boolean(options?.clearReviewFirst), baseline: new Map(inboxRef.current.map(item => [item.externalId, item])) }
+        pending.current = null
       }
-      setInbox(next)
-    },
-    [inbox, isCloudSync, user]
-  )
+      const run = session.current
+      if (!run || run.account !== owner || (retry && !validRequests(run.requests, owner))) throw new RefreshInvalidated()
+      const valid = () => session.current === run && validRequests(run.requests, owner)
+      const outcomes = await manager.run(run.requests, fetchAdzunaSearch, valid, retry)
+      if (!outcomes || !valid()) throw new RefreshInvalidated()
+      const rows: InboxJob[] = []
+      const latest = live.current
+      const batchScore = createCvMatcher(latest.library.cvs)
+      for (const outcome of outcomes) {
+        if (outcome.state !== 'success') continue
+        for (const result of outcome.response!.results) {
+          const now = new Date().toISOString()
+          const old = run.baseline.get(result.externalId)
+          const match = pickMatch(`${result.role}\n${result.description}`, outcome.search.track ?? 'auto', latest.library.cvs, latest.library.names, batchScore)
+          rows.push({ id: old?.id ?? crypto.randomUUID(), externalId: result.externalId, source: 'adzuna', company: result.company, role: result.role, location: result.location, jobUrl: result.jobUrl, salary: result.salary, description: result.description, matchScore: match.score, matchReasons: match.reasons, matchedTrack: match.track, status: 'new', savedSearchId: outcome.search.id, seenCount: old ? (old.seenCount || 1) + 1 : 1, fetchedAt: now, createdAt: old?.createdAt ?? now, updatedAt: now })
+        }
+      }
+      await saveFetched({ account: owner, outcomes, rows, started: run.started, runAlone: run.runAlone, valid })
+    } catch (error) {
+      if (current.current.account === owner) setRefreshError(error instanceof RefreshInvalidated ? 'Searches or account changed. Refresh again to use the latest filters.' : 'Could not prepare the fetched jobs. Check the selected CVs and refresh again. Your existing jobs are safe.')
+    } finally {
+      if (current.current.account === owner) { refreshBusy.current = false; setRefreshing(false) }
+    }
+  }
+  const refreshInbox = (options?: RefreshInboxOptions) => collect(false, options)
+  const retryFailedSearches = () => collect(true)
+  const retryInboxSave = async () => {
+    if (refreshBusy.current || !pending.current) return
+    refreshBusy.current = true; setRefreshing(true); setRefreshError(null)
+    const batch = pending.current
+    try { await saveFetched(batch) }
+    catch { if (current.current.account === batch.account) setRefreshError('Searches changed. Refresh again to use the latest filters.') }
+    finally { if (current.current.account === batch.account) { refreshBusy.current = false; setRefreshing(false) } }
+  }
+
+  const updateInboxItem = useCallback(async (id: string, updates: Partial<InboxJob>) => {
+    await persistAll(items => items.map(item => item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
+  }, [persistAll])
 
   const approveJob = useCallback(
     async (id: string) => {
-      const item = inbox.find((i) => i.id === id)
+      const owner = account
+      const item = inboxRef.current.find((i) => i.id === id)
       if (!item) throw new Error('Inbox item not found')
 
       // Same job shape as manual add: keep full description text; AI fills summary/skills when possible.
@@ -446,6 +331,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (current.current.account !== owner || inboxRef.current.find(entry => entry.id === id)?.status !== 'new') throw new Error('This inbox item changed. Please review it again.')
       const jobText = `${role}\n${item.description}`
       // Parsing can finish after a template was deleted or a search reassigned.
       const latest = live.current
@@ -480,7 +366,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       await updateInboxItem(id, { status: 'approved' })
       return job.id
     },
-    [inbox, addJob, updateInboxItem]
+    [account, addJob, updateInboxItem]
   )
 
   const dismissJob = useCallback(
@@ -501,30 +387,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     } catch { return { ...item, matchScore: 0, matchReasons: ['Selected CV unavailable. Update the saved search before approval.'] } }
   }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, cvsByTrack, library.names, matchJob])
 
-  const value = useMemo(
-    () => ({
-      inbox: scoredInbox,
-      loading,
-      refreshing,
-      refreshError,
-      newCount,
-      refreshInbox,
-      clearReviewList,
-      approveJob,
-      dismissJob,
-    }),
-    [
-      scoredInbox,
-      loading,
-      refreshing,
-      refreshError,
-      newCount,
-      refreshInbox,
-      clearReviewList,
-      approveJob,
-      dismissJob,
-    ]
-  )
+  const value = { inbox: loadedOwner.current === account ? scoredInbox : [], loading, refreshing, refreshError, refreshReport, newCount, refreshInbox, retryFailedSearches, retryInboxSave, clearReviewList, approveJob, dismissJob }
 
   return <InboxContext.Provider value={value}>{children}</InboxContext.Provider>
 }
