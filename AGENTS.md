@@ -1,6 +1,6 @@
 # ApplyTrack agent instructions
 
-This is the single authoritative workflow instruction file for Discover, Plan, Build and Release. Workspace/vault AGENTS.md files are entry-point pointers, not copies of these rules. Current user instructions override older agreements. Use Project Context for facts and status, not a second rulebook.
+This file defines how Discover, Plan, Build and Release work on ApplyTrack. The workspace and vault AGENTS.md files point here. Project Context contains project facts and current status. Follow the user's task instructions within this workflow.
 
 ## Locations and context checkpoints
 
@@ -33,7 +33,7 @@ Write logical Conventional Commits: fix(scope), feat(scope), perf(scope), refact
 
 Present checks and a Vercel preview for application changes; documentation-only work needs content/link checks and disclosure that functional preview review does not apply. Wait for explicit user approval of reviewed changes before merging. Do not enable auto-merge, promote previews or bypass required checks to avoid that gate. Material changes after approval need renewed review. Merge through the PR, then verify main CI, production deployment and affected behavior where practical. Keep committed/pushed/merged/deployed/functionally verified distinct; deployment success is not functional verification.
 
-Completion requires approved scope satisfied, appropriate checks passed or limitations explicitly resolved/disclosed, context current, user-approved PR merged and production verification reported. Archive the finished backlog item concisely; leave unfinished scope active. This supersedes the old automatic-merge agreement. Routine release authorization does not authorize force pushes, published-history rewrites, destructive data operations, credential changes or messages to other chats.
+Completion requires approved scope satisfied, appropriate checks passed or limitations explicitly resolved/disclosed, context current, user-approved PR merged and production verification reported. Archive the finished backlog item concisely; leave unfinished scope active. Routine release authorization does not authorize force pushes, published-history rewrites, destructive data operations, credential changes or messages to other chats.
 
 ## Handoffs and authorization
 
@@ -42,7 +42,7 @@ Chats do not automatically wake or message each other. Send messages only with e
 ## Documentation ownership and format
 
 - Feature Ideas: new capabilities. Fixes & Refinements: existing behavior to improve. Active items are grouped by app section with a short title, Status, Added (YYYY-MM-DD), Problem, Desired outcome. Add approved scope/acceptance criteria inline, Open questions only when unresolved and real PR links when available; omit empty fields and speculative links.
-- Statuses: Captured, Ready for planning, Planned, In progress, In review, Done, Deferred. A saved item is not approved. Preserve deferred items. Green historical markings mean user-confirmed completion, not exhaustive verification.
+- Statuses: Captured, Ready for planning, Planned, In progress, In review, Done, Deferred. A saved item is not approved. Preserve deferred items. Green markings indicate user-confirmed completion; verification evidence is recorded separately.
 - Project Context: architecture, locations, chat IDs, current status, cross-agent decisions and material limits. Replace stale summaries; avoid copying plans/test reports or workflow rules here.
 - PR/relevant repository docs: technical implementation, checks and release evidence. Do not create a new technical document for every trivial change when the PR suffices.
 - Completed Changes: YYYY-MM then app section, with Status, Added, Completed, brief Outcome, real PR/commit link and concise Verification/limits. Historical unknown completion dates stay unknown; group those by confirmation month and label that distinction. Write/verify the completed record before removing the active item. For partial delivery keep a linked active remainder; for regressions create a linked active item and preserve the earlier record.
