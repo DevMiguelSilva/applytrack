@@ -2,7 +2,7 @@ interface IconActionProps {
   label: string
   danger?: boolean
   disabled?: boolean
-  onClick: () => void
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   children: React.ReactNode
 }
 

@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { boardLook } from '../components/BoardLook'
 import { IconAction } from '../components/IconAction'
@@ -54,6 +54,31 @@ export function PortalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [deletingFeed, setDeletingFeed] = useState<PortalFeed | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const deleteDialog = useRef<HTMLDialogElement>(null)
+  const cancelDeleteButton = useRef<HTMLButtonElement>(null)
+  const addFeedButton = useRef<HTMLButtonElement>(null)
+  const deleteTrigger = useRef<HTMLElement | null>(null)
+  const deletePending = useRef(false)
+
+  useEffect(() => {
+    if (deletingFeed) {
+      deleteDialog.current?.showModal()
+      cancelDeleteButton.current?.focus()
+    } else {
+      deleteDialog.current?.close()
+    }
+  }, [deletingFeed])
+
+  const cancelDelete = () => {
+    if (deletePending.current) return
+    deleteDialog.current?.close()
+    setDeletingFeed(null)
+    setDeleteError(null)
+    deleteTrigger.current?.focus()
+  }
 
   const handleAdd = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -153,17 +178,31 @@ export function PortalsPage() {
     }
   }
 
-  const handleDelete = async (feed: PortalFeed) => {
+  const handleDelete = (feed: PortalFeed, trigger: HTMLButtonElement) => {
+    deleteTrigger.current = trigger
+    setDeleteError(null)
+    setDeletingFeed(feed)
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingFeed || deletePending.current) return
+    deletePending.current = true
+    setDeleting(true)
+    setDeleteError(null)
     setError(null)
     setMessage(null)
-    setBusyFeedId(feed.id)
     try {
-      await deleteFeed(feed.id)
-      if (editingId === feed.id) setEditingId(null)
+      await deleteFeed(deletingFeed.id)
+      setEditingId((current) => current === deletingFeed.id ? null : current)
+      deleteDialog.current?.close()
+      setDeletingFeed(null)
+      setShowAddFeed(false)
+      window.requestAnimationFrame(() => addFeedButton.current?.focus())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete feed')
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete feed')
     } finally {
-      setBusyFeedId(null)
+      deletePending.current = false
+      setDeleting(false)
     }
   }
 
@@ -315,7 +354,7 @@ export function PortalsPage() {
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void handleDelete(feed)}
+                          onClick={(event) => handleDelete(feed, event.currentTarget)}
                           className={rowDanger}
                         >
                           Delete
@@ -377,7 +416,7 @@ export function PortalsPage() {
                         >
                           {feed.active ? <PauseIcon /> : <PlayIcon />}
                         </IconAction>
-                        <IconAction label="Delete" danger disabled={busy} onClick={() => void handleDelete(feed)}>
+                        <IconAction label="Delete" danger disabled={busy} onClick={(event) => handleDelete(feed, event.currentTarget)}>
                           <TrashIcon />
                         </IconAction>
                       </div>
@@ -405,7 +444,7 @@ export function PortalsPage() {
 
         <div className="border-t border-[#e6eeeb] pt-4">
           {!showAddFeed ? (
-            <button type="button" onClick={() => setShowAddFeed(true)} className={toolbarBtn}>
+            <button ref={addFeedButton} type="button" onClick={() => setShowAddFeed(true)} className={toolbarBtn}>
               Add portal feed
             </button>
           ) : (
@@ -435,6 +474,29 @@ export function PortalsPage() {
           )}
         </div>
       </section>
+      <dialog
+        ref={deleteDialog}
+        aria-labelledby="delete-portal-title"
+        aria-describedby="delete-portal-description"
+        aria-busy={deleting}
+        onCancel={(event) => {
+          event.preventDefault()
+          cancelDelete()
+        }}
+        className="!m-auto w-[calc(100%-2rem)] max-w-lg max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-[#e6eeeb] bg-white p-6 text-brand-ink backdrop:bg-brand-ink/30"
+      >
+        <h2 id="delete-portal-title" className="font-display text-lg font-semibold">Delete saved portal?</h2>
+        <p id="delete-portal-description" className="mt-3 text-sm text-brand-muted [overflow-wrap:anywhere]">
+          Delete “{deletingFeed?.name.trim() || 'Untitled feed'}” from your saved portals? This cannot be undone.
+        </p>
+        {deleteError && <p role="alert" className="mt-3 text-sm text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="min-h-11 rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60">Cancel</button>
+          <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
+            {deleting ? 'Deleting…' : 'Delete portal'}
+          </button>
+        </div>
+      </dialog>
     </div>
   )
 }
