@@ -4,7 +4,7 @@
 
 Before project work, read the canonical Obsidian note:
 
-`C:\Users\migue\Documents\ChatGPT\ApplyTrack\ApplyTrack Agents.md`
+`C:\Dev\Obsidian Vault\ApplyTrack\ApplyTrack Agents.md`
 
 It contains the project overview, agent roles, working agreements, release status and known limitations. Verify Git and relevant source files before relying on recorded status. If the vault is unavailable on another machine, use `README.md`, `DEPLOY.md` and `docs/` as fallback context and report that the shared note could not be refreshed; do not invent its contents.
 
