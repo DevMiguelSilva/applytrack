@@ -10,6 +10,7 @@ export function InboxRefreshSummary({ report, busy, retryFailed, retrySave }: { 
       <h2 className="font-semibold">{title}</h2>
       <p className="mt-1 text-brand-muted">{successful.length} of {report.outcomes.length} search locations completed · {returned} listing{returned === 1 ? '' : 's'} returned.</p>
       <p className="mt-1 text-brand-muted">{report.persistence === 'failed' ? 'Fetched results are held in this session. Retry saving without making another provider request.' : failed.length ? successful.length ? 'Successful results were kept. Existing review jobs and your approval/dismissal history are preserved.' : 'No new results were saved. Your existing review jobs and approval/dismissal history are unchanged.' : returned ? 'Previously approved or dismissed listings stay out of the review list.' : 'Your existing jobs are unchanged. Try widening the phrase or location.'}</p>
+      {report.persistence === 'failed' && report.saveError && <p className="mt-2 text-brand-muted">{report.saveError}</p>}
     </div>
     {failed.length > 0 && <ul className="max-h-60 space-y-2 overflow-y-auto">
       {failed.map(outcome => <li key={outcome.id} className="rounded-lg bg-brand-mist p-3">

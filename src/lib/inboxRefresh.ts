@@ -15,6 +15,7 @@ export interface SearchOutcome {
 export interface RefreshReport {
   outcomes: SearchOutcome[]
   persistence: 'saved' | 'failed' | 'unchanged'
+  saveError?: string
   invalidated?: boolean
 }
 export function searchFingerprint(search: SavedSearch) {
