@@ -1,5 +1,15 @@
 # Inbox search reliability
 
+## Save conflict correction (October 16, 2026; local implementation)
+
+The user reports Supabase error `23505`, establishing a unique constraint violation. The exact deployed constraint/request was not inspected. A controlled database mock reproduces `23505` when the old default-ID upsert sends a different row ID for an existing `(user_id, external_id)` listing, matching the repository schema. Missing/limited loaded history and partially committed attempts can expose that mismatch; which triggered the live incident remains unverified.
+
+On `codex/inbox-save-diagnostics`, fetched cloud batches reconcile against paginated persisted state rather than assuming the loaded UI list is complete. Inserts use `user_id,external_id` with conflicts ignored, preserving a concurrent insert's identity and reviewed status. Existing review rows update by persisted ID with `status=new` guards; approved/dismissed rows are never refreshed. Pruning follows successful writes and still filters `status=new`. A final read returns canonical identities and current history. Retry repeats reconciliation, so a partially committed save cannot generate duplicate listings. This adds cloud reads and conditional per-row updates; no provider calls or migration are added.
+
+Persistence boundaries distinguish upsert, pruning and browser storage failures. Fixed actionable messages include a stage/category reference; raw database responses, error messages and job contents are not copied into the report. Pruning failures disclose that rows may already have saved. Retained batches, save-only retry and account/search guards remain in place. Invalidation exceptions pass through diagnostics unchanged. Already-dispatched writes cannot be recalled, and cloud operations remain nontransactional.
+
+35 Node tests pass. New persistence tests reproduce the old uniqueness conflict, verify canonical IDs/repeated saves, hidden reviewed history, concurrent insertion and approval, partial commit/pruning recovery, read failure and stale-request invalidation, pagination, safe diagnostics and local-storage boundary recovery. The mocked cloud store survives rereads; retry uses only retained rows and persistence operations. These tests do not establish browser/hook end-to-end recovery, real PostgREST/RLS behavior or live cloud success. Build passes with the existing chunk warning. Full lint reports the recorded five existing errors and twelve warnings, with no new findings. No real provider/database calls, migration, push, PR or release were performed. Live authenticated and browser acceptance verification remain disclosed limits for Release review.
+
 ## Findings (October 15, 2026)
 
 Confirmed in the previous implementation: Adzuna error bodies were interpolated into user-visible errors; requests were unbounded; all upstream errors became HTTP 500; a single failed location discarded prior successes; pruning and persistence used refresh-start Inbox arrays.

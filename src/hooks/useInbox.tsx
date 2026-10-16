@@ -13,6 +13,7 @@ import { InboxRefresh, RefreshInvalidated, searchFingerprint, searchRequests, me
 import { fetchAdzunaSearch } from '../api/client'
 import { parseJobPosting } from '../api/gemini'
 import { inboxJobToRow, rowToInboxJob } from '../lib/database'
+import { InboxSaveError, inboxSaveStep, safeInboxSaveError, saveCloudInboxResults } from '../lib/inboxPersistence'
 import {
   dualTrackReasonLine,
   createCvMatcher,
@@ -195,29 +196,35 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
   }, [load])
 
-  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true) => {
+  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false) => {
     const owner = account
     const operation = mutations.current.catch(() => {}).then(async () => {
       const check = () => { if (current.current.account !== owner || owner === 'signed-out' || !valid()) throw new RefreshInvalidated('Searches or account changed. Refresh again.') }
       check()
       const before = inboxRef.current
-      const next = transform(before)
-      if (isCloudSync && supabase && userId) {
+      let next = transform(before)
+      if (fetched && isCloudSync && supabase && userId) {
+        next = await saveCloudInboxResults(supabase, userId, transform, check)
+      } else if (isCloudSync && supabase && userId) {
         const oldById = new Map(before.map(item => [item.id, item]))
         const changed = next.filter(item => JSON.stringify(item) !== JSON.stringify(oldById.get(item.id)))
         // Save new results before pruning. A failed upsert must not erase review jobs.
         if (changed.length) {
-          const { error } = await supabase.from('job_inbox').upsert(changed.map(item => inboxJobToRow(item, userId)))
-          if (error) throw error
+          await inboxSaveStep('upsert', async () => {
+            const { error } = await supabase!.from('job_inbox').upsert(changed.map(item => inboxJobToRow(item, userId)))
+            if (error) throw error
+          })
         }
         check()
         const nextIds = new Set(next.map(item => item.id))
         const removed = before.filter(item => item.status === 'new' && !nextIds.has(item.id)).map(item => item.id)
         if (removed.length) {
-          const { error } = await supabase.from('job_inbox').delete().eq('user_id', userId).eq('status', 'new').in('id', removed)
-          if (error) throw error
+          await inboxSaveStep('prune', async () => {
+            const { error } = await supabase!.from('job_inbox').delete().eq('user_id', userId).eq('status', 'new').in('id', removed)
+            if (error) throw error
+          })
         }
-      } else writeLocal(next)
+      } else await inboxSaveStep('local', () => writeLocal(next))
       check()
       inboxRef.current = next; setInbox(next)
     })
@@ -238,14 +245,14 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       return
     }
     try {
-      await persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), batch.valid)
+      await persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), batch.valid, true)
       pending.current = null
       setRefreshReport({ outcomes: batch.outcomes, persistence: 'saved' })
     } catch (error) {
       if (error instanceof RefreshInvalidated || !batch.valid()) throw new RefreshInvalidated()
       // Retain fetched rows for save-only retry; keep the previous review list visible.
       pending.current = batch
-      setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed' })
+      setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed', saveError: (error instanceof InboxSaveError ? error : safeInboxSaveError(isCloudSync ? 'upsert' : 'local', error)).message })
     }
   }
 
