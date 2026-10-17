@@ -402,3 +402,13 @@ html { scrollbar-gutter: stable; }
 }
 .desktop-sidebar .sidebar-sign-out:hover { background: #643b34; color: #ffe2db; }
 .sidebar-footer [role='alert'] { color: #ffc4b8; }
+
+/* Dedicated sidebar preference control and balanced mobile account cells. */
+.desktop-sidebar .sidebar-brand { padding-bottom: 0; }
+.desktop-sidebar[data-collapsed="true"] .sidebar-brand { padding-bottom: 0; }
+.sidebar-toggle-row { margin-block: 12px; flex-shrink: 0; }
+.sidebar-toggle-row .sidebar-control { min-height: 44px; }
+.mobile-account-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.mobile-account-panel > .ui-button { min-width: 0; width: 100%; min-height: 44px; }
+.mobile-account-panel-single > :not(.mobile-account-error), .mobile-account-error { grid-column: 1 / -1; }
+.mobile-account-error { overflow-wrap: anywhere; }

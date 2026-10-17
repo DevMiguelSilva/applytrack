@@ -24,6 +24,11 @@ export function Sidebar({ collapsed, toggle }: { collapsed: boolean; toggle: () 
   const accountLabel = user ? 'Sign out' : 'Sign in'
   return <aside aria-label="Application sidebar" data-collapsed={collapsed} className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto px-3 py-4 lg:flex">
     <div className="sidebar-brand"><Hint label="ApplyTrack" compact={collapsed}><Brand compact={collapsed} /></Hint></div>
+    <div className="sidebar-toggle-row">
+      <Hint label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} compact={collapsed}>
+        <button type="button" className={control} onClick={toggle} aria-expanded={!collapsed} aria-controls="desktop-destinations"><NavigationIcon name={collapsed ? 'expand' : 'collapse'} />{label(collapsed ? 'Expand sidebar' : 'Collapse sidebar')}</button>
+      </Hint>
+    </div>
     {!collapsed && <p className="sidebar-group-label">WORKSPACE</p>}
     <nav id="desktop-destinations" aria-label="Primary" className="space-y-1.5">
       {destinations.map(({ label: text, to }) => <Fragment key={to}>
@@ -36,9 +41,6 @@ export function Sidebar({ collapsed, toggle }: { collapsed: boolean; toggle: () 
       </Hint></Fragment>)}
     </nav>
     <div className="sidebar-footer mt-auto space-y-2 pt-6">
-      <Hint label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} compact={collapsed}>
-        <button type="button" className={control} onClick={toggle} aria-expanded={!collapsed} aria-controls="desktop-destinations"><NavigationIcon name={collapsed ? 'expand' : 'collapse'} />{label(collapsed ? 'Expand sidebar' : 'Collapse sidebar')}</button>
-      </Hint>
       {isCloudSync && <Hint label="Synced to cloud" compact={collapsed}><div className={`${control} text-emerald-700`} tabIndex={collapsed ? 0 : undefined}><NavigationIcon name="Synced" />{label('Synced to cloud')}</div></Hint>}
       {isCloudEnabled && <Hint label={accountLabel} compact={collapsed}>
         {user ? <button type="button" className={`ui-button ui-danger-quiet w-full ${collapsed ? 'ui-icon-button' : ''}`} onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />{label(accountLabel)}</button> : <NavLink to="/login" className={`ui-button ui-primary w-full ${collapsed ? 'ui-icon-button' : ''}`}><NavigationIcon name="Sign in" />{label('Sign in')}</NavLink>}
