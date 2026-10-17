@@ -3,23 +3,34 @@ import { TailoringProgress } from './TailoringProgress'
 import { Header } from './Header'
 import { MobileTabBar } from './MobileTabBar'
 import { ScrollToTopButton } from './ScrollToTopButton'
+import { useState, type CSSProperties } from 'react'
+import { Sidebar } from './Sidebar'
+import { readSidebarPreference, saveSidebarPreference } from '../lib/navigation'
+import { WorkspaceBar } from './WorkspaceBar'
 
 export function Layout() {
   const { pathname } = useLocation()
   const showTabs = pathname !== '/login'
-  const onBoard = pathname === '/' || pathname === '/login'
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return readSidebarPreference(window.localStorage) } catch { return false }
+  })
+  const toggle = () => {
+    setCollapsed(!collapsed)
+    try { saveSidebarPreference(window.localStorage, !collapsed) } catch { /* Keep in-memory preference. */ }
+  }
 
   return (
     <div
-      className={`min-h-screen ${
-        onBoard ? 'bg-brand-canvas' : 'bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]'
-      } ${showTabs ? 'pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:pb-0' : ''}`}
+      style={{ '--sidebar-width': showTabs ? collapsed ? '72px' : '240px' : '0px' } as CSSProperties}
+      className={`ui-app min-h-screen ${showTabs ? 'mobile-app-shell pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[var(--sidebar-width)]' : ''}`}
     >
-      <Header />
+      <Header login={!showTabs} />
+      {showTabs && <Sidebar collapsed={collapsed} toggle={toggle} />}
+      {showTabs && <WorkspaceBar />}
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />
       </main>
-      <footer className="border-t border-slate-200/80 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-[#dce8e4] py-6 text-center ui-meta text-[#4d635c]">
         ApplyTrack · Built by Miguel Silva
       </footer>
       {showTabs && <MobileTabBar />}

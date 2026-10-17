@@ -1,5 +1,5 @@
+import { SectionHeader } from '../components/SectionHeader'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { boardLook } from '../components/BoardLook'
 import { IconAction } from '../components/IconAction'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -11,19 +11,17 @@ import {
   type PortalSource,
 } from '../types/portal'
 
-const toolbarBtn =
-  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
-const refreshBtn =
-  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+
+
 const rowBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+  "ui-button ui-secondary ui-compact"
 const rowRun =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+  "ui-button ui-secondary ui-compact"
 const rowDanger =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-50 disabled:opacity-60'
-const fieldLabel = 'text-sm text-brand-muted'
+  "ui-button ui-danger-quiet ui-compact ui-mobile-delete"
+const fieldLabel = "ui-label"
 const fieldControl =
-  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
+  "ui-field mt-1"
 
 type FeedDraft = { name: string; url: string; source: PortalSource }
 
@@ -255,43 +253,40 @@ export function PortalsPage() {
   const checkedActiveCount = activeFeeds.filter((feed) => todayCheckedIds.has(feed.id)).length
 
   return (
-    <div className="space-y-4 font-sans text-brand-ink">
-      <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
-        <h1 className={boardLook.headline}>Portals</h1>
-        <div className="m-actions flex flex-wrap gap-2">
+    <div className="ui-page">
+      <SectionHeader title="Portals" description="Keep your job-search links together and track the portals you check." actions={<div className="m-actions flex flex-wrap gap-2">
           <button
             type="button"
             data-role="primary"
             onClick={() => void handleOpenAll()}
             disabled={activeFeeds.length === 0 || Boolean(busyFeedId)}
-            className={refreshBtn}
+            className="ui-button ui-secondary"
           >
             Open all active ({activeFeeds.length})
           </button>
-        </div>
-      </div>
+        </div>} />
 
       {(message || error) && (
         <p
-          className={`text-sm ${error ? 'text-red-700' : 'text-brand-primaryDeep'}`}
+          className={`text-sm ${error ? 'text-red-700' : 'text-[#23745e]'}`}
           role={error ? 'alert' : 'status'}
         >
           {error || message}
         </p>
       )}
 
-      <section className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
+      <section className={`ui-panel space-y-4`}>
         <div className="space-y-1">
-          <h2 className="font-display text-base font-semibold text-brand-ink">Your feeds</h2>
-          <p className="text-xs text-brand-muted">
+          <h2 className=" ui-section-title">Your feeds</h2>
+          <p className="ui-meta text-brand-muted">
             {checkedActiveCount} of {activeFeeds.length} active feeds checked today.
           </p>
         </div>
 
         {feeds.length === 0 ? (
           <div className="rounded-[1.25rem] border border-dashed border-[#e6eeeb] bg-white p-8 text-center">
-            <h3 className="font-display text-lg font-semibold text-brand-ink">No portal feeds yet</h3>
-            <p className="mt-2 text-sm text-brand-muted">Add a job-search URL to keep it ready for your next search session.</p>
+            <h3 className=" ui-section-title">No portal feeds yet</h3>
+            <p className="mt-2 ui-helper text-brand-muted">Add a job-search URL to keep it ready for your next search session.</p>
           </div>
         ) : (
           <ul className="space-y-3">
@@ -320,7 +315,7 @@ export function PortalsPage() {
                           type="submit"
                           data-role="primary"
                           disabled={busy}
-                          className={refreshBtn}
+                          className="ui-button ui-primary"
                         >
                           {busy ? 'Saving…' : 'Save changes'}
                         </button>
@@ -331,7 +326,7 @@ export function PortalsPage() {
                             setEditingId(null)
                             setError(null)
                           }}
-                          className={toolbarBtn}
+                          className="ui-button ui-secondary"
                         >
                           Cancel
                         </button>
@@ -363,34 +358,34 @@ export function PortalsPage() {
                           draggable
                           onDragStart={(event) => handleFeedDragStart(index, event)}
                           onDragEnd={handleFeedDragEnd}
-                          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing"
+                          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing ui-drag-control"
                           title="Drag to reorder"
                           aria-label={`Reorder ${feed.name || 'portal feed'}`}
                         >
                           ⋮⋮
                         </button>
-                        <input
+                        <label className="ui-check-target"><input
                           type="checkbox"
                           checked={checked}
                           disabled={!feed.active || busy}
                           onChange={() => void handleToggleChecked(feed)}
-                          className="h-4 w-4 shrink-0 accent-emerald-600"
+                          className="ui-checkbox"
                           title="Checked today"
                           aria-label={`Mark ${feed.name || 'portal feed'} checked today`}
-                        />
+                        /></label>
                         <div className="min-w-0 text-left">
                           <p className="font-medium text-brand-ink">
                             {feed.name || 'Untitled feed'}
                             {feed.active ? (
-                              <span className="ml-2 text-xs font-medium text-brand-primaryDeep">active</span>
+                              <span className="ml-2 ui-meta font-medium text-[#23745e]">active</span>
                             ) : (
-                              <span className="ml-2 text-xs text-brand-muted">paused</span>
+                              <span className="ml-2 ui-meta text-brand-muted">paused</span>
                             )}
                             {checked && (
-                              <span className="ml-2 text-xs text-brand-primaryDeep">checked today ✓</span>
+                              <span className="ml-2 ui-meta text-[#23745e]">checked today ✓</span>
                             )}
                           </p>
-                          <p className="mt-1 truncate text-xs leading-relaxed text-brand-muted">
+                          <p className="mt-1 truncate ui-meta leading-relaxed text-brand-muted">
                             {PORTAL_SOURCE_LABELS[feed.source]} · {feed.url}
                           </p>
                         </div>
@@ -438,13 +433,17 @@ export function PortalsPage() {
 
         <div className="border-t border-[#e6eeeb] pt-4">
           {!showAddFeed ? (
-            <button ref={addFeedButton} type="button" onClick={() => setShowAddFeed(true)} className={toolbarBtn}>
+            <button ref={addFeedButton} type="button" onClick={() => setShowAddFeed(true)} className="ui-button ui-primary">
               Add portal feed
             </button>
           ) : (
             <form onSubmit={handleAdd} className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-display text-base font-semibold text-brand-ink">New portal feed</p>
+              <p className="ui-section-title">New portal feed</p>
+              <FeedFields draft={draft} setDraft={setDraft} />
+              <div className="m-actions flex flex-wrap gap-2">
+                <button type="submit" data-role="primary" className="ui-button ui-primary">
+                  Save feed
+                </button>
                 <button
                   type="button"
                   data-role="quiet"
@@ -453,15 +452,9 @@ export function PortalsPage() {
                     setDraft(emptyDraft)
                     setError(null)
                   }}
-                  className={toolbarBtn}
+                  className="ui-button ui-secondary"
                 >
                   Cancel
-                </button>
-              </div>
-              <FeedFields draft={draft} setDraft={setDraft} />
-              <div className="m-actions flex flex-wrap gap-2">
-                <button type="submit" data-role="primary" className={refreshBtn}>
-                  Save feed
                 </button>
               </div>
             </form>
@@ -477,16 +470,16 @@ export function PortalsPage() {
           event.preventDefault()
           cancelDelete()
         }}
-        className="!m-auto w-[calc(100%-2rem)] max-w-lg max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-[#e6eeeb] bg-white p-6 text-brand-ink backdrop:bg-brand-ink/30"
+        className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg backdrop:bg-brand-ink/30"
       >
-        <h2 id="delete-portal-title" className="font-display text-lg font-semibold">Delete saved portal?</h2>
-        <p id="delete-portal-description" className="mt-3 text-sm text-brand-muted [overflow-wrap:anywhere]">
+        <h2 id="delete-portal-title" className=" ui-dialog-title">Delete saved portal?</h2>
+        <p id="delete-portal-description" className="mt-3 ui-helper text-brand-muted [overflow-wrap:anywhere]">
           Delete “{deletingFeed?.name.trim() || 'Untitled feed'}” from your saved portals? This cannot be undone.
         </p>
-        {deleteError && <p role="alert" className="mt-3 text-sm text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        {deleteError && <p role="alert" className="mt-3 ui-body text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="min-h-11 rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60">Cancel</button>
-          <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60">
+          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="ui-button ui-secondary">Cancel</button>
+          <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="ui-button ui-danger-quiet">
             {deleting ? 'Deleting…' : 'Delete portal'}
           </button>
         </div>
@@ -504,7 +497,7 @@ function FeedFields({
 }) {
   return (
     <div className="search-fields">
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Name</span>
         <input
           value={draft.name}
@@ -512,7 +505,7 @@ function FeedFields({
           className={fieldControl}
         />
       </label>
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Source</span>
         <select
           value={PORTAL_SOURCE_OPTIONS.includes(draft.source as (typeof PORTAL_SOURCE_OPTIONS)[number])
@@ -528,7 +521,7 @@ function FeedFields({
           ))}
         </select>
       </label>
-      <label className="search-field-wide block">
+      <label className="ui-label block">
         <span className={fieldLabel}>
           URL <span className="text-red-700">*</span>
         </span>

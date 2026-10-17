@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
-import { boardLook } from '../components/BoardLook'
+import { SectionHeader } from '../components/SectionHeader'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
@@ -15,11 +15,10 @@ import {
   type PortalJobSource,
 } from '../types/job'
 
-const mintBtn =
-  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
-const fieldLabel = 'text-sm text-brand-muted'
+
+const fieldLabel = "ui-label"
 const fieldControl =
-  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
+  "ui-field mt-1"
 
 export function AddJobPage() {
   const navigate = useNavigate()
@@ -110,11 +109,11 @@ export function AddJobPage() {
     : 'indeed'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className={boardLook.headline}>Add application</h1>
+    <div className="ui-page mx-auto max-w-3xl">
+      <SectionHeader title="Add application" description="Paste a job posting or enter its details to add it to your board." />
 
-      <section className={`${boardLook.card} space-y-3 p-4 sm:p-5`}>
-        <h2 className="font-display text-base font-semibold text-brand-ink">Quick add with AI</h2>
+      <section className={`ui-panel space-y-3`}>
+        <h2 className=" ui-section-title">Quick add with AI</h2>
         <textarea
           value={pasteText}
           onChange={(e) => {
@@ -132,7 +131,8 @@ export function AddJobPage() {
             data-role="primary"
             onClick={handleParseAndFill}
             disabled={parsing || !pasteText.trim()}
-            className={mintBtn}
+            aria-busy={parsing}
+            className="ui-button ui-primary"
           >
             {parsing ? 'Parsing…' : 'Parse with AI'}
           </button>
@@ -140,15 +140,15 @@ export function AddJobPage() {
         {parsing && <LoadingSpinner label="Extracting job details…" />}
       </section>
 
-      <form onSubmit={handleSubmit} className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
+      <form onSubmit={handleSubmit} className={`ui-panel space-y-4`}>
         {error && (
-          <p className="text-sm text-red-700" role="alert">
+          <p className="ui-body text-red-700" role="alert">
             {error}
           </p>
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>
               Company <span className="text-red-700">*</span>
             </span>
@@ -159,7 +159,7 @@ export function AddJobPage() {
               required
             />
           </label>
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>
               Role <span className="text-red-700">*</span>
             </span>
@@ -170,7 +170,7 @@ export function AddJobPage() {
               required
             />
           </label>
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>Location</span>
             <input
               value={form.location}
@@ -178,7 +178,7 @@ export function AddJobPage() {
               className={fieldControl}
             />
           </label>
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>Salary</span>
             <input
               value={form.salary}
@@ -186,7 +186,7 @@ export function AddJobPage() {
               className={fieldControl}
             />
           </label>
-          <label className="block sm:col-span-2">
+          <label className="sm:col-span-2 ui-label block">
             <span className={fieldLabel}>Job URL</span>
             <input
               type="url"
@@ -195,7 +195,7 @@ export function AddJobPage() {
               className={fieldControl}
             />
           </label>
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>Portal</span>
             <select
               value={sourceValue}
@@ -212,7 +212,7 @@ export function AddJobPage() {
               ))}
             </select>
           </label>
-          <label className="block">
+          <label className="ui-label block">
             <span className={fieldLabel}>
               Master CV <span className="text-red-700">*</span>
             </span>
@@ -233,11 +233,11 @@ export function AddJobPage() {
         {form.jdSummary && (
           <div className="rounded-lg border border-[#e6eeeb] bg-[#f7fbf9] p-3">
             <span className={fieldLabel}>AI summary</span>
-            <p className="mt-1 text-sm leading-relaxed text-brand-ink">{form.jdSummary}</p>
+            <p className="mt-1 ui-body leading-relaxed text-brand-ink">{form.jdSummary}</p>
           </div>
         )}
 
-        <label className="block">
+        <label className="ui-label block">
           <span className={fieldLabel}>Full job description</span>
           <textarea
             value={form.jobDescription}
@@ -250,7 +250,7 @@ export function AddJobPage() {
           />
         </label>
 
-        <label className="block">
+        <label className="ui-label block">
           <span className={fieldLabel}>Personal notes</span>
           <textarea
             value={form.notes}
@@ -265,7 +265,7 @@ export function AddJobPage() {
             <span className={fieldLabel}>Extracted skills</span>
             <div className="mt-2 flex flex-wrap gap-2">
               {form.extractedSkills.map((skill) => (
-                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink">
+                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink">
                   {skill}
                 </span>
               ))}
@@ -273,8 +273,8 @@ export function AddJobPage() {
           </div>
         )}
 
-        <div className="m-actions">
-          <button type="submit" data-role="primary" className={mintBtn}>
+        <div className="ui-form-actions">
+          <button type="submit" data-role="primary" className="ui-button ui-primary">
             Save application
           </button>
         </div>

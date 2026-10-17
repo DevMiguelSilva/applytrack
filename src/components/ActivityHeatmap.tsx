@@ -120,10 +120,10 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   return (
     <div className="space-y-3">
       {mode === 'year' && (
-        <p className="text-xs font-medium text-slate-500">{year}</p>
+        <p className="ui-meta font-medium text-[#4d635c]">{year}</p>
       )}
       <div ref={scrollRef} className="app-scroll flex gap-2 overflow-x-auto pb-1">
-        <div className="sticky left-0 z-10 flex flex-col justify-between bg-white py-1 pr-1 text-[10px] text-slate-400">
+        <div className="sticky left-0 z-10 flex flex-col justify-between bg-white py-1 pr-1 ui-meta text-[#4d635c]">
           {WEEKDAYS.map((d, i) => (
             <span key={d} className={i % 2 === 1 ? 'invisible' : ''}>
               {d}
@@ -150,7 +150,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-2 ui-meta text-[#4d635c]">
         <span>Less</span>
         <span className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[0]}`} />
         <span className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[1]}`} />
@@ -159,7 +159,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
           <span className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[3]}`} />
         )}
         <span>More</span>
-        <span className="ml-2 text-slate-400">{legend}</span>
+        <span className="ml-2 text-[#4d635c]">{legend}</span>
       </div>
     </div>
   )

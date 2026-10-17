@@ -1,0 +1,111 @@
+# Application UI consistency
+
+Implemented locally on `codex/navigation-redesign` in the Build-owned navigation worktree on 2026-10-17. This follows the approved shared-style scope in the vault's Fixes & Refinements. No release, migration or API/data model change is included.
+
+## Shared roles
+
+`src/ui.css` defines explicit roles, imported after the existing application stylesheet. `SectionHeader` supplies the page title, description and wrapping action layout. `appUi`, `formUi` and `BoardLook` now reference these roles; the older sky/pill primary button is removed from those helpers. Native buttons, links, fields, refs and handlers remain in their components. Styling does not infer action meaning from runtime labels or target every heading/button globally.
+
+| Role | Font / size / line height | Treatment |
+| --- | --- | --- |
+| Page title | Plus Jakarta Sans 600, 28 / 34 | Same at every width; wraps |
+| Section title | Plus Jakarta Sans 600, 18 / 24 | Shared section hierarchy |
+| Dialog title | Plus Jakarta Sans 600, 20 / 28 | Portal/CV/More |
+| Body / description | Inter 400, 16 / 24 and 15 / 24 | Description muted #4d635c |
+| Label/helper / metadata | Inter, 14 / 20 and 12 / 16 | Shared secondary hierarchy |
+| Button / field | Inter 600, 14 / 20; fields Inter 400, 14 / 20 desktop and 16 / 24 touch | Buttons 44px; single-line fields 36px desktop / 44px touch; buttons 12px / fields 8px corners |
+
+Following the user’s visual correction, primary actions use the previous dark green #204b36 / off-white #f1fbf4, hover #2b6044. Standard shared button variants use the restored 12px corners; fields remain 8px. Secondary actions use white / ink with #dce8e4 borders and #e7f4ef hover. Destructive confirmations use #b91c1c / white, hover #991b1b; delete entry points use outlined red. Fields use #80958c borders and a 2px #23745e focus outline with 2px offset. Selected filters retain programmatic selection and a dark-green border. Disabled controls use 0.6 opacity and suppress hover. Existing pending labels/native disabling remain; asynchronous operations expose busy state. Standard icons are 20px and touch controls are at least 44px. Explicit compact row controls become 36px only at >=1024px. Panels use 20px corners and 16px/24px responsive padding.
+
+## Rendered inventory
+
+- Board: restored two-card desktop overview / plain mobile header and description, streak labels, status filters, search/clear, cards, columns, trash controls and empty-state Add your first job action.
+- Inbox: approved header/actions, saved-search forms/rows/icon actions/deletion confirmation, review actions, search reports and save-only/provider retry controls.
+- Portals: approved header, add/edit forms, row controls and native confirmation dialog with Cancel/Delete/error states.
+- Add application: approved header, parse/save actions, labels, inputs/selects/textareas and error/pending states.
+- CV library: approved header (including the former 24px/30px mismatch), template creation/rename/deletion, all editor sections, file-picker trigger, remove icons and save actions. Deletion dialog now has explicit title/description associations.
+- Job Detail: role title and approved description with existing metadata, status transitions, URL, posting editor, notes, interviews, preparation, tailoring, skill utilities, previews and export actions.
+- Auth/layout: local/cloud auth titles, descriptions, forms/toggles, More title/close/account controls, sidebar account controls, footer, loading labels, tailoring notifications and Back to top.
+
+Submit/create/save/approve/run/refresh/generate use primary. Cancel/edit/open/copy/download and passive show/hide use secondary or inline utility roles. Delete/remove/sign out use destructive roles. Dismiss/reject retain review/status meaning. No data handlers, provider payloads, generated document source, submitted snapshots or stored content formats were changed.
+
+Deliberate exceptions: statistic numbers keep their numerical hierarchy; Board count filters remain stacked cards; status hues, coverage/skill chips and document previews retain their meanings. Small yellow/sky/green statistic text was darkened within its existing hue for contrast. Compact metadata/status pills are not full buttons. Navigation destinations retain the approved dark sidebar/dock geometry and selected navigation treatment; account actions use canonical button roles. Inline links remain links. Dense nested rows can retain row padding rather than adding a second full panel. Generated/printed/downloaded document typography is unchanged.
+
+## Verification
+
+Controlled Chromium browser checks used cloud-disabled app origins and separate local fixtures outside the repository. The full-app fixture intercepts all API paths with synthetic results; a separate auth fixture mocks the auth hook. No real provider/database/account requests were used. User preview storage was not cleared.
+
+- 35 computed-style/page checks: Board, Inbox, Portals, Add, CV library, Job Detail and local auth at 360/390/768/1024/1280px. Exactly one page h1, 28/34/600; descriptions 15/24; visible canonical buttons Inter 14/20/600 with the initial 8px corners. The later visual correction below changes button corners to 12px. No page horizontal overflow. The audit found a native CV select reporting normal line-height; applying the shared select appearance corrected it to 24px, verified afterward.
+- Initial empty Board CTA computed mint/ink, 44px height and the same font/radius as Save/Approve. Inbox primary/secondary/delete icon colors matched their full-button counterparts. Native file-picker trigger computed 14px text and 44px minimum height.
+- Synthetic parse pending state, Add submission, notes failure/recovery, tailoring pending/background notification, retained-output save retry, Inbox held-results save retry and approval worked. Save-only retries retained the same one search/one tailoring provider-call count. Existing 36-test suite also exercises duplicate generation/retry protection and submitted-document/current-state guards.
+- Portal and CV dialogs retained long-name wrapping, 20/28 headings, 14/20 buttons, initial focus, Enter cancellation and recoverable storage-error state. Mobile CV dialog stayed within the viewport; long CV save labels grew without clipping. Native date editing, interview creation and Mark done worked; mobile actions remained >=44px and wrapped without page overflow.
+- Mock auth submission disabled fields/actions, exposed busy state, retained primary styling and returned a controlled error. Keyboard field focus used the dark-green outline. Sidebar collapsed/reload width remained 72px; collapsed account button fit at 44px. More retained Escape/focus restoration and a 20px title; mobile/desktop Sign out both computed red/white, 14/20, 44px.
+- Reflow at 640x450 (the effective CSS space of 1280x900 at 200% zoom) passed with long labels. Actual browser zoom could not be changed through the available browser automation; this is a reflow check, not a claim of real 200% zoom verification.
+- Calculated foreground/background contrast: current dark-green primary/off-white 9.36:1 (hover 6.94), muted on white 6.45, destructive/white 6.47, dark-green utility/focus on white 5.63. Field border/white is 3.18:1. Status numerical text checked at 4.92–5.93:1 for the corrected yellow/sky/green hues. Pale secondary borders use the approved palette; text/focus provide stronger distinctions.
+- `node --test tests/*.test.mjs`: 36 pass. Production build passes with existing large-chunk warning. Lint retains its five pre-existing errors/twelve warnings: useJobs `_interviewStage`, applyStreak/huntStreak prefer-const, docxExport control regex, matchScore `_roleHint`; none introduced by this work. Diff whitespace check passes.
+
+Limits: live authentication/cloud persistence, real Safari, assistive technology, physical-device safe areas and real browser 200% zoom remain unverified. Native hover/motion settings and very brief synchronous local deletion pending states were source-inspected rather than fully emulated. Pending/error state checks use mocks and do not establish live service performance. Local review remains available at http://127.0.0.1:5188/. Screenshots and fixture evidence stay in the chat workspace.
+
+## User visual correction (2026-10-17)
+
+The user supplied the earlier dark-green/white Add application button and asked to restore that design. This supersedes the earlier mint/ink primary palette. Restored #204b36 background, #f1fbf4 text/icons, #2b6044 hover and 12px button corners through the shared role, including primary icon actions. Button font sizes, 44px standard targets and existing disabled/focus behavior stay consistent. Computed desktop Add and mobile Parse/Save controls match the restored colors/radius; mobile has no horizontal overflow. Text contrast is 9.36:1 normal and 6.94:1 hover. Existing 36 tests/build pass; lint baseline unchanged. Preview screenshot: ui-primary-restored.png in the chat workspace.
+
+## Compact row icon correction (2026-10-17)
+
+After user review found Saved Searches and portal-feed icons too large, their shared IconAction variant now uses 36px visual boxes, 16px glyphs, 8px corners and 12px/16px captions. This is an explicit dense-row exception to standard buttons. At 640–1023px the outer target remains at least 44px wide (56px tall); desktop targets are compact. Below 640px the existing full-width/mobile text-action layout remains. Run keeps dark-green/off-white colors. Computed checks on both real page components confirm matching dimensions, no page overflow and unchanged Run color; tablet targets and phone fallback checked. Only CSS changed. 36 tests and build pass; lint remains five existing errors/twelve warnings. Screenshot ui-compact-search-actions.png stays in the chat workspace.
+
+## Desktop Board restoration (2026-10-17)
+
+The latest user image supersedes the desktop plain-header choice. At >=1024px Board again shows a pale-green welcome card with ApplyTrack, Find · Tailor · Track and the original command-center description, beside the white application-streak panel. Below that breakpoint the plain Board heading/description and stacked streak remain. A single responsive h1 keeps the 28px/34px shared title size; other pages and recent button/icon corrections are preserved. Existing grid zero-minimum tracks keep heatmap scrolling within its card.
+
+Computed checks at 360/390/768/1024/1280px found no page overflow. Desktop cards share top position/height (286px at 1280, 322px at 1024) and mobile/tablet remain stacked. Collapsed 72px sidebar also passes. 36 tests and build pass; existing five lint errors/twelve warnings remain. Screenshot ui-desktop-overview-restored.png is stored in the chat workspace. Local preview remains running; no release, data/provider changes or calls.
+
+## Deletion and empty-state extension (2026-10-17)
+
+The user expanded scope to request saved-search confirmation, a new Board empty-state icon, and outlined portal/Empty trash deletion buttons. The existing outline Board navigation icon now replaces the decorative clipboard emoji in a pale-green 56px tile. Portal Delete and Empty trash use white backgrounds, #b91c1c text and #fecaca borders through ui-danger-quiet. Their existing deletion mechanics remain. Other destructive roles are unchanged.
+
+Inbox desktop icon Delete and mobile edit-row Delete now both open a native, labeled confirmation dialog. Cancel receives initial focus; Cancel/Enter and Escape return to the invoking control without calling deleteSearch. A synchronous pending guard prevents duplicate submissions, disables Cancel/confirmation during persistence and exposes busy state. Failure stays in the dialog for retry; success clears only a matching edit state, closes and focuses the saved-search toggle. Account changes/unmount invalidate delayed dialog outcomes; already dispatched persistence cannot be recalled. Existing saved-search storage/provider code is unchanged.
+
+Verification used disposable local origin 5297, synthetic records and a fixture-only delayed/failing deletion gateway. Cancel/Escape checks dispatched zero deletions. A failed mobile deletion and retry stayed open with the search preserved; pending Enter/Escape caused no extra request. Exactly three gateway calls represented two deliberate failures and one successful retry. Success removed only the synthetic search, restored focus and kept the five original fixture searches after reload. Mobile dialog fit 390px without overflow. Computed portal, saved-search and Empty trash buttons match white/red/outlined colors; Empty trash was inspected without purging anything. The new empty-board icon was visually checked. 36 tests/build pass; lint remains five existing errors/twelve warnings; whitespace check passes. No real provider/database calls or changes to user preview data. Actual account-switch/native assistive-technology behavior remains source-inspected/unverified. Screenshots and fixture config stay outside the repository.
+
+## Board filter and portal form correction (2026-10-17)
+
+The Board filter now uses an explicit desktop density exception: 280px maximum width, 36px height and 14px/20px text at >=1024px. Touch layouts retain the standard 44px height/16px field text. The clear control uses a centered 14px outline glyph, transparent target and only a 24px circular hover accent, replacing the full tinted square. Its desktop target is 32px inset by 2px; touch target remains 44px. Existing focus indication remains. Clearing returns focus to the search input. Other fields are unchanged.
+
+New portal-feed creation now puts Save feed and Cancel together below all fields. Cancel remains type=button with its original draft reset/error clearing behavior; Save remains submit. Mobile retains its two equal action columns. Verified desktop 1280px and mobile 390px: search and clearing dimensions/centering, live filtering, Tab/Enter clear and pointer clear, empty clear-button removal, input focus restoration and no page overflow. Portal Save/Cancel share the same top position below the last field; Enter on Cancel closes without submitting, and reopening starts with an empty draft. No records were written or provider/database calls made. 36 tests/build pass, lint retains the existing five errors/twelve warnings. Screenshots ui-board-search-compact.png and ui-portal-actions-bottom.png stay in the chat workspace.
+
+## Shared field density and status borders (2026-10-17)
+
+The user requested extending the compact Board field sizing throughout the app. At >=1024px every ui-field input/select/textarea now uses 14px/20px text and 7px/10px padding; single-line inputs/selects have a 36px height. Below that breakpoint fields retain 16px/24px text and 44px single-line height for touch use. Textareas retain rows, multiline height and resizing. Explicit single-line height also normalizes the native date field. File-picker triggers, checkbox targets, labels and unrelated typography are unchanged. The shared classes cover auth fields as well; live auth remains unverified.
+
+Offer lost its outline because the shared button shorthand explicitly reset border color to transparent after the status color classes. The base now sets width/style without overriding color; workflow controls retain their intended normal/hover border colors. Board status actions use the same #dce8e4 normal border as other neutral actions. This also restores the Done control border without replacing its semantic color. Primary/destructive variants keep their existing explicit colors.
+
+Computed checks inspected ten desktop/mobile views across Add, CVs, portal creation, saved-search creation and job notes/interviews: all visible fields have matching role font/minimum-height values and no page overflow. Native date fields rechecked at exactly 36px desktop/44px mobile. Offer computes a solid, nontransparent #dce8e4 border on both layouts; clicking it successfully moves the disposable job to Offer. No provider/database calls or user preview writes were used. 36 tests/build pass; lint remains five pre-existing errors/twelve warnings. Evidence screenshots ui-compact-fields-global.png and ui-offer-border-fixed.png and computed audit remain in the chat workspace.
+
+## Not selected neutral tone (2026-10-17)
+
+Not selected now uses an explicit ui-neutral variant: white background, #374151 text and #d1d5db border; enabled hover is #f3f4f6 with #111827 text and #9ca3af border. Shared size/focus/disabled rules and the existing outcome handler remain. The user requested a neutral negative-outcome treatment rather than the green secondary hover.
+
+A disposable visual fixture imported the actual page/styles and disabled only this click handler so the pointer could remain over it without recording a status change. Browser :hover was true and computed exactly the gray/dark colors above. Other secondary/primary controls are unchanged. Existing 36 tests/build pass, lint retains five known errors/twelve warnings. Screenshot ui-not-selected-neutral.png stays in the chat workspace. No real provider/database calls or user record changes.
+
+## Responsive primary action widths (2026-10-17)
+
+Inbox Refresh active now spans both columns below 640px, leaving Saved searches/Clear review as a paired row. Add application and CV save use the same ui-form-actions wrapper: content-width, left-aligned above the phone breakpoint and full-width below it, with long-label wrapping. Submission handlers, disabled state and saved feedback remain unchanged. Browser checks at 390/1280px confirm matching font/color roles and responsive widths without horizontal overflow; mobile Refresh is 348px across its 348px row. No records were submitted or changed. 36 tests and build pass; lint retains the existing five errors/twelve warnings. Screenshot ui-refresh-full-width.png is outside the repository.
+
+## Dropdown arrow restoration (2026-10-17)
+
+The shared ui-field background shorthand cleared the form-select SVG arrow. Normal and disabled fields now set background-color only, preserving the existing 16px chevron, right position and 36px text clearance. Mobile/desktop Add dropdown computed styles confirm the arrow at 390/1280px; keyboard focus/navigation remains native. Screenshot ui-dropdown-arrows.png stays in the workspace. 36 tests/build pass; lint remains five existing errors/twelve warnings. No data changes.
+
+## Save labels and interview icon actions (2026-10-17)
+
+CV submit now reads Save CV regardless of template name (temporary Saved feedback retained). Both CV and application submit buttons are 160px from 640px upward and full row on phones. Corrected the earlier wrapper placement: only application submit uses ui-form-actions; Parse retains m-actions. Interviews reuse IconAction with check/Edit/Remove glyphs and captions, shared 36px boxes and primary/secondary/outlined-danger tones. Optional pressed prop preserves completion toggle state. Read-only display, persistence, draft controls and disabled guards remain. Fixture checks cover toggle, edit/cancel, 390px no overflow, 36px icons, desktop 160px matching save widths and full-width mobile saves. 36 tests/build pass; lint retains five errors/twelve warnings. Screenshot ui-interview-icon-actions.png remains outside source. Only synthetic fixture interview state changed.
+
+Interview action alignment: the row action group now uses fixed 76/44/52px grid columns, reserving the full Mark done caption width in both states. Groups stay right-aligned when wrapping. At 390px and 1280px, all three icon x positions are identical before/after toggling completion; no mobile overflow. Synthetic records only. 36 tests/build pass; existing lint five errors/twelve warnings. Screenshot ui-interview-alignment.png stays outside source.
+
+Mobile Delete correction: user rejected the persistent light-red fill. Removed the mobile override; Inbox and feed edit-row Delete controls share white backgrounds, red borders/text and white mobile hover/focus background matching the final screenshot reference. Mobile computed check confirms white/#b91c1c/#fecaca. No data changes. 36 tests/build pass; lint retains five existing errors/twelve warnings. Corrected screenshot ui-mobile-delete-corrected.png stays in workspace.
+
+Final mobile Delete reference: ui-mobile-delete now explicitly keeps the background white during hover as well, preventing the shared pink hover from lingering on touch devices. Inbox confirmation open/Cancel restores focus with white background and no record deletion. Tests/build pass; lint baseline unchanged. Screenshot ui-delete-reference-matched.png stays in workspace.
+
+## Independent Release review (2026-10-17)
+
+Release inspected the actual navigation/layout, shared styles, page/control diffs and saved-search confirmation against the inline approved scope and latest user corrections. Independently reran 36 Node tests (pass), build (pass with existing chunk warning), lint (the recorded five errors/twelve warnings), and whitespace checks. An isolated cloud-disabled Vite origin on port 5298, with no API plugin, kept the user's 5188 preview/storage untouched. Chromium checks covered Add/Inbox/Portals/CVs/missing Detail at 360/390/768/1023/1024/1280px with no horizontal overflow; regular pages have one h1 and fields switch from 16px touch text to 14px desktop text. Missing Detail retains its existing explanation state. Sidebar collapse persisted at 72px after reload. More opened as a native modal with body scroll locked, Close initially focused, and Escape restored More focus. A newly created disposable local search was preserved on Escape, then deleted by confirmation with focus restored to the saved-search toggle; mobile Delete retained a white background after focus restoration. Desktop Board and mobile confirmation were visually inspected. No live cloud/provider calls or user preview writes were made. Broader mocked state coverage remains Build evidence; Safari, assistive technology, physical safe areas, live auth/cloud/account switching and actual 200% zoom remain unverified as recorded above.

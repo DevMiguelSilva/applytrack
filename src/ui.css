@@ -1,0 +1,157 @@
+/* Canonical application UI roles. Exported/printed documents do not use this stylesheet. */
+:root {
+  --ui-primary: #204b36;
+  --ui-primary-hover: #2b6044;
+  --ui-on-primary: #f1fbf4;
+  --ui-ink: #020907;
+  --ui-muted: #4d635c;
+  --ui-line: #dce8e4;
+  --ui-field-line: #80958c;
+  --ui-focus: #23745e;
+  --ui-canvas: #fafdfc;
+}
+.ui-app { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; color: var(--ui-ink); }
+.ui-title, .ui-section-title, .ui-dialog-title { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 600; color: var(--ui-ink); overflow-wrap: anywhere; }
+.ui-title { font-size: 28px; line-height: 34px; letter-spacing: -0.025em; }
+.ui-section-title { font-size: 18px; line-height: 24px; letter-spacing: -0.015em; }
+.ui-dialog-title { font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
+.ui-body { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; }
+.ui-description { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 24px; color: var(--ui-muted); }
+.ui-helper, .ui-label { font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; }
+.ui-helper { color: var(--ui-muted); }
+.ui-label { font-weight: 500; color: var(--ui-muted); }
+.ui-meta { font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: 16px; }
+.ui-card-title { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; }
+.ui-section-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.ui-heading-copy { min-width: 0; flex: 1 1 260px; }
+.ui-heading-copy .ui-description { margin-top: 8px; max-width: 640px; }
+.ui-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ui-page { display: flex; flex-direction: column; gap: 24px; }
+.ui-page > .ui-section-header { margin-bottom: 0; }
+.ui-panel { border: 1px solid var(--ui-line); border-radius: 20px; background: white; padding: 16px; }
+.ui-dialog { color: var(--ui-ink); }
+.ui-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ui-button, .ui-status-button, .ui-filter {
+  display: inline-flex; min-height: 44px; min-width: 0; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px; border-width: 1px; border-style: solid; border-radius: 12px;
+  font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600;
+  text-align: center; white-space: normal; overflow-wrap: anywhere;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+.ui-button.ui-primary { background: var(--ui-primary); color: var(--ui-on-primary); border-color: var(--ui-primary); }
+.ui-button.ui-secondary { background: white; color: var(--ui-ink); border-color: var(--ui-line); }
+.ui-button.ui-neutral { background: white; color: #374151; border-color: #d1d5db; }
+.ui-button.ui-danger { background: #b91c1c; color: white; border-color: #b91c1c; }
+.ui-button.ui-danger-quiet { background: white; color: #b91c1c; border-color: #fecaca; }
+.ui-button.ui-primary:where(:not(:disabled):not([aria-disabled='true'])):hover { background: var(--ui-primary-hover); border-color: var(--ui-primary-hover); }
+.ui-button.ui-secondary:where(:not(:disabled):not([aria-disabled='true'])):hover { background: #e7f4ef; }
+.ui-button.ui-neutral:where(:not(:disabled):not([aria-disabled='true'])):hover { background: #f3f4f6; color: #111827; border-color: #9ca3af; }
+.ui-button.ui-danger:where(:not(:disabled):not([aria-disabled='true'])):hover { background: #991b1b; border-color: #991b1b; }
+.ui-button.ui-danger-quiet:where(:not(:disabled):not([aria-disabled='true'])):hover { background: #fef2f2; }
+.ui-button:disabled, .ui-field:disabled, .ui-status-button:disabled, .ui-filter:disabled, .ui-icon-action:disabled, .ui-inline:disabled { opacity: .6; cursor: not-allowed; }
+.ui-button:disabled, .ui-status-button:disabled, .ui-filter:disabled { pointer-events: none; }
+.ui-filter { background: white; color: var(--ui-ink); border-color: var(--ui-line); }
+.ui-filter[aria-pressed='true'], .ui-filter-active { background: #e7f4ef; border-color: var(--ui-focus); color: var(--ui-ink); }
+.ui-field {
+  display: block; min-height: 44px; min-width: 0; width: 100%; padding: 9px 12px; border: 1px solid var(--ui-field-line);
+  border-radius: 8px; background-color: white; color: var(--ui-ink); font-family: Inter, system-ui, sans-serif;
+  font-size: 16px; line-height: 24px; font-weight: 400;
+}
+input.ui-field, select.ui-field { height: 44px; }
+select.ui-field { padding-right: 36px; }
+textarea.ui-field { height: auto; resize: vertical; }
+.ui-field::placeholder { color: var(--ui-muted); opacity: 1; }
+.ui-field:disabled { background-color: #f1f5f3; }
+.ui-file { max-width: 100%; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--ui-muted); }
+.ui-file::file-selector-button { min-height: 44px; margin-right: 12px; padding: 10px 16px; border: 1px solid var(--ui-line); border-radius: 12px; background: white; color: var(--ui-ink); font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600; cursor: pointer; }
+.ui-file:disabled { opacity: .6; }
+.ui-icon-button { display: inline-flex; min-height: 44px; min-width: 44px; width: 44px; padding: 0; flex-shrink: 0; }
+.ui-icon-action { display: inline-flex; min-width: 44px; flex-direction: column; align-items: center; gap: 4px; padding: 0; border-radius: 8px; font: 600 12px/16px Inter, system-ui, sans-serif; }
+.ui-icon-action-box { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--ui-line); border-radius: 8px; background-color: white; color: var(--ui-ink); }
+.ui-icon-action-box > svg { width: 16px; height: 16px; flex-shrink: 0; }
+.ui-icon-action-danger .ui-icon-action-box { color: #b91c1c; border-color: #fecaca; }
+.ui-icon-action:not(:disabled):hover .ui-icon-action-box { background: #e7f4ef; }
+.ui-icon-action-danger:not(:disabled):hover .ui-icon-action-box { background: #fef2f2; }
+.ui-icon-action-danger { color: #b91c1c; }
+.ui-button > svg, .ui-status-button > svg, .ui-icon-button > svg { width: 20px; height: 20px; flex-shrink: 0; }
+.ui-inline { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 6px 0; border-radius: 4px; color: var(--ui-focus); font: 600 14px/20px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; }
+.ui-button:focus-visible, .ui-status-button:focus-visible, .ui-filter:focus-visible, .ui-field:focus-visible, .ui-icon-action:focus-visible, .ui-inline:focus-visible, .ui-file:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; box-shadow: none; }
+.ui-skill-control { min-height: 44px; font: 500 14px/20px Inter, system-ui, sans-serif; }
+.ui-stat { font-family: Inter, system-ui, sans-serif; }
+.ui-search { padding-left: 36px; padding-right: 44px; }
+.ui-search-clear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--ui-muted); background: transparent; }
+.ui-search-clear::before { content: ''; position: absolute; width: 24px; height: 24px; border-radius: 50%; }
+.ui-search-clear > svg { position: relative; width: 14px; height: 14px; }
+.ui-search-clear:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -4px; }
+.ui-app .ui-description, .ui-app .ui-helper, .ui-app .ui-label { color: var(--ui-muted); }
+@media (min-width: 640px) { .ui-panel { padding: 24px; } }
+@media (min-width: 1024px) {
+ .ui-field { min-height: 36px; padding: 7px 10px; font-size: 14px; line-height: 20px; }
+ input.ui-field, select.ui-field { height: 36px; }
+ select.ui-field { padding-right: 36px; }
+ .ui-search { min-height: 36px; padding: 7px 36px; font-size: 14px; line-height: 20px; }
+ .ui-search-clear { right: 2px; width: 32px; height: 32px; }
+ .ui-search-clear:focus-visible { outline-offset: -2px; }
+ .ui-icon-action { min-width: 36px; }
+ .ui-compact { min-height: 36px; padding: 7px 12px; }
+ .ui-icon-button.ui-compact { min-width: 36px; width: 36px; padding: 0; }
+ .ui-inline, .ui-skill-control { min-height: 36px; }
+}
+@media (max-width: 639px) { .ui-header-actions { width: 100%; } .ui-header-actions > .m-actions { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ui-button, .ui-filter, .ui-field, .ui-status-button { transition: none; } }
+
+.ui-surface { border: 1px solid var(--ui-line); border-radius: 20px; background: white; }
+.ui-empty { border-style: dashed; }
+.ui-app.mobile-app-shell { background: var(--ui-canvas); }
+.ui-icon-action-primary .ui-icon-action-box { background: var(--ui-primary); border-color: var(--ui-primary); color: var(--ui-on-primary); }
+.ui-icon-action-primary:not(:disabled):hover .ui-icon-action-box { background: var(--ui-primary-hover); }
+.ui-check-label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.ui-drag-control { min-height: 36px; min-width: 36px; }
+.ui-focus:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; box-shadow: none; }
+.ui-body, .ui-description, .ui-helper { font-weight: 400; }
+.mobile-sheet-heading .ui-dialog-title { font: 600 20px/28px 'Plus Jakarta Sans', system-ui, sans-serif; color: var(--ui-ink); letter-spacing: -0.015em; }
+.mobile-destination-title { font: 600 16px/24px Inter, system-ui, sans-serif; }
+.mobile-destination-caption { font: 400 14px/20px Inter, system-ui, sans-serif; }
+.mobile-tab { font: 600 14px/20px Inter, system-ui, sans-serif; }
+.mobile-inbox-badge { min-width: 20px; height: 20px; font: 600 12px/16px Inter, system-ui, sans-serif; }
+.sidebar-link, .desktop-sidebar .sidebar-control { font: 600 14px/20px Inter, system-ui, sans-serif; }
+.sidebar-group-label, .mobile-sheet-eyebrow, .workspace-breadcrumb { font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: 16px; }
+.sidebar-inbox-badge { font: 600 12px/16px Inter, system-ui, sans-serif; }
+.mobile-tab-icon svg, .sidebar-link-icon svg { width: 20px; height: 20px; }
+.ui-search-clear:hover { color: var(--ui-ink); }
+.ui-search-clear:hover::before { background: #e7f4ef; }
+.ui-nav-toggle:focus-visible { outline: 2px solid #a8dcb8; outline-offset: 2px; }
+@media (max-width: 1023px) { .ui-drag-control { min-height: 44px; min-width: 44px; } }
+@media (max-width: 639px) { .ui-app .m-actions > .ui-button { width: 100%; } }
+
+.ui-stat { flex-direction: column; gap: 0; }
+.ui-app .m-actions > .ui-button:only-child { grid-column: 1 / -1; }
+.ui-drag-control, .ui-skill-control { outline-offset: 2px; }
+.ui-drag-control:focus-visible, .ui-skill-control:focus-visible { outline: 2px solid var(--ui-focus); }
+.ui-skill-control:disabled { opacity: .6; pointer-events: none; }
+.ui-button[aria-disabled='true'] { opacity: .6; cursor: not-allowed; }
+
+.ui-app { background: var(--ui-canvas); }
+
+.ui-checkbox { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--ui-focus); }
+.ui-checkbox:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.ui-checkbox:disabled { opacity: .6; cursor: not-allowed; }
+.ui-check-target { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex-shrink: 0; }
+@media (min-width: 1024px) { .ui-check-target { min-width: 36px; min-height: 36px; } }
+
+.ui-form-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.ui-form-actions > .ui-button { max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  .ui-app .m-actions > .ui-mobile-full-row { grid-column: 1 / -1; }
+  .ui-form-actions > .ui-button { width: 100%; }
+}
+
+@media (min-width: 640px) { .ui-form-actions > .ui-button { width: 160px; } }
+
+.ui-interview-actions { display: grid; grid-template-columns: 76px 44px 52px; align-items: start; gap: 8px; margin-left: auto; }
+
+
+@media (max-width: 639px) {
+  .ui-button.ui-mobile-delete,
+  .ui-button.ui-mobile-delete:where(:not(:disabled):not([aria-disabled="true"])):hover { background-color: white; }
+}

@@ -50,7 +50,7 @@ export function JobDetailPage() {
   if (!job) {
     return (
       <div className="text-center">
-        <p className="text-slate-500">Job not found.</p>
+        <h1 className="ui-title">Job not found.</h1>
       </div>
     )
   }
@@ -81,12 +81,11 @@ export function JobDetailPage() {
   const statusBtn = (slot: 'saved' | 'applied' | 'interview' | 'offer' | 'rejected' | 'trash') =>
     `m-action rounded-lg px-4 py-2 text-sm font-semibold transition ${BOARD_TONE[slot].action}`
   const quietBtn =
-    'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8]'
-  const pasteBtn =
-    'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist'
-  const panel = 'rounded-[1.25rem] border border-[#e6eeeb] bg-white p-6'
+    "ui-button ui-secondary"
+
+  const panel = "ui-panel"
   const field =
-    'mt-2 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm leading-relaxed text-brand-ink outline-none transition focus:border-brand-primary'
+    "ui-field mt-2"
 
   const saveNotes = async () => {
     setSavingNotes(true)
@@ -195,26 +194,27 @@ export function JobDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-[1.25rem] border border-[#e6eeeb] bg-white p-6 sm:p-8">
+    <div className="ui-page">
+      <section className="ui-panel  ">
         <div className="m-action-row flex flex-wrap items-start justify-between gap-6">
           <div className="min-w-0">
             <p className="flex items-baseline gap-2">
               <span className={`text-sm font-medium ${tone.figure}`}>{statusLabel}</span>
-              <span className="text-[11px] text-brand-muted">{jobSourceLabel(job.source)}</span>
+              <span className="ui-meta text-brand-muted">{jobSourceLabel(job.source)}</span>
             </p>
-            <h1 className="mt-2 font-display text-[1.75rem] font-semibold leading-[1.2] tracking-tight text-brand-ink">
+            <h1 className="mt-2 ui-title">
               {job.role || 'Untitled role'}
             </h1>
-            <p className="mt-1 truncate text-sm text-brand-muted">{job.company || 'Unknown company'}</p>
-            <p className="truncate text-sm text-brand-muted">
+            <p className="mt-1 truncate ui-helper text-brand-muted">{job.company || 'Unknown company'}</p>
+            <p className="truncate ui-helper text-brand-muted">
               {job.location.trim() || 'No location'}
             </p>
-            <p className={`mt-2 text-sm ${job.salary.trim() ? 'text-brand-ink' : 'text-brand-muted'}`}>
+            <p className="ui-description mt-2">Manage this application, prepare documents and track your progress.</p>
+            <p className={`mt-2 ui-helper ${job.salary.trim() ? 'text-brand-ink' : 'text-brand-muted'}`}>
               {job.salary.trim() || 'No salary yet'}
             </p>
             {job.status !== 'saved' && (job.appliedDate || matchPercent != null) && (
-              <p className="mt-2 text-sm text-brand-muted">
+              <p className="mt-2 ui-helper text-brand-muted">
                 {[
                   job.appliedDate ? `Applied ${job.appliedDate}` : null,
                   matchPercent != null ? `${matchPercent}% match` : null,
@@ -224,29 +224,29 @@ export function JobDetailPage() {
               </p>
             )}
             {job.deletedAt && (
-              <p className="mt-1 text-xs text-brand-muted">Was {STATUS_CONFIG[job.status].label}</p>
+              <p className="mt-1 ui-meta text-brand-muted">Was {STATUS_CONFIG[job.status].label}</p>
             )}
             {job.status === 'interview' && job.notSelected && (
-              <p className="pt-2 text-sm text-brand-muted">Not selected</p>
+              <p className="pt-2 ui-helper text-brand-muted">Not selected</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
-              <p className="pt-2 text-sm text-emerald-700">Interview booked</p>
+              <p className="pt-2 ui-body text-emerald-700">Interview booked</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
-              <p className="pt-2 text-sm text-emerald-700">Waiting for an answer</p>
+              <p className="pt-2 ui-body text-emerald-700">Waiting for an answer</p>
             )}
             {jdIncomplete && !job.needsRescore && (
-              <p className="pt-2 text-sm text-[#8a6230]">Description incomplete</p>
+              <p className="pt-2 ui-body text-[#8a6230]">Description incomplete</p>
             )}
           </div>
 
           <div className="m-actions flex flex-wrap gap-2">
             {job.deletedAt ? (
               <>
-                <button type="button" data-slot="saved" data-role="primary" onClick={handleRestore} className={statusBtn('saved')}>
+                <button type="button" data-slot="saved" data-role="primary" onClick={handleRestore} className={`${statusBtn('saved')} ui-status-button`}>
                   Restore
                 </button>
-                <button type="button" data-slot="rejected" onClick={handlePurge} className={statusBtn('rejected')}>
+                <button type="button" data-slot="rejected" onClick={handlePurge} className={`${statusBtn('rejected')} ui-status-button`}>
                   Delete
                 </button>
               </>
@@ -258,7 +258,7 @@ export function JobDetailPage() {
                     data-slot="applied"
                     data-role="primary"
                     onClick={() => moveJob(job.id, 'applied')}
-                    className={statusBtn('applied')}
+                    className={`${statusBtn('applied')} ui-status-button`}
                   >
                     Mark as applied
                   </button>
@@ -270,11 +270,11 @@ export function JobDetailPage() {
                       data-slot="interview"
                       data-role="primary"
                       onClick={() => moveJob(job.id, 'interview')}
-                      className={statusBtn('interview')}
+                      className={`${statusBtn('interview')} ui-status-button`}
                     >
                       Interview
                     </button>
-                    <button type="button" data-slot="rejected" onClick={() => moveJob(job.id, 'rejected')} className={statusBtn('rejected')}>
+                    <button type="button" data-slot="rejected" onClick={() => moveJob(job.id, 'rejected')} className={`${statusBtn('rejected')} ui-status-button`}>
                       Rejected
                     </button>
                   </>
@@ -289,7 +289,7 @@ export function JobDetailPage() {
                       data-slot="offer"
                       data-role="primary"
                       onClick={() => moveJob(job.id, 'offer')}
-                      className={statusBtn('offer')}
+                      className={`${statusBtn('offer')} ui-status-button`}
                     >
                       Offer
                     </button>
@@ -298,7 +298,7 @@ export function JobDetailPage() {
                         type="button"
                         data-role="quiet"
                         onClick={() => updateJob(job.id, { notSelected: true })}
-                        className={`${quietBtn} m-action`}
+                        className="ui-button ui-neutral m-action"
                       >
                         Not selected
                       </button>
@@ -306,7 +306,7 @@ export function JobDetailPage() {
                   </>
                 )}
                 {job.status === 'saved' && (
-                  <button type="button" data-slot="trash" onClick={handleDelete} className={statusBtn('trash')}>
+                  <button type="button" data-slot="trash" onClick={handleDelete} className="ui-button ui-danger-quiet m-action">
                     Move to trash
                   </button>
                 )}
@@ -333,24 +333,24 @@ export function JobDetailPage() {
       </section>
 
       <section className={panel}>
-        <span className="text-sm text-brand-muted">Posting URL</span>
+        <span className="ui-helper text-brand-muted">Posting URL</span>
         {hasUrl ? (
           <a
             href={job.jobUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 block truncate text-sm text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline"
+            className="ui-inline mt-1 max-w-full break-words"
           >
             Open original posting
           </a>
         ) : (
-          <p className="mt-1 text-sm text-brand-muted">No URL on this job</p>
+          <p className="mt-1 ui-helper text-brand-muted">No URL on this job</p>
         )}
       </section>
 
       {job.status === 'saved' && !job.deletedAt && (jdIncomplete || editingJd) && (
         <section className={`${panel} space-y-4`}>
-          <h2 className="font-display text-base font-semibold text-brand-ink">Job description</h2>
+          <h2 className=" ui-section-title">Job description</h2>
 
           {!editingJd ? (
             job.needsRescore ? (
@@ -358,27 +358,27 @@ export function JobDetailPage() {
                 <button
                   type="button"
                   data-role="primary"
-                  disabled={savingJd || parsingJd}
+                  disabled={savingJd || parsingJd} aria-busy={savingJd || parsingJd}
                   onClick={() => void saveJd(job.jobDescription)}
-                  className={`${pasteBtn} m-action disabled:opacity-60`}
+                  className="ui-button ui-primary m-action"
                 >
                   {parsingJd || savingJd ? 'Rescoring…' : 'Rescore'}
                 </button>
                 {jdError && (
-                  <p className="text-sm text-[#8a6230]" role="alert">
+                  <p className="ui-body text-[#8a6230]" role="alert">
                     {jdError}
                   </p>
                 )}
               </div>
             ) : (
-              <button type="button" data-role="primary" onClick={openJdEditor} className={`${quietBtn} m-action`}>
+              <button type="button" data-role="primary" onClick={openJdEditor} className="ui-button ui-secondary m-action">
                 Paste full job description
               </button>
             )
           ) : (
             <div className="space-y-3">
-              <label className="block">
-                <span className="text-sm text-brand-muted">Full job description</span>
+              <label className="ui-label block">
+                <span className="ui-label text-brand-muted">Full job description</span>
                 <textarea
                   value={jdDraft}
                   onChange={(e) => setJdDraft(e.target.value)}
@@ -388,7 +388,7 @@ export function JobDetailPage() {
                 />
               </label>
               {jdError && (
-                <p className="text-sm text-[#8a6230]" role="alert">
+                <p className="ui-body text-[#8a6230]" role="alert">
                   {jdError}
                 </p>
               )}
@@ -398,7 +398,7 @@ export function JobDetailPage() {
                   data-role="primary"
                   disabled={savingJd || parsingJd}
                   onClick={() => void saveJd(jdDraft)}
-                  className={`${pasteBtn} m-action disabled:opacity-60`}
+                  className="ui-button ui-primary m-action"
                 >
                   {parsingJd ? 'Parsing…' : savingJd ? 'Saving…' : 'Parse, save & rescore'}
                 </button>
@@ -410,7 +410,7 @@ export function JobDetailPage() {
                     setEditingJd(false)
                     setJdError(null)
                   }}
-                  className={`${quietBtn} m-action disabled:opacity-60`}
+                  className="ui-button ui-secondary m-action"
                 >
                   Cancel
                 </button>
@@ -426,7 +426,7 @@ export function JobDetailPage() {
         job.jobDescription) && (
         <section className={`${panel} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-base font-semibold text-brand-ink">Posting overview</h2>
+            <h2 className=" ui-section-title">Posting overview</h2>
             {job.status === 'saved' && !job.deletedAt && job.jdComplete && !editingJd && (
               <button type="button" onClick={openJdEditor} className={quietBtn}>
                 Update
@@ -435,18 +435,18 @@ export function JobDetailPage() {
           </div>
           {job.jdSummary && (
             <div>
-              <h3 className="mb-1 text-sm text-brand-muted">Summary</h3>
-              <p className="text-sm leading-relaxed text-brand-ink">{job.jdSummary}</p>
+              <h3 className="mb-1 ui-label">Summary</h3>
+              <p className="ui-body leading-relaxed text-brand-ink">{job.jdSummary}</p>
             </div>
           )}
           {job.extractedSkills.length > 0 && (
             <div>
-              <h3 className="mb-2 text-sm text-brand-muted">Skills from the posting</h3>
+              <h3 className="mb-2 ui-label">Skills from the posting</h3>
               <div className="flex flex-wrap gap-2">
                 {job.extractedSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink"
+                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink"
                   >
                     {skill}
                   </span>
@@ -456,8 +456,8 @@ export function JobDetailPage() {
           )}
           {job.extractedRequirements.length > 0 && (
             <div>
-              <h3 className="mb-2 text-sm text-brand-muted">Requirements</h3>
-              <ul className="space-y-1 text-sm text-brand-ink">
+              <h3 className="mb-2 ui-label">Requirements</h3>
+              <ul className="space-y-1 ui-body text-brand-ink">
                 {job.extractedRequirements.map((req) => (
                   <li key={req} className="flex gap-2">
                     <span className="text-brand-muted">•</span>
@@ -473,7 +473,7 @@ export function JobDetailPage() {
               {showFullJd ? (
                 <>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm text-brand-muted">Full text</h3>
+                    <h3 className=" ui-label">Full text</h3>
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => void copyFullJd()} className={quietBtn}>
                         {jdCopied ? 'Copied' : 'Copy'}
@@ -484,7 +484,7 @@ export function JobDetailPage() {
                     </div>
                   </div>
                   <div
-                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-brand-ink"
+                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap ui-body leading-relaxed text-brand-ink"
                     role="region"
                     aria-label="Job description"
                   >
@@ -496,7 +496,7 @@ export function JobDetailPage() {
                   type="button"
                   data-role="quiet"
                   onClick={() => setShowFullJd(true)}
-                  className={`${quietBtn} m-action`}
+                  className="ui-button ui-secondary m-action"
                   aria-expanded={false}
                 >
                   {jdIncomplete ? 'Show listing preview' : 'Show full job description'}
@@ -504,14 +504,14 @@ export function JobDetailPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-brand-muted">No description saved yet.</p>
+            <p className="ui-helper text-brand-muted">No description saved yet.</p>
           )}
         </section>
       )}
 
       <section className={`${panel} space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-display text-base font-semibold text-brand-ink">Personal notes</h2>
+          <h2 className=" ui-section-title">Personal notes</h2>
           {!editingNotes && (
             <button
               type="button"
@@ -536,7 +536,7 @@ export function JobDetailPage() {
               className={field}
             />
             {notesError && (
-              <p className="text-sm text-[#8a6230]" role="alert">
+              <p className="ui-body text-[#8a6230]" role="alert">
                 {notesError}
               </p>
             )}
@@ -544,9 +544,9 @@ export function JobDetailPage() {
               <button
                 type="button"
                 data-role="primary"
-                disabled={savingNotes}
+                disabled={savingNotes} aria-busy={savingNotes}
                 onClick={() => void saveNotes()}
-                className={`${pasteBtn} m-action disabled:opacity-60`}
+                className="ui-button ui-primary m-action"
               >
                 {savingNotes ? 'Saving…' : 'Save'}
               </button>
@@ -558,21 +558,21 @@ export function JobDetailPage() {
                   setEditingNotes(false)
                   setNotesError(null)
                 }}
-                className={`${quietBtn} m-action disabled:opacity-60`}
+                className="ui-button ui-secondary m-action"
               >
                 Cancel
               </button>
             </div>
           </div>
         ) : notesText.trim() ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{notesText}</p>
+          <p className="whitespace-pre-wrap ui-body leading-relaxed text-brand-ink">{notesText}</p>
         ) : (
-          <p className="text-sm text-brand-muted">No notes yet.</p>
+          <p className="ui-helper text-brand-muted">No notes yet.</p>
         )}
       </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
-      {job.status === 'saved' && !job.deletedAt && <label className="block rounded-2xl border border-[#e6eeeb] bg-white p-5 text-sm text-brand-muted">CV template<select aria-label="CV template" className="mt-2 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-brand-ink" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
+      {job.status === 'saved' && !job.deletedAt && <label className="ui-label block">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
       {job.jdComplete && <TailorPanel job={job} />}
     </div>
   )
