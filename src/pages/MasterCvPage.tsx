@@ -1,4 +1,5 @@
 import { TrashIcon } from '../components/TrashIcon'
+import { SectionHeader } from '../components/SectionHeader'
 import { useEffect, useRef, useState } from 'react'
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
@@ -23,9 +24,9 @@ import {
   type MasterCv,
 } from '../types/cv'
 
-const card = 'min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6'
-const button = 'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-mist disabled:opacity-50'
-const field = 'w-full min-w-0 rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none focus:border-brand-primary'
+const card = "ui-panel min-w-0 space-y-4"
+const button = "ui-button ui-secondary legacy-size-text_sm"
+const field = "ui-field legacy-size-text_sm"
 
 export function MasterCvPage() {
   const {
@@ -136,73 +137,70 @@ export function MasterCvPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-brand-muted">Loading master CV…</p>
+    return <p className="ui-helper text-brand-muted legacy-size-text_sm">Loading master CV…</p>
   }
 
-  if (loadError || !cv) return <div className={card}><p role="alert">{loadError ?? 'CV template unavailable.'}</p><button className={button} onClick={() => void reload()}>Retry loading CVs</button></div>
+  if (loadError || !cv) return <div className={card}><p role="alert" className="ui-helper">{loadError ?? 'CV template unavailable.'}</p><button className="ui-button ui-primary" onClick={() => void reload()}>Retry loading CVs</button></div>
   const locked = busy || importing
   const refs = deleting ? templateReferences(library, deleting, jobs, searches) : { jobs: [], searches: [] }
   const needsReplacement = refs.jobs.length + refs.searches.length > 0
 
   return (
-    <div className="mx-auto min-w-0 max-w-3xl space-y-6 text-brand-ink">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">CV library</h1><p className="mt-2 text-sm text-brand-muted">Keep a master CV for each kind of role you apply to.</p></div>
-        <button type="button" className={button} disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>
-      </header>
-      {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 text-sm text-red-700"><p role="alert">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
+    <div className="ui-page ui-cv-page mx-auto min-w-0 max-w-3xl" aria-busy={locked}>
+      <SectionHeader title="CV library" description="Create and manage master CVs for the roles you apply to." actions={<button type="button" className="ui-button ui-primary" disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>} />
+      {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 legacy-size-text_sm"><p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
       {showAdd && <form className={card} onSubmit={(e) => { e.preventDefault(); void run(async () => { await saveDraft(); await addTemplate(newName, copyFrom || undefined); setNewName(''); setShowAdd(false) }) }}>
-        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">New CV template</h2>
-        <label className="block text-sm text-brand-muted">Template name<input required disabled={locked} className={`${field} mt-1`} value={newName} onChange={(e) => setNewName(e.target.value)} /></label>
-        <label className="block text-sm text-brand-muted">Start from<select className={`${field} mt-1`} disabled={locked} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}><option value="">Blank CV</option>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-        <div className="flex min-w-0 gap-2"><button className={button} disabled={locked || !newName.trim()}>Create CV</button><button type="button" className={button} disabled={locked} onClick={() => setShowAdd(false)}>Cancel</button></div>
+        <h2 className="break-words ui-section-title legacy-size-text_lg">New CV template</h2>
+        <label className="ui-label block legacy-size-text_sm">Template name<input required disabled={locked} className={`${field} mt-1`} value={newName} onChange={(e) => setNewName(e.target.value)} /></label>
+        <label className="ui-label block legacy-size-text_sm">Start from<select className={`${field} mt-1 form-select`} disabled={locked} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}><option value="">Blank CV</option>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+        <div className="flex min-w-0 gap-2"><button className="ui-button ui-primary" disabled={locked || !newName.trim()}>Create CV</button><button type="button" className={button} disabled={locked} onClick={() => setShowAdd(false)}>Cancel</button></div>
       </form>}
       <section className={card}>
-        <label className="block text-sm font-medium">Selected CV<select aria-label="Selected CV" disabled={locked} className={`${field} mt-2`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-brand-muted">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }} /></div>
-        {rename !== null && <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="block text-sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className={button} disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
+        <label className="ui-label block legacy-size-text_sm">Selected CV<select aria-label="Selected CV" disabled={locked} className={`${field} mt-2 form-select`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto ui-meta text-brand-muted legacy-size-text_xs">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }} /></div>
+        {rename !== null && <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="ui-label block legacy-size-text_sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className="ui-button ui-primary" disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
       </section>
-      <dialog ref={dialog} onCancel={(e) => { if (locked) e.preventDefault(); else setDeleting(null) }} className="w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-[#e6eeeb] bg-white p-6 text-brand-ink backdrop:bg-brand-ink/30">
-        {deleting && <div className="min-w-0 space-y-4"><h2 className="break-words text-xl font-semibold">Delete {getLabel(deleting)}?</h2><p className="text-sm text-brand-muted">This removes the template and its attached resume. Submitted application documents stay saved.</p>
-          {needsReplacement && <><p className="text-sm">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto text-sm">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
-          <label className="block text-sm">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-          {importError && <p role="alert" className="text-sm text-red-700">{importError}</p>}
-          <div className="flex flex-wrap gap-2"><CvDeleteButton label="Delete template" disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })} />{busy && <span role="status" className="self-center text-sm text-brand-muted">Deleting…</span>}<button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
+      <dialog ref={dialog} aria-labelledby="delete-cv-title" aria-describedby="delete-cv-description" aria-busy={locked} onCancel={(e) => { if (locked) e.preventDefault(); else setDeleting(null) }} className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg backdrop:bg-brand-ink/30">
+        {deleting && <div className="min-w-0 space-y-4"><h2 id="delete-cv-title" className="break-words ui-dialog-title legacy-size-text_xl">Delete {getLabel(deleting)}?</h2><p id="delete-cv-description" className="ui-helper text-brand-muted legacy-size-text_sm">This removes the template and its attached resume. Submitted application documents stay saved.</p>
+          {needsReplacement && <><p className="ui-body legacy-size-text_sm">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto ui-body legacy-size-text_sm">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
+          <label className="ui-label block legacy-size-text_sm">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1 form-select`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+          {importError && <p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{importError}</p>}
+          <div className="flex flex-wrap gap-2"><CvDeleteButton confirm label="Delete template" disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })} />{busy && <span role="status" className="self-center ui-helper text-brand-muted legacy-size-text_sm">Deleting…</span>}<button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
         </div>}
       </dialog>
       <fieldset disabled={locked} className="min-w-0 space-y-6">
-      <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
-        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Attach resume → fill form</h2>
+      <section className="ui-panel min-w-0 space-y-4">
+        <h2 className="break-words ui-section-title legacy-size-text_lg">Attach resume → fill form</h2>
         <input
           type="file"
           accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           disabled={locked}
           onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-brand-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          className="ui-file w-full"
         />
         {attachment && (
-          <p className="break-words text-xs text-brand-muted">
+          <p className="break-words ui-meta text-brand-muted legacy-size-text_xs">
             Stored: <span className="font-medium">{attachment.fileName}</span> ·{' '}
             {new Date(attachment.uploadedAt).toLocaleString()} ·{' '}
             {attachment.extractedText.length.toLocaleString()} chars extracted
           </p>
         )}
-        {importing && <p className="text-sm text-brand-primaryDeep">Importing…</p>}
+        {importing && <p className="ui-helper !text-[#23745e] legacy-size-text_sm">Importing…</p>}
         {importError && (
-          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <p className="rounded-lg bg-red-50 p-3 ui-helper !text-red-700 legacy-size-text_sm">
             {importError}
           </p>
         )}
         {importNote && (
-          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+          <p className="rounded-lg bg-emerald-50 p-3 ui-helper !text-emerald-800 legacy-size-text_sm">
             {importNote}
           </p>
         )}
       </section>
 
       <form onSubmit={handleSave} className="space-y-6">
-        <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
-          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Contact · {getLabel(editingTrack)}</h2>
+        <section className="ui-panel min-w-0 space-y-4">
+          <h2 className="break-words ui-section-title legacy-size-text_lg">Contact · {getLabel(editingTrack)}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -212,19 +210,19 @@ export function MasterCvPage() {
                 ['location', 'Location'],
               ] as const
             ).map(([key, label]) => (
-              <label key={key} className="block text-sm">
+              <label key={key} className="ui-label block legacy-size-text_sm">
                 <span className="font-medium">{label}</span>
                 <input
                   value={cv.contact[key]}
                   onChange={(e) =>
                     setCv({ ...cv, contact: { ...cv.contact, [key]: e.target.value } })
                   }
-                  className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
+                  className="mt-1 min-w-0 w-full ui-field"
                 />
               </label>
             ))}
           </div>
-          <label className="block text-sm">
+          <label className="ui-label block legacy-size-text_sm">
             <span className="font-medium">Links (comma-separated)</span>
             <input
               value={cv.contact.links.join(', ')}
@@ -240,24 +238,24 @@ export function MasterCvPage() {
                   },
                 })
               }
-              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
+              className="mt-1 min-w-0 w-full ui-field"
             />
           </label>
-          <label className="block text-sm">
+          <label className="ui-label block legacy-size-text_sm">
             <span className="font-medium">Headline</span>
             <input
               value={cv.headline}
               onChange={(e) => setCv({ ...cv, headline: e.target.value })}
-              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
+              className="mt-1 min-w-0 w-full ui-field"
             />
           </label>
-          <label className="block text-sm">
+          <label className="ui-label block legacy-size-text_sm">
             <span className="font-medium">Summary</span>
             <textarea
               value={cv.summary}
               onChange={(e) => setCv({ ...cv, summary: e.target.value })}
               rows={5}
-              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
+              className="mt-1 min-w-0 w-full ui-field"
             />
           </label>
         </section>
@@ -282,12 +280,14 @@ export function MasterCvPage() {
           onChange={(certifications) => setCv({ ...cv, certifications })}
         />
 
+        <div className="ui-form-actions">
         <button
           type="submit"
-          disabled={locked} className="w-full break-words rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primaryDeep"
+          disabled={locked} className="ui-button ui-primary break-words"
         >
-          {saved ? '✓ Saved' : `Save ${getLabel(editingTrack)} CV`}
+          {saved ? '✓ Saved' : 'Save CV'}
         </button>
+        </div>
       </form>
       </fieldset>
     </div>
@@ -302,12 +302,12 @@ function SkillGroupsEditor({
   onChange: (skills: CvSkillGroup[]) => void
 }) {
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+    <section className="ui-panel min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Skills</h2>
+        <h2 className="break-words ui-section-title legacy-size-text_lg">Skills</h2>
         <button
           type="button"
-          className={button}
+          className="ui-button ui-primary"
           onClick={() =>
             onChange([...skills, { id: crypto.randomUUID(), group: 'Group', items: [] }])
           }
@@ -325,7 +325,7 @@ function SkillGroupsEditor({
                 next[index] = { ...group, group: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 w-full ui-field"
             />
             <CvDeleteButton
               label={`Remove ${group.group || 'skill'} group`}
@@ -346,7 +346,7 @@ function SkillGroupsEditor({
               onChange(next)
             }}
             placeholder="React, TypeScript, …"
-            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+            className="min-w-0 w-full ui-field"
           />
         </div>
       ))}
@@ -354,7 +354,7 @@ function SkillGroupsEditor({
   )
 }
 
-function CvDeleteButton({ onClick, label, disabled }: { onClick: () => void; label: string; disabled?: boolean }) {
+function CvDeleteButton({ onClick, label, disabled, confirm = false }: { onClick: () => void; label: string; disabled?: boolean; confirm?: boolean }) {
   return (
     <button
       type="button"
@@ -362,9 +362,9 @@ function CvDeleteButton({ onClick, label, disabled }: { onClick: () => void; lab
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e6eeeb] bg-white text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+      className={confirm ? "ui-button ui-danger" : "ui-button ui-danger-quiet ui-icon-button ui-compact"}
     >
-      <TrashIcon />
+      <TrashIcon />{confirm && <span>{label}</span>}
     </button>
   )
 }
@@ -377,12 +377,12 @@ function ExperienceEditor({
   onChange: (experience: CvExperience[]) => void
 }) {
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+    <section className="ui-panel min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Experience</h2>
+        <h2 className="break-words ui-section-title legacy-size-text_lg">Experience</h2>
         <button
           type="button"
-          className={button}
+          className="ui-button ui-primary"
           onClick={() =>
             onChange([
               ...experience,
@@ -405,7 +405,7 @@ function ExperienceEditor({
       {experience.map((exp, index) => (
         <div key={exp.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
+            <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Role {index + 1}
             </p>
             <CvDeleteButton
@@ -422,7 +422,7 @@ function ExperienceEditor({
                 next[index] = { ...exp, title: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={exp.company}
@@ -432,7 +432,7 @@ function ExperienceEditor({
                 next[index] = { ...exp, company: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={exp.location}
@@ -442,7 +442,7 @@ function ExperienceEditor({
                 next[index] = { ...exp, location: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <div className="flex min-w-0 gap-2">
               <input
@@ -453,7 +453,7 @@ function ExperienceEditor({
                   next[index] = { ...exp, start: e.target.value }
                   onChange(next)
                 }}
-                className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+                className="min-w-0 w-full ui-field"
               />
               <input
                 value={exp.end}
@@ -464,13 +464,13 @@ function ExperienceEditor({
                   next[index] = { ...exp, end: e.target.value }
                   onChange(next)
                 }}
-                className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+                className="min-w-0 w-full ui-field"
               />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="ui-label ui-check-label legacy-size-text_sm">
             <input
-              type="checkbox"
+              type="checkbox" className="ui-checkbox"
               checked={exp.current}
               onChange={(e) => {
                 const next = [...experience]
@@ -499,7 +499,7 @@ function ExperienceEditor({
             }}
             rows={4}
             placeholder="One bullet per line"
-            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+            className="min-w-0 w-full ui-field"
           />
         </div>
       ))}
@@ -515,12 +515,12 @@ function ProjectsEditor({
   onChange: (projects: CvProject[]) => void
 }) {
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+    <section className="ui-panel min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Projects</h2>
+        <h2 className="break-words ui-section-title legacy-size-text_lg">Projects</h2>
         <button
           type="button"
-          className={button}
+          className="ui-button ui-primary"
           onClick={() =>
             onChange([
               ...projects,
@@ -539,7 +539,7 @@ function ProjectsEditor({
       {projects.map((project, index) => (
         <div key={project.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
+            <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Project {index + 1}
             </p>
             <CvDeleteButton
@@ -555,7 +555,7 @@ function ProjectsEditor({
               next[index] = { ...project, name: e.target.value }
               onChange(next)
             }}
-            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+            className="min-w-0 w-full ui-field"
           />
           <input
             value={project.url}
@@ -565,7 +565,7 @@ function ProjectsEditor({
               next[index] = { ...project, url: e.target.value }
               onChange(next)
             }}
-            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+            className="min-w-0 w-full ui-field"
           />
           <textarea
             value={project.bullets.map((b) => b.text).join('\n')}
@@ -585,7 +585,7 @@ function ProjectsEditor({
               onChange(next)
             }}
             rows={3}
-            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+            className="min-w-0 w-full ui-field"
           />
         </div>
       ))}
@@ -608,16 +608,16 @@ function EducationEditor({
   const movable = education.length - preview.education.length
 
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+    <section className="ui-panel min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Education</h2>
+          <h2 className="break-words ui-section-title legacy-size-text_lg">Education</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {movable > 0 && (
             <button
               type="button"
-              className="text-sm font-medium text-amber-700 hover:underline"
+              className="ui-button ui-secondary legacy-size-text_sm"
               onClick={onSplitCerts}
             >
               Move {movable} cert{movable === 1 ? '' : 's'} → Certifications
@@ -625,7 +625,7 @@ function EducationEditor({
           )}
           <button
             type="button"
-            className={button}
+            className="ui-button ui-primary"
             onClick={() =>
               onChange([
                 ...education,
@@ -640,7 +640,7 @@ function EducationEditor({
       {education.map((edu, index) => (
         <div key={edu.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
+            <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Education {index + 1}
             </p>
             <CvDeleteButton
@@ -657,7 +657,7 @@ function EducationEditor({
                 next[index] = { ...edu, degree: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={edu.school}
@@ -667,7 +667,7 @@ function EducationEditor({
                 next[index] = { ...edu, school: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={edu.start ?? ''}
@@ -677,7 +677,7 @@ function EducationEditor({
                 next[index] = { ...edu, start: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={edu.end ?? ''}
@@ -687,7 +687,7 @@ function EducationEditor({
                 next[index] = { ...edu, end: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
           </div>
         </div>
@@ -704,14 +704,14 @@ function CertificationsEditor({
   onChange: (certifications: CvCertification[]) => void
 }) {
   return (
-    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+    <section className="ui-panel min-w-0 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Certifications</h2>
+          <h2 className="break-words ui-section-title legacy-size-text_lg">Certifications</h2>
         </div>
         <button
           type="button"
-          className={button}
+          className="ui-button ui-primary"
           onClick={() =>
             onChange([
               ...certifications,
@@ -725,7 +725,7 @@ function CertificationsEditor({
       {certifications.map((cert, index) => (
         <div key={cert.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
+            <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Certification {index + 1}
             </p>
             <CvDeleteButton
@@ -742,7 +742,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, name: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm sm:col-span-1"
+              className="min-w-0 sm:col-span-1 ui-field"
             />
             <input
               value={cert.issuer}
@@ -752,7 +752,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, issuer: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
             <input
               value={cert.year}
@@ -762,7 +762,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, year: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
+              className="min-w-0 ui-field"
             />
           </div>
         </div>

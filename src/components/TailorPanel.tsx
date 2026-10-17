@@ -34,24 +34,18 @@ function hasGapContent(gap: GapReport): boolean {
 }
 
 const quietBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+  "ui-button ui-secondary legacy-size-text_sm"
 const pasteBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
-const quietOn =
-  'rounded-lg border border-brand-primary bg-brand-mist px-4 py-2 text-sm font-semibold text-brand-ink disabled:opacity-60'
-const nested = 'rounded-[1.25rem] border border-[#e6eeeb] bg-[#fafdfc] p-4 sm:p-5'
+  "ui-button ui-primary legacy-size-text_sm"
+const nested = "ui-panel"
 
-function panelButtonClass(active: boolean, primary = false): string {
-  if (active) return quietOn
-  return primary ? pasteBtn : quietBtn
-}
 
 function skillKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 const skillLink =
-  'text-left font-medium underline-offset-4 transition hover:underline'
+  "ui-inline ui-skill-control text-left"
 
 const chipHave = 'rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink'
 const chipAdded = 'rounded-lg border border-brand-primary bg-brand-mist px-2.5 py-1 text-sm text-brand-ink'
@@ -79,7 +73,7 @@ function SkillName({
       type="button"
       aria-expanded={active}
       onClick={onClick}
-      className={`${skillLink} text-brand-ink hover:text-brand-primaryDeep ${active || added ? 'underline' : ''}`}
+      className={`${`${skillLink} text-brand-ink hover:text-[#23745e] ${active || added ? 'underline' : ''}`} ui-skill-control`}
     >
       {skill}
     </button>
@@ -96,10 +90,10 @@ function SkillAnswer({
   summary: string | null
 }) {
   return (
-    <div className="mt-2 text-sm leading-relaxed text-brand-ink">
+    <div className="mt-2 ui-body text-brand-ink">
       {loading && <p className="text-brand-muted">Looking it up…</p>}
       {error && (
-        <p className="text-red-700" role="alert">
+        <p className="ui-helper !text-red-700" role="alert">
           {error}
         </p>
       )}
@@ -113,9 +107,9 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const { getForJob, loading: docsLoading } = useTailoredDocs()
   const doc = getForJob(job.id)
   const masterCv = resolveJobCv(library, job, doc)
-  if (loading || docsLoading) return <p className="text-sm text-brand-muted">Loading application documents…</p>
-  if (job.status === 'saved' && loadError) return <p role="alert" className="text-sm text-red-700">{loadError}</p>
-  if (!masterCv) return <section className="rounded-2xl border border-[#e6eeeb] bg-white p-5"><h2 className="font-semibold">Application document unavailable</h2><p className="mt-2 text-sm text-brand-muted">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
+  if (loading || docsLoading) return <p className="ui-helper text-brand-muted legacy-size-text_sm">Loading application documents…</p>
+  if (job.status === 'saved' && loadError) return <p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{loadError}</p>
+  if (!masterCv) return <section className="ui-panel  "><h2 className=" ui-section-title">Application document unavailable</h2><p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
   return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} templateLabel={job.status === 'saved' ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
 }
 
@@ -351,14 +345,14 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   const claimFor = (row: (typeof transferSuggestions)[number]) => {
     if (addedKeys.has(skillKey(row.skill))) {
       return skillsLocked ? (
-        <span className="text-sm font-medium text-brand-ink">Added</span>
+        <span className="ui-body font-medium text-brand-ink legacy-size-text_sm">Added</span>
       ) : (
         <button
           type="button"
-          disabled={!!loading}
+          disabled={!!loading} aria-busy={!!loading}
           onClick={() => void toggleClaimedSkill(row.skill)}
           title="Click to remove it from this resume"
-          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline disabled:opacity-60"
+          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-[#23745e] hover:underline disabled:opacity-60 ui-skill-control legacy-size-text_sm"
         >
           Added
         </button>
@@ -366,7 +360,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
     }
     return row.checkIt ? (
       skillsLocked ? (
-        <span className="text-sm font-medium text-brand-ink">
+        <span className="ui-body font-medium text-brand-ink legacy-size-text_sm">
           {transferCheck(row.difficulty) === 'yes' ? 'Yes' : 'Probably'}
         </span>
       ) : (
@@ -374,7 +368,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
           type="button"
           disabled={!!loading}
           onClick={() => void toggleClaimedSkill(row.skill)}
-          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline disabled:opacity-60"
+          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-[#23745e] hover:underline disabled:opacity-60 ui-skill-control legacy-size-text_sm"
         >
           {transferCheck(row.difficulty) === 'yes' ? 'Yes' : 'Probably'}
         </button>
@@ -393,10 +387,10 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   }
 
   return (
-    <div className="space-y-4 rounded-[1.25rem] border border-[#e6eeeb] bg-white p-4 sm:p-6">
+    <div className="ui-panel space-y-4">
       <div>
-        <h2 className="font-display text-base font-semibold text-brand-ink">ATS tailor & export</h2>
-        <p className="mt-1 text-sm text-brand-muted">
+        <h2 className=" ui-section-title legacy-size-text_base">ATS tailor & export</h2>
+        <p className="mt-1 ui-helper text-brand-muted legacy-size-text_sm">
           Using <span className="text-brand-ink">{templateLabel}</span> master CV. One
           button writes the resume and the cover letter. Click it again to show or hide both.
           {skillsLocked
@@ -411,7 +405,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
           data-role="quiet"
           disabled={!!loading}
           onClick={onGapClick}
-          className={`${panelButtonClass(showGap)} m-action w-full sm:w-auto`}
+          className="ui-button ui-primary m-action"
         >
           {loading === 'gap' ? 'Checking…' : 'Gap check'}
         </button>
@@ -420,7 +414,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
           data-role="primary"
           disabled={!!loading}
           onClick={onTailorClick}
-          className={`${panelButtonClass(showTailor, true)} m-action w-full sm:w-auto`}
+          className={`${tailoredCv ? quietBtn : pasteBtn} m-action w-full sm:w-auto`}
         >
           {loading === 'tailor' ? 'Tailoring…' : tailoredCv ? (showTailor ? 'Hide files' : 'See files') : 'Tailor'}
         </button>
@@ -428,27 +422,27 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
 
       {loading && <LoadingSpinner label="Working…" />}
       {error && (
-        <p className="text-sm text-red-700" role="alert">
+        <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
           {error}
         </p>
       )}
-      {task?.phase === 'failed' && <div role="alert" className="space-y-2 text-sm text-red-700">
-        <p>{task.error}</p>
-        {!skillsLocked && <button type="button" className={quietBtn} onClick={() => void (task.output ? retrySave(job.id) : runTailor())}>{task.output ? 'Retry save' : 'Retry tailoring'}</button>}
+      {task?.phase === 'failed' && <div role="alert" className="space-y-2">
+        <p className="ui-helper !text-red-700">{task.error}</p>
+        {!skillsLocked && <button type="button" className="ui-button ui-primary" onClick={() => void (task.output ? retrySave(job.id) : runTailor())}>{task.output ? 'Retry save' : 'Retry tailoring'}</button>}
       </div>}
-      {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border border-brand-line bg-white px-4 py-3 text-sm font-medium text-brand-ink shadow-sm sm:bottom-6">Cover letter copied</div>}
+      {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 max-w-[calc(100%-2rem)] text-center rounded-lg border border-brand-line bg-white px-4 py-3 ui-helper font-medium !text-brand-ink shadow-sm lg:bottom-6 legacy-size-text_sm">Cover letter copied</div>}
 
       {showGap && hasGapContent(gapReport) && (
         <div className={nested}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm text-brand-muted">
+            <h3 className=" ui-label legacy-size-text_sm">
               Keyword coverage: {gapReport.coveragePercent}%
             </h3>
             <button type="button" className={quietBtn} onClick={() => setPanelOpen('gap', false)}>
               Close
             </button>
           </div>
-          <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-brand-muted">
+          <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 ui-meta text-brand-muted legacy-size-text_xs">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm bg-[#f4faf8] ring-1 ring-[#dce8e4]" />
               On your CV
@@ -479,14 +473,14 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
                   disabled={!!loading}
                   onClick={() => void toggleClaimedSkill(item.skill)}
                   title={item.state === 'added' ? 'Click to remove it from this resume' : 'Click if you know this skill'}
-                  className={className}
+                  className={`${className} ui-skill-control`}
                 >
                   {item.skill}
                 </button>
               )
             })}
           </div>
-          <ul className="mt-3 space-y-1 text-sm text-brand-ink">
+          <ul className="mt-3 space-y-1 ui-body text-brand-ink legacy-size-text_sm">
             {gapReport.suggestions
               .filter((s) => !(skillsLocked && s.startsWith('Warm chips')))
               .map((s) => (
@@ -499,7 +493,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
           {transferSuggestions.length > 0 && (
             <div className="mt-4 border-t border-[#e6eeeb] pt-4">
               <h4 className="text-sm font-medium text-brand-ink">Compared with your CV</h4>
-              <p className="mt-1 hidden text-sm text-brand-muted sm:block">
+              <p className="mt-1 hidden ui-helper text-brand-muted sm:block legacy-size-text_sm">
                 How hard it is to become proficient, based on what is already on your CV. A check
                 stays in this list.
               </p>
@@ -512,14 +506,14 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
                       active={explainSkillName === row.skill}
                       onClick={() => void lookupSkill(row.skill)}
                     />
-                    <p className="mt-1 text-sm">
+                    <p className="mt-1 ui-body legacy-size-text_sm">
                       <span className={transferDifficultyClass(row.difficulty)}>
                         {transferDifficultyLabel(row.difficulty)}
                       </span>
                       <span className="text-brand-muted"> · </span>
                       {claimFor(row)}
                     </p>
-                    <p className="mt-0.5 text-sm text-brand-muted">{baseFor(row)}</p>
+                    <p className="mt-0.5 ui-helper text-brand-muted legacy-size-text_sm">{baseFor(row)}</p>
                     {explainSkillName === row.skill && (
                       <SkillAnswer
                         loading={explainLoading}
@@ -590,7 +584,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
       {showTailor && tailoredCv && (
         <div className={nested}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm text-brand-muted">Tailored preview</h3>
+            <h3 className=" ui-label legacy-size-text_sm">Tailored preview</h3>
             <div className="flex items-center gap-2">
               {!skillsLocked && (
                 <button
@@ -611,12 +605,12 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
               </button>
             </div>
           </div>
-          <p className="text-sm font-medium text-brand-ink">{tailoredCv.headline}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">
+          <p className="ui-body font-medium text-brand-ink legacy-size-text_sm">{tailoredCv.headline}</p>
+          <p className="mt-2 whitespace-pre-wrap ui-body text-brand-ink legacy-size-text_sm">
             {tailoredCv.summary}
           </p>
           {tailoredCv.experience[0]?.bullets?.length ? (
-            <ul className="mt-3 space-y-1 text-sm text-brand-ink">
+            <ul className="mt-3 space-y-1 ui-body text-brand-ink legacy-size-text_sm">
               {tailoredCv.experience[0].bullets.slice(0, 4).map((b) => (
                 <li key={b.id} className="flex gap-2">
                   <span className="text-brand-muted">•</span>
@@ -631,7 +625,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
               data-role="primary"
               disabled={!!loading}
               onClick={handleApplicationPack}
-              className={`${pasteBtn} m-action`}
+              className="ui-button ui-secondary m-action"
               title="ZIP folder with resume and cover letter"
             >
               {loading === 'pack' ? 'Packing…' : 'Download application folder'}
@@ -641,7 +635,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
               data-role="quiet"
               disabled={!!loading}
               onClick={handlePrint}
-              className={`${quietBtn} m-action`}
+              className="ui-button ui-secondary m-action"
             >
               {loading === 'print' ? 'Opening…' : 'Print / PDF'}
             </button>
@@ -652,7 +646,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
       {showTailor && (
         <div className={nested}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm text-brand-muted">Cover letter</h3>
+            <h3 className=" ui-label legacy-size-text_sm">Cover letter</h3>
             {coverLetter.trim() && (
               <div className="flex items-center gap-2">
                 <button
@@ -669,9 +663,9 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
             )}
           </div>
           {coverLetter.trim() ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{coverLetter}</p>
+            <p className="whitespace-pre-wrap ui-body text-brand-ink legacy-size-text_sm">{coverLetter}</p>
           ) : (
-            <p className="text-sm text-brand-muted">
+            <p className="ui-helper text-brand-muted legacy-size-text_sm">
               No cover letter saved with this resume. Re-run creates the resume and the letter together.
             </p>
           )}

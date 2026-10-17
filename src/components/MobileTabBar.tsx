@@ -1,69 +1,74 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { NavLink, useLocation } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { useJobs } from '../hooks/useJobs'
 import { useInbox } from '../hooks/useInbox'
-
-const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${
-    isActive ? 'text-brand-primary' : 'text-brand-muted'
-  }`
-
+import { NavigationIcon } from './NavigationIcon'
+const tabClass = (active: boolean) => `nav-focus mobile-tab ${active ? 'mobile-tab-active' : ''}`
 export function MobileTabBar() {
   const { newCount } = useInbox()
+  const { user, isCloudEnabled, signOut } = useAuth()
+  const { isCloudSync } = useJobs()
+  const { pathname } = useLocation()
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState(false)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const more = useRef<HTMLButtonElement>(null)
+  useEffect(() => { setOpen(false); setError(false) }, [pathname, user?.id, isCloudEnabled])
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)')
+    const resize = () => { if (media.matches) setOpen(false) }
+    media.addEventListener('change', resize)
+    return () => media.removeEventListener('change', resize)
+  }, [])
+  useEffect(() => {
+    if (!open || !dialog.current) return
+    const modal = dialog.current
+    const trigger = more.current
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    modal.showModal()
+    return () => {
+      modal.close()
+      document.body.style.overflow = overflow
+      if (!window.matchMedia('(min-width: 1024px)').matches) trigger?.focus()
+    }
+  }, [open])
 
-  return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 sm:hidden"
-    >
-      <div className="grid h-16 grid-cols-3 rounded-2xl border border-brand-line bg-white/95 shadow-lg shadow-brand-ink/10 backdrop-blur-md">
-        <NavLink to="/" end className={tabClass}>
-          <BoardIcon />
-          Board
-        </NavLink>
-        <NavLink to="/portals" className={tabClass}>
-          <PortalsIcon />
-          Portals
-        </NavLink>
-        <NavLink to="/inbox" className={tabClass}>
-          <span className="relative">
-            <InboxIcon />
-            {newCount > 0 && (
-              <span className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-primary px-1 text-[9px] font-bold text-brand-ink">
-                {newCount > 99 ? '99+' : newCount}
-              </span>
-            )}
-          </span>
-          Inbox
-        </NavLink>
+  return <>
+    <nav aria-label="Primary" className="mobile-navigation fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 lg:hidden">
+      <div className="mobile-navigation-surface">
+        {([{ text: 'Board', to: '/' }, { text: 'Portals', to: '/portals' }, { text: 'Inbox', to: '/inbox' }] as const).map(({ text, to }) => <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => tabClass(isActive)}>
+          <span className="mobile-tab-icon"><NavigationIcon name={text} />{text === 'Inbox' && newCount > 0 && <span className="mobile-inbox-badge">{newCount > 99 ? '99+' : newCount}</span>}</span><span>{text}</span>
+        </NavLink>)}
+        <button ref={more} type="button" className={tabClass(open || pathname === '/add' || pathname === '/cv')} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open} aria-controls="more-navigation"><span className="mobile-tab-icon"><NavigationIcon name="More" /></span><span>More</span></button>
       </div>
     </nav>
-  )
-}
-
-function BoardIcon() {
-  return (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
-      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
-      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
-    </svg>
-  )
-}
-
-function PortalsIcon() {
-  return (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-      <circle cx="12" cy="12" r="8" />
-      <path strokeLinecap="round" d="M4 12h16M12 4c2.2 2.4 3.3 5.2 3.3 8s-1.1 5.6-3.3 8c-2.2-2.4-3.3-5.2-3.3-8s1.1-5.6 3.3-8z" />
-    </svg>
-  )
-}
-
-function InboxIcon() {
-  return (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13l2.2-6.2A2 2 0 017.1 5.5h9.8a2 2 0 011.9 1.3L21 13v4.5a2 2 0 01-2 2H5a2 2 0 01-2-2V13z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13h5l1.5 2h5L16 13h5" />
-    </svg>
-  )
+    {createPortal(<dialog ref={dialog} id="more-navigation" aria-labelledby="more-title" className="navigation-sheet" onCancel={() => setOpen(false)} onKeyDown={event => {
+      if (event.key !== 'Tab') return
+      const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')]
+      const first = controls[0], last = controls[controls.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }} onClick={event => {
+      if (event.target !== event.currentTarget) return
+      const bounds = event.currentTarget.getBoundingClientRect()
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setOpen(false)
+    }}>
+      <div className="mobile-workspace">
+        <div className="mobile-sheet-handle" aria-hidden="true" />
+        <div className="mobile-sheet-heading"><div><p className="mobile-sheet-eyebrow">YOUR WORKSPACE</p><h2 className="ui-dialog-title" id="more-title">More</h2></div><button autoFocus type="button" aria-label="Close More" className="ui-button ui-secondary ui-icon-button" onClick={() => setOpen(false)}><NavigationIcon name="close" /></button></div>
+        <nav aria-label="More destinations" className="mobile-destination-grid">
+          <NavLink to="/add" aria-label="Add" className="nav-focus mobile-destination mobile-destination-primary"><span className="mobile-destination-icon"><NavigationIcon name="Add" /></span><span className="mobile-destination-title">Add application</span><span className="mobile-destination-caption">Track a new opportunity</span></NavLink>
+          <NavLink to="/cv" aria-label="CVs" className="nav-focus mobile-destination"><span className="mobile-destination-icon"><NavigationIcon name="CVs" /></span><span className="mobile-destination-title">CV library</span><span className="mobile-destination-caption">Manage your master CVs</span></NavLink>
+        </nav>
+        {(isCloudSync || isCloudEnabled) && <div className="mobile-account-panel">
+          {isCloudSync && <p className="flex items-center gap-3 px-4 py-3 text-sm text-emerald-700"><NavigationIcon name="Synced" /><span>Synced to cloud</span><span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /></p>}
+          {isCloudEnabled && (user ? <button type="button" className="ui-button ui-danger-quiet" onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />Sign out</button> : <NavLink to="/login" className="ui-button ui-primary w-full"><NavigationIcon name="Sign in" />Sign in</NavLink>)}
+          {error && <p role="alert" className="px-4 text-sm text-red-700">Sign out failed. Please retry.</p>}
+        </div>}
+      </div>
+    </dialog>, document.body)}
+  </>
 }

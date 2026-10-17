@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { IconAction } from './IconAction'
 import { formControlClass } from '../lib/formUi'
 import { getErrorMessage } from '../lib/errorMessage'
 import {
@@ -7,12 +8,9 @@ import {
   type InterviewRound,
 } from '../types/job'
 
-const quietBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-ink transition hover:bg-[#f4faf8]'
-const interviewBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-ink transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700'
-const removeBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-700'
+
+
+
 
 interface InterviewListProps {
   interviews: InterviewRound[]
@@ -98,13 +96,13 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       }
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-semibold">Interviews</h2>
+        <h2 className=" ui-section-title">Interviews</h2>
         {!readOnly && !adding && !editingId && (
           <button
             type="button"
-            disabled={saving}
+            disabled={saving} aria-busy={saving}
             onClick={startAdd}
-            className={`${interviewBtn} px-3 py-1.5 text-sm disabled:opacity-50`}
+            className="ui-button ui-primary ui-compact"
           >
             Add interview
           </button>
@@ -112,7 +110,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       </div>
 
       {interviews.length === 0 && !adding && (
-        <p className="text-sm text-slate-500">No interviews yet.</p>
+        <p className="ui-helper text-slate-500 legacy-size-text_sm">No interviews yet.</p>
       )}
 
       {interviews.length > 0 && (
@@ -144,58 +142,33 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
             return (
               <li
                 key={round.id}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${rowTone}`}
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${rowTone}`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  <p className="ui-helper font-medium !text-slate-800 dark:text-slate-100 legacy-size-text_sm">
                     {formatInterviewDate(round.date)}
                   </p>
                   {round.label && (
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">{round.label}</p>
+                    <p className="truncate ui-meta text-slate-500 dark:text-slate-400 legacy-size-text_xs">{round.label}</p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="ui-interview-actions">
                   {readOnly ? (
                     round.done && (
-                      <span className="text-xs font-medium text-teal-700 dark:text-teal-300">Done</span>
+                      <span className="ui-meta font-medium text-teal-700 dark:text-teal-300 legacy-size-text_xs">Done</span>
                     )
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        aria-pressed={round.done}
-                        disabled={saving}
-                        onClick={() =>
-                          void persist(
-                            interviews.map((item) =>
-                              item.id === round.id ? { ...item, done: !item.done } : item
-                            )
-                          )
-                        }
-                        className={`px-2.5 py-1 text-xs disabled:opacity-50 ${
-                          round.done
-                            ? 'rounded-lg border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700'
-                            : interviewBtn
-                        }`}
-                      >
-                        {round.done ? 'Done' : 'Mark done'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => startEdit(round)}
-                        className={`${quietBtn} px-2.5 py-1 text-xs disabled:opacity-50`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void persist(interviews.filter((item) => item.id !== round.id))}
-                        className={`${removeBtn} px-2.5 py-1 text-xs disabled:opacity-50`}
-                      >
-                        Remove
-                      </button>
+                      <IconAction label={round.done ? 'Done' : 'Mark done'} pressed={round.done} primary disabled={saving}
+                        onClick={() => void persist(interviews.map((item) => item.id === round.id ? { ...item, done: !item.done } : item))}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" /></svg>
+                      </IconAction>
+                      <IconAction label="Edit" disabled={saving} onClick={() => startEdit(round)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m16 3 5 5L8 21H3v-5L16 3Z" /></svg>
+                      </IconAction>
+                      <IconAction label="Remove" danger disabled={saving} onClick={() => void persist(interviews.filter((item) => item.id !== round.id))}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></svg>
+                      </IconAction>
                     </>
                   )}
                 </div>
@@ -220,7 +193,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       )}
 
       {error && (
-        <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
+        <p className="ui-helper !text-amber-700 dark:!text-amber-300 legacy-size-text_sm" role="alert">
           {error}
         </p>
       )}
@@ -251,8 +224,8 @@ function DraftFields({
 }) {
   return (
     <div className="grid gap-2 rounded-xl border border-[#e6eeeb] p-3 sm:grid-cols-[1fr_11rem_auto] sm:items-end">
-      <label className="block">
-        <span className="text-xs text-brand-muted">Name</span>
+      <label className="ui-label block">
+        <span className="ui-label text-brand-muted legacy-size-text_xs">Name</span>
         <input
           disabled={saving}
           value={labelDraft}
@@ -261,8 +234,8 @@ function DraftFields({
           className={formControlClass}
         />
       </label>
-      <label className="block">
-        <span className="text-xs text-brand-muted">Date</span>
+      <label className="ui-label block">
+        <span className="ui-label text-brand-muted legacy-size-text_xs">Date</span>
         <input
           type="date"
           disabled={saving}
@@ -276,7 +249,7 @@ function DraftFields({
           type="button"
           disabled={!draftReady || saving}
           onClick={onSubmit}
-          className={`${interviewBtn} px-3 py-2 text-sm disabled:opacity-50`}
+          className="ui-button ui-primary ui-compact"
         >
           {saving ? 'Saving…' : submitLabel}
         </button>
@@ -284,7 +257,7 @@ function DraftFields({
           type="button"
           disabled={saving}
           onClick={onCancel}
-          className={`${quietBtn} px-3 py-2 text-sm disabled:opacity-50`}
+          className="ui-button ui-secondary ui-compact"
         >
           Cancel
         </button>

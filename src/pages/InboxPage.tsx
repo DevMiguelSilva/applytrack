@@ -1,30 +1,30 @@
+import { SectionHeader } from '../components/SectionHeader'
 import { InboxRefreshSummary } from '../components/InboxRefreshSummary'
 import { TrashIcon } from '../components/TrashIcon'
-import { useMemo, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { boardLook } from '../components/BoardLook'
 import { attachCardDragGhost } from '../components/JobCard'
 import { IconAction } from '../components/IconAction'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useInbox } from '../hooks/useInbox'
+import { useAuth } from '../hooks/useAuth'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { expandSearchLocations } from '../lib/searchLocations'
 import { type CvTrack } from '../types/cv'
 import { createEmptySavedSearch, type SavedSearch } from '../types/job'
 
-const toolbarBtn =
-  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
-const refreshBtn =
-  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+
+
 const rowBtn =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+  "ui-button ui-secondary ui-compact legacy-size-text_sm"
 const rowRun =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+  "ui-button ui-primary ui-compact legacy-size-text_sm"
 const rowDanger =
-  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-50'
-const fieldLabel = 'text-sm text-brand-muted'
+  "ui-button ui-danger-quiet ui-compact ui-mobile-delete legacy-size-text_sm"
+const fieldLabel = "ui-label legacy-size-text_sm"
 const fieldControl =
-  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
+  "ui-field mt-1 legacy-size-text_sm"
 
 const emptyDraft = {
   label: '',
@@ -42,6 +42,8 @@ try {
 }
 
 export function InboxPage() {
+  const { user, isCloudEnabled } = useAuth()
+  const account = isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
   const {
     inbox,
     loading,
@@ -75,6 +77,76 @@ export function InboxPage() {
   const [editDraft, setEditDraft] = useState(emptyDraft)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [deletingSearch, setDeletingSearch] = useState<SavedSearch | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const deleteDialog = useRef<HTMLDialogElement>(null)
+  const cancelDeleteButton = useRef<HTMLButtonElement>(null)
+  const searchToggle = useRef<HTMLButtonElement>(null)
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null)
+  const deletePending = useRef(false)
+  const deleteAttempt = useRef(0)
+
+  // A confirmation belongs to the current account/page, including delayed results.
+  useEffect(() => {
+    setDeletingSearch(null)
+    setDeleting(false)
+    setDeleteError(null)
+    return () => {
+      deleteAttempt.current += 1
+      deletePending.current = false
+    }
+  }, [account])
+
+  useEffect(() => {
+    if (deletingSearch) {
+      deleteDialog.current?.showModal()
+      cancelDeleteButton.current?.focus()
+    } else {
+      deleteDialog.current?.close()
+    }
+  }, [deletingSearch])
+
+  const requestDeleteSearch = (search: SavedSearch, trigger: HTMLButtonElement) => {
+    deleteTrigger.current = trigger
+    setDeleteError(null)
+    setDeletingSearch(search)
+  }
+
+  const cancelDeleteSearch = () => {
+    if (deletePending.current) return
+    deleteDialog.current?.close()
+    setDeletingSearch(null)
+    setDeleteError(null)
+    if (deleteTrigger.current?.isConnected) deleteTrigger.current.focus()
+    else searchToggle.current?.focus()
+  }
+
+  const confirmDeleteSearch = async () => {
+    if (!deletingSearch || deletePending.current) return
+    const searchId = deletingSearch.id
+    const attempt = ++deleteAttempt.current
+    deletePending.current = true
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteSearch(searchId)
+      if (attempt !== deleteAttempt.current) return
+      setEditingId(current => current === searchId ? null : current)
+      deleteDialog.current?.close()
+      setDeletingSearch(null)
+      searchToggle.current?.focus()
+    } catch (err) {
+      if (attempt === deleteAttempt.current) {
+        setDeleteError(err instanceof Error ? err.message : 'Failed to delete saved search')
+      }
+    } finally {
+      if (attempt === deleteAttempt.current) {
+        deletePending.current = false
+        setDeleting(false)
+      }
+    }
+  }
 
   const newJobs = useMemo(
     () => inbox.filter((j) => j.status === 'new').sort((a, b) => b.matchScore - a.matchScore),
@@ -238,24 +310,20 @@ export function InboxPage() {
     setEditingId(null)
   }
 
-  const dismissBtn =
-    'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-red-200 hover:text-red-700 disabled:opacity-60'
-  const approveBtn =
-    'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+
+
 
   return (
-    <div className="space-y-4">
-      <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
-        <h1 className={boardLook.headline}>Inbox</h1>
-        <div className="m-actions flex flex-wrap gap-2">
-          <button type="button" onClick={() => setShowSearches((v) => !v)} className={toolbarBtn}>
+    <div className="ui-page">
+      <SectionHeader title="Inbox" description="Review job matches from your saved searches, then approve or dismiss them." actions={<div className="m-actions flex flex-wrap gap-2">
+          <button ref={searchToggle} type="button" onClick={() => setShowSearches((v) => !v)} className="ui-button ui-secondary">
             {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
           </button>
           <button
             type="button"
             onClick={handleClearReview}
             disabled={refreshing || newCount === 0}
-            className={toolbarBtn}
+            className="ui-button ui-secondary"
           >
             Clear review list
           </button>
@@ -264,15 +332,15 @@ export function InboxPage() {
             data-role="primary"
             onClick={handleRefresh}
             disabled={refreshing || Boolean(runningAloneId)}
-            className={refreshBtn}
+            aria-busy={refreshing}
+            className="ui-button ui-primary ui-mobile-full-row"
           >
             {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
           </button>
-        </div>
-      </div>
+        </div>} />
 
       <div className={`${boardLook.card} px-5 py-4`}>
-        <p className="text-sm text-brand-ink">
+        <p className="ui-helper !text-brand-ink legacy-size-text_sm">
           <span className="font-semibold tabular-nums">{newCount}</span>
           <span className="text-brand-muted"> ready to review</span>
           {newCount > 0 && (
@@ -283,7 +351,7 @@ export function InboxPage() {
             </span>
           )}
         </p>
-        <p className="mt-1 text-xs text-brand-muted">
+        <p className="mt-1 ui-meta text-brand-muted legacy-size-text_xs">
           {activeSearches.length === 0
             ? searches.length === 0
               ? 'No saved searches yet.'
@@ -295,7 +363,7 @@ export function InboxPage() {
       </div>
 
       {(error || refreshError) && (
-        <p className="text-sm text-red-700" role="alert">
+        <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
           {error || refreshError}
         </p>
       )}
@@ -303,8 +371,8 @@ export function InboxPage() {
       {refreshReport && <InboxRefreshSummary report={refreshReport} busy={refreshing} retryFailed={retryFailedSearches} retrySave={retryInboxSave} />}
 
       {showSearches && (
-        <section className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
-          <h2 className="font-display text-base font-semibold text-brand-ink">Saved searches</h2>
+        <section className={`ui-panel space-y-4`}>
+          <h2 className=" ui-section-title legacy-size-text_base">Saved searches</h2>
           <ul className="space-y-3">
             {searches.map((search, index) => (
               <li
@@ -332,7 +400,7 @@ export function InboxPage() {
                   onRun={() => void handleRunAlone(search.id)}
                   onEdit={() => startEdit(search)}
                   onToggleActive={() => void updateSearch(search.id, { active: !search.active })}
-                  onDelete={() => void deleteSearch(search.id)}
+                  onDelete={event => requestDeleteSearch(search, event.currentTarget)}
                   onSave={() => void saveEdit(search.id)}
                   onCancel={() => setEditingId(null)}
                 />
@@ -342,15 +410,15 @@ export function InboxPage() {
 
           <div className="border-t border-[#e6eeeb] pt-4">
             {!showAddSearch ? (
-              <button type="button" onClick={() => setShowAddSearch(true)} className={toolbarBtn}>
+              <button type="button" onClick={() => setShowAddSearch(true)} className="ui-button ui-primary">
                 Add search
               </button>
             ) : (
               <form onSubmit={handleAddSearch} className="space-y-3">
-                <p className="font-display text-base font-semibold text-brand-ink">New saved search</p>
+                <p className="ui-section-title legacy-size-text_base">New saved search</p>
                 <SearchFields draft={draft} setDraft={setDraft} />
                 <div className="m-actions flex flex-wrap gap-2">
-                  <button type="submit" data-role="primary" className={refreshBtn}>
+                  <button type="submit" data-role="primary" className="ui-button ui-primary">
                     Save search
                   </button>
                   <button
@@ -360,7 +428,7 @@ export function InboxPage() {
                       setShowAddSearch(false)
                       setDraft(emptyDraft)
                     }}
-                    className={toolbarBtn}
+                    className="ui-button ui-secondary"
                   >
                     Cancel
                   </button>
@@ -388,28 +456,28 @@ export function InboxPage() {
             const searchName = job.savedSearchId ? searchLabelById.get(job.savedSearchId) : undefined
             const seenBefore = (job.seenCount ?? 1) > 1
             return (
-              <li key={job.id} className={`${boardLook.card} inbox-job p-4 sm:p-5`}>
+              <li key={job.id} className={`ui-panel inbox-job`}>
                 <div className="inbox-job-facts min-w-0">
-                  <p className={`text-sm ${seenBefore ? 'text-[#8a6230]' : 'text-brand-muted'}`}>
+                  <p className={`ui-helper ${seenBefore ? 'text-[#8a6230]' : 'text-brand-muted'}`}>
                     {seenBefore ? 'Seen before' : 'New'}
                   </p>
-                  <h3 className="mt-2 font-sans text-base font-semibold leading-snug text-brand-ink">
+                  <h3 className="mt-2 ui-inbox-job-title legacy-size-text_base">
                     {job.role || 'Untitled role'}
                   </h3>
-                  <p className="mt-1 truncate text-sm text-brand-muted">{job.company || 'Unknown company'}</p>
+                  <p className="mt-1 truncate ui-meta text-brand-muted legacy-size-text_sm">{job.company || 'Unknown company'}</p>
                   {job.location.trim() && (
-                    <p className="truncate text-sm text-brand-muted">{job.location}</p>
+                    <p className="truncate ui-meta text-brand-muted legacy-size-text_sm">{job.location}</p>
                   )}
-                  {job.salary.trim() && <p className="mt-2 text-sm text-brand-ink">{job.salary}</p>}
+                  {job.salary.trim() && <p className="mt-2 ui-meta !text-brand-ink legacy-size-text_sm">{job.salary}</p>}
                   {searchName && (
-                    <p className="mt-2 text-sm text-brand-muted">Found by {searchName}</p>
+                    <p className="mt-2 ui-meta text-brand-muted legacy-size-text_sm">Found by {searchName}</p>
                   )}
                   {job.jobUrl && (
                     <a
                       href={job.jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2 inline-block text-sm text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline"
+                      className="ui-inline ui-posting-link mt-2 legacy-size-text_sm"
                     >
                       Open original posting
                     </a>
@@ -420,20 +488,20 @@ export function InboxPage() {
                     {skills.map((skill) => (
                       <span
                         key={skill}
-                        className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink"
+                        className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"
                       >
                         {skill}
                       </span>
                     ))}
                   </div>
                 )}
-                <div className="inbox-job-actions m-actions flex flex-wrap gap-2">
+                <div aria-busy={actionId === job.id} className="inbox-job-actions m-actions flex flex-wrap gap-2">
                   <button
                     type="button"
                     data-role="quiet"
                     disabled={actionId === job.id}
                     onClick={() => handleDismiss(job.id)}
-                    className={dismissBtn}
+                    className="ui-button ui-secondary"
                   >
                     Dismiss
                   </button>
@@ -442,7 +510,7 @@ export function InboxPage() {
                     data-role="primary"
                     disabled={actionId === job.id}
                     onClick={() => handleApprove(job.id)}
-                    className={approveBtn}
+                    className="ui-button ui-primary"
                   >
                     Approve
                   </button>
@@ -452,6 +520,26 @@ export function InboxPage() {
           })}
         </ul>
       )}
+      <dialog
+        ref={deleteDialog}
+        aria-labelledby="delete-search-title"
+        aria-describedby="delete-search-description"
+        aria-busy={deleting}
+        onCancel={event => { event.preventDefault(); cancelDeleteSearch() }}
+        className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg backdrop:bg-brand-ink/30"
+      >
+        <h2 id="delete-search-title" className="ui-dialog-title">Delete saved search?</h2>
+        <p id="delete-search-description" className="mt-3 ui-helper [overflow-wrap:anywhere]">
+          Delete “{deletingSearch?.label.trim() || deletingSearch?.query.trim() || 'Untitled search'}” from your saved searches? This cannot be undone.
+        </p>
+        {deleteError && <p role="alert" className="mt-3 ui-helper !text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDeleteSearch} className="ui-button ui-secondary">Cancel</button>
+          <button type="button" disabled={deleting} onClick={() => void confirmDeleteSearch()} className="ui-button ui-danger-quiet">
+            {deleting ? 'Deleting…' : 'Delete search'}
+          </button>
+        </div>
+      </dialog>
     </div>
   )
 }
@@ -485,7 +573,7 @@ function SavedSearchBody({
   onRun: () => void
   onEdit: () => void
   onToggleActive: () => void
-  onDelete: () => void
+  onDelete: (event: MouseEvent<HTMLButtonElement>) => void
   onSave: () => void
   onCancel: () => void
 }) {
@@ -498,10 +586,10 @@ function SavedSearchBody({
       <div className="space-y-2.5">
         <SearchFields draft={editDraft} setDraft={setEditDraft} />
         <div className="m-actions flex flex-wrap gap-2">
-          <button type="button" data-role="primary" onClick={onSave} className={refreshBtn}>
+          <button type="button" data-role="primary" onClick={onSave} className="ui-button ui-primary">
             Save changes
           </button>
-          <button type="button" data-role="quiet" onClick={onCancel} className={toolbarBtn}>
+          <button type="button" data-role="quiet" onClick={onCancel} className="ui-button ui-secondary">
             Cancel
           </button>
         </div>
@@ -525,7 +613,7 @@ function SavedSearchBody({
           draggable
           onDragStart={(event) => onDragStart(index, event)}
           onDragEnd={onDragEnd}
-          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing"
+          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing ui-drag-control"
           title="Drag to reorder"
           aria-label={`Reorder ${name}`}
         >
@@ -535,16 +623,16 @@ function SavedSearchBody({
           <p className="font-medium text-brand-ink">
             {name}
             {search.active ? (
-              <span className="ml-2 text-xs font-medium text-brand-primaryDeep">active</span>
+              <span className="ml-2 ui-meta font-medium text-[#23745e] legacy-size-text_xs">active</span>
             ) : (
-              <span className="ml-2 text-xs text-brand-muted">paused</span>
+              <span className="ml-2 ui-meta text-brand-muted legacy-size-text_xs">paused</span>
             )}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-brand-muted">{meta}</p>
+          <p className="mt-1 ui-meta leading-relaxed text-brand-muted legacy-size-text_xs">{meta}</p>
         </div>
       </div>
       <div className="search-icons">
-        <IconAction label={running ? 'Running' : 'Run'} disabled={busy} onClick={onRun}>
+        <IconAction label={running ? 'Running' : 'Run'} primary busy={running} disabled={busy} onClick={onRun}>
           <PlayIcon />
         </IconAction>
         <IconAction label="Edit" onClick={onEdit}>
@@ -619,7 +707,7 @@ function SearchFields({
   const { library, getLabel } = useMasterCv()
   return (
     <div className="search-fields">
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Label</span>
         <input
           value={draft.label}
@@ -627,7 +715,7 @@ function SearchFields({
           className={fieldControl}
         />
       </label>
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Locations</span>
         <input
           value={draft.location}
@@ -635,7 +723,7 @@ function SearchFields({
           className={fieldControl}
         />
       </label>
-      <label className="search-field-wide block">
+      <label className="ui-label block">
         <span className={fieldLabel}>
           Phrase <span className="text-red-700">*</span>
         </span>
@@ -646,7 +734,7 @@ function SearchFields({
           className={fieldControl}
         />
       </label>
-      <label className="search-field-wide block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Exclude</span>
         <input
           value={draft.excludeTerms}
@@ -654,7 +742,7 @@ function SearchFields({
           className={fieldControl}
         />
       </label>
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>Max days old</span>
         <input
           type="number"
@@ -665,7 +753,7 @@ function SearchFields({
           className={fieldControl}
         />
       </label>
-      <label className="block">
+      <label className="ui-label block">
         <span className={fieldLabel}>CV track</span>
         <select
           value={draft.track}

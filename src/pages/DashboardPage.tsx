@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { boardLook } from '../components/BoardLook'
-import { PageHero } from '../components/PageHero'
+import { NavigationIcon } from '../components/NavigationIcon'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
 import { KanbanBoard, type BoardColumn } from '../components/KanbanBoard'
 import {
@@ -59,6 +59,7 @@ export function DashboardPage() {
   const [endColumn, setEndColumn] = useState<EndColumn>('offer')
   const [mobileColumn, setMobileColumn] = useState<BoardColumn>('saved')
   const [boardSearch, setBoardSearch] = useState('')
+  const searchInput = useRef<HTMLInputElement>(null)
 
   const searchHits = useMemo(
     () => collectSearchHits(activeJobs, trashedJobs, boardSearch),
@@ -85,20 +86,25 @@ export function DashboardPage() {
 
   return (
     <div className={boardLook.page}>
-      <PageHero
-        label="ApplyTrack"
-        title={
-          <>
-            Find · Tailor · <span className="text-brand-primary">Track</span>
-          </>
-        }
-        description="Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place."
-      />
+      <div className="dashboard-overview">
+        <header className="board-welcome">
+          <div>
+            <p className="ui-label mb-2 hidden lg:block">ApplyTrack</p>
+            <h1 className="ui-title">
+              <span className="lg:hidden">Board</span>
+              <span className="hidden lg:inline">Find · Tailor · <span className="text-[#23745e]">Track</span></span>
+            </h1>
+            <p className="ui-description mt-2">
+              <span className="lg:hidden">Track your applications and move jobs through each stage.</span>
+              <span className="hidden lg:inline">Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place.</span>
+            </p>
+          </div>
+        </header>
 
       <section className={`${boardLook.card} ${boardLook.cardPad}`}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className={boardLook.streakTitle}>Application streak</h2>
-          <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex flex-wrap gap-4 ui-body legacy-size-text_sm">
             <div>
               <p className={boardLook.caption}>Streak</p>
               <p className={boardLook.streakValue}>
@@ -119,6 +125,7 @@ export function DashboardPage() {
         </div>
         <ActivityHeatmap variant="apply" countsByDate={applyCounts} mode="year" />
       </section>
+      </div>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map(({ status, count }) => (
@@ -155,7 +162,7 @@ export function DashboardPage() {
 
       <section>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-          <div className="relative w-full sm:max-w-xs">
+          <div className="relative w-full sm:max-w-xs lg:max-w-[17.5rem]">
             <label htmlFor="board-search" className="sr-only">
               Search applications
             </label>
@@ -174,6 +181,7 @@ export function DashboardPage() {
               />
             </svg>
             <input
+              ref={searchInput}
               id="board-search"
               type="search"
               value={boardSearch}
@@ -185,12 +193,12 @@ export function DashboardPage() {
             {boardSearch && (
               <button
                 type="button"
-                onClick={() => setBoardSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-brand-muted hover:bg-brand-mist hover:text-brand-ink"
+                onClick={() => { setBoardSearch(''); searchInput.current?.focus() }}
+                className="ui-search-clear"
                 aria-label="Clear search"
               >
-                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                  <path d="m7 7 10 10M7 17 17 7" />
                 </svg>
               </button>
             )}
@@ -198,7 +206,7 @@ export function DashboardPage() {
         </div>
 
         {searching && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <div className="mb-4 flex flex-wrap items-center gap-2 ui-body legacy-size-text_sm">
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 searchHits.length >= 2
@@ -235,7 +243,9 @@ export function DashboardPage() {
           <p className={boardLook.body}>Loading applications…</p>
         ) : activeJobs.length === 0 && trashedJobs.length === 0 ? (
           <div className={boardLook.empty}>
-            <p className="text-4xl">📋</p>
+            <div aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#dce8e4] bg-[#e7f4ef] text-[#23745e]">
+              <NavigationIcon name="Board" />
+            </div>
             <h3 className={boardLook.emptyTitle}>No applications yet</h3>
             <Link to="/add" className={`mt-4 ${boardLook.button}`}>
               Add your first job
@@ -286,7 +296,7 @@ function CountCard({
   const selectable = narrow || slot === 'offer' || slot === 'rejected' || slot === 'trash'
   const selected = narrow ? mobileColumn === slot : endColumn === slot && selectable
   const className = `border p-4 text-center ${boardLook.cardHover} ${boardLook.card} ${
-    selected ? 'ring-2 ring-brand-primary/40' : ''
+    selected ? 'ui-filter-active' : ''
   }`
   const body = (
     <>
@@ -307,7 +317,7 @@ function CountCard({
       : `Show ${label}`
 
   return (
-    <button type="button" onClick={() => (narrow ? onMobile(slot) : onDesktop(slot))} className={className} aria-pressed={selected} title={title}>
+    <button type="button" onClick={() => (narrow ? onMobile(slot) : onDesktop(slot))} className={`${className} ui-filter ui-stat flex-col gap-0`} aria-pressed={selected} title={title}>
       {body}
     </button>
   )

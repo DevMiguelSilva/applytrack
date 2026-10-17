@@ -10,9 +10,10 @@ function pageIsScrolled(): boolean {
 }
 
 function scrollPageToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+  window.scrollTo({ top: 0, behavior })
   document.querySelectorAll<HTMLElement>('.app-scroll').forEach((el) => {
-    if (el.scrollTop > 0) el.scrollTo({ top: 0, behavior: 'smooth' })
+    if (el.scrollTop > 0) el.scrollTo({ top: 0, behavior })
   })
 }
 
@@ -32,7 +33,7 @@ export function ScrollToTopButton() {
     <button
       type="button"
       onClick={scrollPageToTop}
-      className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-600 shadow-lg shadow-slate-300/50 transition hover:border-sky-200 hover:text-sky-700 hover:shadow-sky-100/70 sm:bottom-8 sm:right-6"
+      className="ui-back-to-top ui-button ui-secondary ui-icon-button fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-40 lg:bottom-8"
       aria-label="Back to top"
     >
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>

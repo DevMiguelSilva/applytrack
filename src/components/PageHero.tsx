@@ -11,7 +11,7 @@ interface PageHeroProps {
 /** Welcome banner for the board home — not used on sub-pages (nav handles those). */
 export function PageHero({ label, title, description, actions }: PageHeroProps) {
   return (
-    <section className={boardLook.hero}>
+    <section className={`board-welcome ${boardLook.hero}`}>
       <div className="relative flex flex-wrap items-end justify-between gap-4">
         <div>
           {label && <p className={boardLook.label}>{label}</p>}
