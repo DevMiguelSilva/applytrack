@@ -363,7 +363,7 @@ export function InboxPage() {
       </div>
 
       {(error || refreshError) && (
-        <p className="ui-body text-red-700" role="alert">
+        <p className="ui-helper !text-red-700" role="alert">
           {error || refreshError}
         </p>
       )}
@@ -532,7 +532,7 @@ export function InboxPage() {
         <p id="delete-search-description" className="mt-3 ui-helper [overflow-wrap:anywhere]">
           Delete “{deletingSearch?.label.trim() || deletingSearch?.query.trim() || 'Untitled search'}” from your saved searches? This cannot be undone.
         </p>
-        {deleteError && <p role="alert" className="mt-3 ui-body text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        {deleteError && <p role="alert" className="mt-3 ui-helper !text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDeleteSearch} className="ui-button ui-secondary">Cancel</button>
           <button type="button" disabled={deleting} onClick={() => void confirmDeleteSearch()} className="ui-button ui-danger-quiet">

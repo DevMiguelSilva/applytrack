@@ -93,7 +93,7 @@ function SkillAnswer({
     <div className="mt-2 ui-body leading-relaxed text-brand-ink">
       {loading && <p className="text-brand-muted">Looking it up…</p>}
       {error && (
-        <p className="text-red-700" role="alert">
+        <p className="ui-helper !text-red-700" role="alert">
           {error}
         </p>
       )}
@@ -108,7 +108,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const doc = getForJob(job.id)
   const masterCv = resolveJobCv(library, job, doc)
   if (loading || docsLoading) return <p className="ui-helper text-brand-muted">Loading application documents…</p>
-  if (job.status === 'saved' && loadError) return <p role="alert" className="ui-body text-red-700">{loadError}</p>
+  if (job.status === 'saved' && loadError) return <p role="alert" className="ui-helper !text-red-700">{loadError}</p>
   if (!masterCv) return <section className="ui-panel  "><h2 className=" ui-section-title">Application document unavailable</h2><p className="mt-2 ui-helper text-brand-muted">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
   return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} templateLabel={job.status === 'saved' ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
 }
@@ -422,15 +422,15 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
 
       {loading && <LoadingSpinner label="Working…" />}
       {error && (
-        <p className="ui-body text-red-700" role="alert">
+        <p className="ui-helper !text-red-700" role="alert">
           {error}
         </p>
       )}
-      {task?.phase === 'failed' && <div role="alert" className="space-y-2 ui-body text-red-700">
-        <p>{task.error}</p>
+      {task?.phase === 'failed' && <div role="alert" className="space-y-2">
+        <p className="ui-helper !text-red-700">{task.error}</p>
         {!skillsLocked && <button type="button" className="ui-button ui-primary" onClick={() => void (task.output ? retrySave(job.id) : runTailor())}>{task.output ? 'Retry save' : 'Retry tailoring'}</button>}
       </div>}
-      {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 max-w-[calc(100%-2rem)] text-center rounded-lg border border-brand-line bg-white px-4 py-3 ui-body font-medium text-brand-ink shadow-sm lg:bottom-6">Cover letter copied</div>}
+      {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 max-w-[calc(100%-2rem)] text-center rounded-lg border border-brand-line bg-white px-4 py-3 ui-helper font-medium !text-brand-ink shadow-sm lg:bottom-6">Cover letter copied</div>}
 
       {showGap && hasGapContent(gapReport) && (
         <div className={nested}>

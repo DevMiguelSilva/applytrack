@@ -476,7 +476,7 @@ export function PortalsPage() {
         <p id="delete-portal-description" className="mt-3 ui-helper text-brand-muted [overflow-wrap:anywhere]">
           Delete “{deletingFeed?.name.trim() || 'Untitled feed'}” from your saved portals? This cannot be undone.
         </p>
-        {deleteError && <p role="alert" className="mt-3 ui-body text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        {deleteError && <p role="alert" className="mt-3 ui-helper !text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="ui-button ui-secondary">Cancel</button>
           <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="ui-button ui-danger-quiet">

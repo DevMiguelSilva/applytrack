@@ -140,7 +140,7 @@ export function MasterCvPage() {
     return <p className="ui-helper text-brand-muted">Loading master CV…</p>
   }
 
-  if (loadError || !cv) return <div className={card}><p role="alert">{loadError ?? 'CV template unavailable.'}</p><button className="ui-button ui-primary" onClick={() => void reload()}>Retry loading CVs</button></div>
+  if (loadError || !cv) return <div className={card}><p role="alert" className="ui-helper">{loadError ?? 'CV template unavailable.'}</p><button className="ui-button ui-primary" onClick={() => void reload()}>Retry loading CVs</button></div>
   const locked = busy || importing
   const refs = deleting ? templateReferences(library, deleting, jobs, searches) : { jobs: [], searches: [] }
   const needsReplacement = refs.jobs.length + refs.searches.length > 0
@@ -148,7 +148,7 @@ export function MasterCvPage() {
   return (
     <div className="ui-page mx-auto min-w-0 max-w-3xl" aria-busy={locked}>
       <SectionHeader title="CV library" description="Create and manage master CVs for the roles you apply to." actions={<button type="button" className="ui-button ui-primary" disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>} />
-      {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 ui-body text-red-700"><p role="alert">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
+      {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3"><p role="alert" className="ui-helper !text-red-700">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
       {showAdd && <form className={card} onSubmit={(e) => { e.preventDefault(); void run(async () => { await saveDraft(); await addTemplate(newName, copyFrom || undefined); setNewName(''); setShowAdd(false) }) }}>
         <h2 className="break-words ui-section-title">New CV template</h2>
         <label className="ui-label block">Template name<input required disabled={locked} className={`${field} mt-1`} value={newName} onChange={(e) => setNewName(e.target.value)} /></label>
@@ -164,7 +164,7 @@ export function MasterCvPage() {
         {deleting && <div className="min-w-0 space-y-4"><h2 id="delete-cv-title" className="break-words ui-dialog-title">Delete {getLabel(deleting)}?</h2><p id="delete-cv-description" className="ui-helper text-brand-muted">This removes the template and its attached resume. Submitted application documents stay saved.</p>
           {needsReplacement && <><p className="ui-body">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto ui-body">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
           <label className="ui-label block">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1 form-select`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-          {importError && <p role="alert" className="ui-body text-red-700">{importError}</p>}
+          {importError && <p role="alert" className="ui-helper !text-red-700">{importError}</p>}
           <div className="flex flex-wrap gap-2"><CvDeleteButton confirm label="Delete template" disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })} />{busy && <span role="status" className="self-center ui-helper text-brand-muted">Deleting…</span>}<button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
         </div>}
       </dialog>
@@ -185,14 +185,14 @@ export function MasterCvPage() {
             {attachment.extractedText.length.toLocaleString()} chars extracted
           </p>
         )}
-        {importing && <p className="ui-body text-[#23745e]">Importing…</p>}
+        {importing && <p className="ui-helper !text-[#23745e]">Importing…</p>}
         {importError && (
-          <p className="rounded-lg bg-red-50 p-3 ui-body text-red-700">
+          <p className="rounded-lg bg-red-50 p-3 ui-helper !text-red-700">
             {importError}
           </p>
         )}
         {importNote && (
-          <p className="rounded-lg bg-emerald-50 p-3 ui-body text-emerald-800">
+          <p className="rounded-lg bg-emerald-50 p-3 ui-helper !text-emerald-800">
             {importNote}
           </p>
         )}

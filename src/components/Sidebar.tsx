@@ -41,7 +41,7 @@ export function Sidebar({ collapsed, toggle }: { collapsed: boolean; toggle: () 
       </Hint>
       {isCloudSync && <Hint label="Synced to cloud" compact={collapsed}><div className={`${control} text-emerald-700`} tabIndex={collapsed ? 0 : undefined}><NavigationIcon name="Synced" />{label('Synced to cloud')}</div></Hint>}
       {isCloudEnabled && <Hint label={accountLabel} compact={collapsed}>
-        {user ? <button type="button" className={`ui-button ui-danger w-full ${collapsed ? 'ui-icon-button' : ''}`} onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />{label(accountLabel)}</button> : <NavLink to="/login" className={`ui-button ui-primary w-full ${collapsed ? 'ui-icon-button' : ''}`}><NavigationIcon name="Sign in" />{label('Sign in')}</NavLink>}
+        {user ? <button type="button" className={`ui-button ui-danger-quiet w-full ${collapsed ? 'ui-icon-button' : ''}`} onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />{label(accountLabel)}</button> : <NavLink to="/login" className={`ui-button ui-primary w-full ${collapsed ? 'ui-icon-button' : ''}`}><NavigationIcon name="Sign in" />{label('Sign in')}</NavLink>}
       </Hint>}
       {error && <p role="alert" className="break-words text-xs text-red-700">Sign out failed. Retry.</p>}
     </div>

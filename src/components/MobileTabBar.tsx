@@ -65,7 +65,7 @@ export function MobileTabBar() {
         </nav>
         {(isCloudSync || isCloudEnabled) && <div className="mobile-account-panel">
           {isCloudSync && <p className="flex items-center gap-3 px-4 py-3 text-sm text-emerald-700"><NavigationIcon name="Synced" /><span>Synced to cloud</span><span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /></p>}
-          {isCloudEnabled && (user ? <button type="button" className="ui-button ui-danger" onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />Sign out</button> : <NavLink to="/login" className="ui-button ui-primary w-full"><NavigationIcon name="Sign in" />Sign in</NavLink>)}
+          {isCloudEnabled && (user ? <button type="button" className="ui-button ui-danger-quiet" onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />Sign out</button> : <NavLink to="/login" className="ui-button ui-primary w-full"><NavigationIcon name="Sign in" />Sign in</NavLink>)}
           {error && <p role="alert" className="px-4 text-sm text-red-700">Sign out failed. Please retry.</p>}
         </div>}
       </div>

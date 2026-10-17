@@ -142,7 +142,7 @@ export function AddJobPage() {
 
       <form onSubmit={handleSubmit} className={`ui-panel space-y-4`}>
         {error && (
-          <p className="ui-body text-red-700" role="alert">
+          <p className="ui-helper !text-red-700" role="alert">
             {error}
           </p>
         )}

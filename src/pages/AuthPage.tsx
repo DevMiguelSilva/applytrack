@@ -43,7 +43,7 @@ export function AuthPage() {
         <div className={`ui-panel text-center`}>
           <div className="mb-4 flex justify-center"><AppLogo tone="brand" /></div>
           <p className={`mb-2 ${boardLook.label}`}>ApplyTrack</p>
-          <h1 className={boardLook.headline}>Your workspace is ready</h1>
+          <h1 className="ui-dialog-title">Your workspace is ready</h1>
           <p className={`mt-3 ${boardLook.body}`}>Track your applications on this device. Your changes are saved locally.</p>
           <a href="/" className={`mt-6 ${boardLook.button} ${focusClass}`}>Continue to Board</a>
         </div>
@@ -91,10 +91,10 @@ export function AuthPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4" aria-busy={loading}>
             {error && (
-              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 ui-body text-red-700">{error}</p>
+              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 ui-helper !text-red-700">{error}</p>
             )}
             {message && (
-              <p role="status" className="rounded-lg border border-brand-primary/25 bg-brand-mist p-3 ui-body text-brand-ink">{message}</p>
+              <p role="status" className="rounded-lg border border-brand-primary/25 bg-brand-mist p-3 ui-helper !text-brand-ink">{message}</p>
             )}
 
             <label className="ui-label block">

@@ -50,7 +50,7 @@ export function JobDetailPage() {
   if (!job) {
     return (
       <div className="text-center">
-        <h1 className="ui-title">Job not found.</h1>
+        <h1 className="ui-dialog-title">Job not found.</h1>
       </div>
     )
   }
@@ -230,13 +230,13 @@ export function JobDetailPage() {
               <p className="pt-2 ui-helper text-brand-muted">Not selected</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
-              <p className="pt-2 ui-body text-emerald-700">Interview booked</p>
+              <p className="pt-2 ui-helper !text-emerald-700">Interview booked</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
-              <p className="pt-2 ui-body text-emerald-700">Waiting for an answer</p>
+              <p className="pt-2 ui-helper !text-emerald-700">Waiting for an answer</p>
             )}
             {jdIncomplete && !job.needsRescore && (
-              <p className="pt-2 ui-body text-[#8a6230]">Description incomplete</p>
+              <p className="pt-2 ui-helper !text-[#8a6230]">Description incomplete</p>
             )}
           </div>
 
@@ -365,7 +365,7 @@ export function JobDetailPage() {
                   {parsingJd || savingJd ? 'Rescoring…' : 'Rescore'}
                 </button>
                 {jdError && (
-                  <p className="ui-body text-[#8a6230]" role="alert">
+                  <p className="ui-helper !text-[#8a6230]" role="alert">
                     {jdError}
                   </p>
                 )}
@@ -388,7 +388,7 @@ export function JobDetailPage() {
                 />
               </label>
               {jdError && (
-                <p className="ui-body text-[#8a6230]" role="alert">
+                <p className="ui-helper !text-[#8a6230]" role="alert">
                   {jdError}
                 </p>
               )}
@@ -536,7 +536,7 @@ export function JobDetailPage() {
               className={field}
             />
             {notesError && (
-              <p className="ui-body text-[#8a6230]" role="alert">
+              <p className="ui-helper !text-[#8a6230]" role="alert">
                 {notesError}
               </p>
             )}

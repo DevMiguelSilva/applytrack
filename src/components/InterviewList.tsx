@@ -193,7 +193,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       )}
 
       {error && (
-        <p className="ui-body text-amber-700 dark:text-amber-300" role="alert">
+        <p className="ui-helper !text-amber-700 dark:!text-amber-300" role="alert">
           {error}
         </p>
       )}
