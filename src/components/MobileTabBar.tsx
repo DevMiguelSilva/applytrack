@@ -63,10 +63,10 @@ export function MobileTabBar() {
           <NavLink to="/add" aria-label="Add" className="nav-focus mobile-destination mobile-destination-primary"><span className="mobile-destination-icon"><NavigationIcon name="Add" /></span><span className="mobile-destination-title">Add application</span><span className="mobile-destination-caption">Track a new opportunity</span></NavLink>
           <NavLink to="/cv" aria-label="CVs" className="nav-focus mobile-destination"><span className="mobile-destination-icon"><NavigationIcon name="CVs" /></span><span className="mobile-destination-title">CV library</span><span className="mobile-destination-caption">Manage your master CVs</span></NavLink>
         </nav>
-        {(isCloudSync || isCloudEnabled) && <div className="mobile-account-panel">
-          {isCloudSync && <p className="flex items-center gap-3 px-4 py-3 text-sm text-emerald-700"><NavigationIcon name="Synced" /><span>Synced to cloud</span><span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /></p>}
+        {(isCloudSync || isCloudEnabled) && <div className={`mobile-account-panel ${!(isCloudSync && isCloudEnabled) ? 'mobile-account-panel-single' : ''}`}>
+          {isCloudSync && <p className="mobile-account-status flex min-w-0 items-center gap-2 px-3 py-3 text-sm text-emerald-700"><NavigationIcon name="Synced" /><span className="min-w-0 break-words">Synced to cloud</span><span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" /></p>}
           {isCloudEnabled && (user ? <button type="button" className="ui-button ui-danger-quiet" onClick={() => { setError(false); void signOut().catch(() => setError(true)) }}><NavigationIcon name="Sign out" />Sign out</button> : <NavLink to="/login" className="ui-button ui-primary w-full"><NavigationIcon name="Sign in" />Sign in</NavLink>)}
-          {error && <p role="alert" className="px-4 text-sm text-red-700">Sign out failed. Please retry.</p>}
+          {error && <p role="alert" className="mobile-account-error px-4 text-sm text-red-700">Sign out failed. Please retry.</p>}
         </div>}
       </div>
     </dialog>, document.body)}
