@@ -104,7 +104,7 @@ export function DashboardPage() {
       <section className={`${boardLook.card} ${boardLook.cardPad}`}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className={boardLook.streakTitle}>Application streak</h2>
-          <div className="flex flex-wrap gap-4 ui-body">
+          <div className="flex flex-wrap gap-4 ui-body legacy-size-text_sm">
             <div>
               <p className={boardLook.caption}>Streak</p>
               <p className={boardLook.streakValue}>
@@ -206,7 +206,7 @@ export function DashboardPage() {
         </div>
 
         {searching && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 ui-body">
+          <div className="mb-4 flex flex-wrap items-center gap-2 ui-body legacy-size-text_sm">
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 searchHits.length >= 2

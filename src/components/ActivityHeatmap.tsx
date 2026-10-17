@@ -120,7 +120,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   return (
     <div className="space-y-3">
       {mode === 'year' && (
-        <p className="ui-meta font-medium text-[#4d635c]">{year}</p>
+        <p className="ui-meta font-medium text-[#4d635c] legacy-size-text_xs">{year}</p>
       )}
       <div ref={scrollRef} className="app-scroll flex gap-2 overflow-x-auto pb-1">
         <div className="sticky left-0 z-10 flex flex-col justify-between bg-white py-1 pr-1 ui-meta text-[#4d635c]">
@@ -150,7 +150,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 ui-meta text-[#4d635c]">
+      <div className="flex flex-wrap items-center gap-2 ui-meta text-[#4d635c] legacy-size-text_xs">
         <span>Less</span>
         <span className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[0]}`} />
         <span className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[1]}`} />

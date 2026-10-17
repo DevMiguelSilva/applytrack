@@ -50,7 +50,7 @@ export function JobDetailPage() {
   if (!job) {
     return (
       <div className="text-center">
-        <h1 className="ui-dialog-title">Job not found.</h1>
+        <h1 className="ui-dialog-title legacy-size-text_base">Job not found.</h1>
       </div>
     )
   }
@@ -81,11 +81,11 @@ export function JobDetailPage() {
   const statusBtn = (slot: 'saved' | 'applied' | 'interview' | 'offer' | 'rejected' | 'trash') =>
     `m-action rounded-lg px-4 py-2 text-sm font-semibold transition ${BOARD_TONE[slot].action}`
   const quietBtn =
-    "ui-button ui-secondary"
+    "ui-button ui-secondary legacy-size-text_sm"
 
   const panel = "ui-panel"
   const field =
-    "ui-field mt-2"
+    "ui-field mt-2 legacy-size-text_sm"
 
   const saveNotes = async () => {
     setSavingNotes(true)
@@ -200,13 +200,13 @@ export function JobDetailPage() {
           <div className="min-w-0">
             <p className="flex items-baseline gap-2">
               <span className={`text-sm font-medium ${tone.figure}`}>{statusLabel}</span>
-              <span className="ui-meta text-brand-muted">{jobSourceLabel(job.source)}</span>
+              <span className="ui-meta text-brand-muted legacy-size-text__11px_">{jobSourceLabel(job.source)}</span>
             </p>
-            <h1 className="mt-2 ui-title">
+            <h1 className="mt-2 ui-title legacy-size-text__1_75rem_">
               {job.role || 'Untitled role'}
             </h1>
-            <p className="mt-1 truncate ui-helper text-brand-muted">{job.company || 'Unknown company'}</p>
-            <p className="truncate ui-helper text-brand-muted">
+            <p className="mt-1 truncate ui-helper text-brand-muted legacy-size-text_sm">{job.company || 'Unknown company'}</p>
+            <p className="truncate ui-helper text-brand-muted legacy-size-text_sm">
               {job.location.trim() || 'No location'}
             </p>
             <p className="ui-description mt-2">Manage this application, prepare documents and track your progress.</p>
@@ -214,7 +214,7 @@ export function JobDetailPage() {
               {job.salary.trim() || 'No salary yet'}
             </p>
             {job.status !== 'saved' && (job.appliedDate || matchPercent != null) && (
-              <p className="mt-2 ui-helper text-brand-muted">
+              <p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">
                 {[
                   job.appliedDate ? `Applied ${job.appliedDate}` : null,
                   matchPercent != null ? `${matchPercent}% match` : null,
@@ -224,19 +224,19 @@ export function JobDetailPage() {
               </p>
             )}
             {job.deletedAt && (
-              <p className="mt-1 ui-meta text-brand-muted">Was {STATUS_CONFIG[job.status].label}</p>
+              <p className="mt-1 ui-meta text-brand-muted legacy-size-text_xs">Was {STATUS_CONFIG[job.status].label}</p>
             )}
             {job.status === 'interview' && job.notSelected && (
-              <p className="pt-2 ui-helper text-brand-muted">Not selected</p>
+              <p className="pt-2 ui-helper text-brand-muted legacy-size-text_sm">Not selected</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
-              <p className="pt-2 ui-helper !text-emerald-700">Interview booked</p>
+              <p className="pt-2 ui-helper !text-emerald-700 legacy-size-text_sm">Interview booked</p>
             )}
             {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
-              <p className="pt-2 ui-helper !text-emerald-700">Waiting for an answer</p>
+              <p className="pt-2 ui-helper !text-emerald-700 legacy-size-text_sm">Waiting for an answer</p>
             )}
             {jdIncomplete && !job.needsRescore && (
-              <p className="pt-2 ui-helper !text-[#8a6230]">Description incomplete</p>
+              <p className="pt-2 ui-helper !text-[#8a6230] legacy-size-text_sm">Description incomplete</p>
             )}
           </div>
 
@@ -333,24 +333,24 @@ export function JobDetailPage() {
       </section>
 
       <section className={panel}>
-        <span className="ui-helper text-brand-muted">Posting URL</span>
+        <span className="block ui-helper text-brand-muted legacy-size-text_sm">Posting URL</span>
         {hasUrl ? (
           <a
             href={job.jobUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ui-inline mt-1 max-w-full break-words"
+            className="ui-inline ui-posting-link mt-1 max-w-full break-words legacy-size-text_sm"
           >
             Open original posting
           </a>
         ) : (
-          <p className="mt-1 ui-helper text-brand-muted">No URL on this job</p>
+          <p className="mt-1 ui-helper text-brand-muted legacy-size-text_sm">No URL on this job</p>
         )}
       </section>
 
       {job.status === 'saved' && !job.deletedAt && (jdIncomplete || editingJd) && (
         <section className={`${panel} space-y-4`}>
-          <h2 className=" ui-section-title">Job description</h2>
+          <h2 className=" ui-section-title legacy-size-text_base">Job description</h2>
 
           {!editingJd ? (
             job.needsRescore ? (
@@ -365,7 +365,7 @@ export function JobDetailPage() {
                   {parsingJd || savingJd ? 'Rescoring…' : 'Rescore'}
                 </button>
                 {jdError && (
-                  <p className="ui-helper !text-[#8a6230]" role="alert">
+                  <p className="ui-helper !text-[#8a6230] legacy-size-text_sm" role="alert">
                     {jdError}
                   </p>
                 )}
@@ -378,7 +378,7 @@ export function JobDetailPage() {
           ) : (
             <div className="space-y-3">
               <label className="ui-label block">
-                <span className="ui-label text-brand-muted">Full job description</span>
+                <span className="ui-label text-brand-muted legacy-size-text_sm">Full job description</span>
                 <textarea
                   value={jdDraft}
                   onChange={(e) => setJdDraft(e.target.value)}
@@ -388,7 +388,7 @@ export function JobDetailPage() {
                 />
               </label>
               {jdError && (
-                <p className="ui-helper !text-[#8a6230]" role="alert">
+                <p className="ui-helper !text-[#8a6230] legacy-size-text_sm" role="alert">
                   {jdError}
                 </p>
               )}
@@ -426,7 +426,7 @@ export function JobDetailPage() {
         job.jobDescription) && (
         <section className={`${panel} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className=" ui-section-title">Posting overview</h2>
+            <h2 className=" ui-section-title legacy-size-text_base">Posting overview</h2>
             {job.status === 'saved' && !job.deletedAt && job.jdComplete && !editingJd && (
               <button type="button" onClick={openJdEditor} className={quietBtn}>
                 Update
@@ -435,18 +435,18 @@ export function JobDetailPage() {
           </div>
           {job.jdSummary && (
             <div>
-              <h3 className="mb-1 ui-label">Summary</h3>
-              <p className="ui-body leading-relaxed text-brand-ink">{job.jdSummary}</p>
+              <h3 className="mb-1 ui-label legacy-size-text_sm">Summary</h3>
+              <p className="ui-helper !text-brand-ink legacy-size-text_sm">{job.jdSummary}</p>
             </div>
           )}
           {job.extractedSkills.length > 0 && (
             <div>
-              <h3 className="mb-2 ui-label">Skills from the posting</h3>
+              <h3 className="mb-2 ui-label legacy-size-text_sm">Skills from the posting</h3>
               <div className="flex flex-wrap gap-2">
                 {job.extractedSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink"
+                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"
                   >
                     {skill}
                   </span>
@@ -456,8 +456,8 @@ export function JobDetailPage() {
           )}
           {job.extractedRequirements.length > 0 && (
             <div>
-              <h3 className="mb-2 ui-label">Requirements</h3>
-              <ul className="space-y-1 ui-body text-brand-ink">
+              <h3 className="mb-2 ui-label legacy-size-text_sm">Requirements</h3>
+              <ul className="space-y-1 ui-helper !text-brand-ink legacy-size-text_sm">
                 {job.extractedRequirements.map((req) => (
                   <li key={req} className="flex gap-2">
                     <span className="text-brand-muted">•</span>
@@ -473,7 +473,7 @@ export function JobDetailPage() {
               {showFullJd ? (
                 <>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className=" ui-label">Full text</h3>
+                    <h3 className=" ui-label legacy-size-text_sm">Full text</h3>
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => void copyFullJd()} className={quietBtn}>
                         {jdCopied ? 'Copied' : 'Copy'}
@@ -484,7 +484,7 @@ export function JobDetailPage() {
                     </div>
                   </div>
                   <div
-                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap ui-body leading-relaxed text-brand-ink"
+                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap ui-helper !text-brand-ink legacy-size-text_sm"
                     role="region"
                     aria-label="Job description"
                   >
@@ -504,14 +504,14 @@ export function JobDetailPage() {
               )}
             </div>
           ) : (
-            <p className="ui-helper text-brand-muted">No description saved yet.</p>
+            <p className="ui-helper text-brand-muted legacy-size-text_sm">No description saved yet.</p>
           )}
         </section>
       )}
 
       <section className={`${panel} space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className=" ui-section-title">Personal notes</h2>
+          <h2 className=" ui-section-title legacy-size-text_base">Personal notes</h2>
           {!editingNotes && (
             <button
               type="button"
@@ -536,7 +536,7 @@ export function JobDetailPage() {
               className={field}
             />
             {notesError && (
-              <p className="ui-helper !text-[#8a6230]" role="alert">
+              <p className="ui-helper !text-[#8a6230] legacy-size-text_sm" role="alert">
                 {notesError}
               </p>
             )}
@@ -565,14 +565,14 @@ export function JobDetailPage() {
             </div>
           </div>
         ) : notesText.trim() ? (
-          <p className="whitespace-pre-wrap ui-body leading-relaxed text-brand-ink">{notesText}</p>
+          <p className="whitespace-pre-wrap ui-helper !text-brand-ink legacy-size-text_sm">{notesText}</p>
         ) : (
-          <p className="ui-helper text-brand-muted">No notes yet.</p>
+          <p className="ui-helper text-brand-muted legacy-size-text_sm">No notes yet.</p>
         )}
       </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
-      {job.status === 'saved' && !job.deletedAt && <label className="ui-label block">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
+      {job.status === 'saved' && !job.deletedAt && <label className="ui-label block legacy-size-text_sm">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
       {job.jdComplete && <TailorPanel job={job} />}
     </div>
   )

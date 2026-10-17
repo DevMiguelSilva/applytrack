@@ -10,8 +10,8 @@ function ColumnHead({ title, count }: { title: string; count: number }) {
     <div className="sticky top-0 z-10 isolate">
       <div className="bg-[#f7fbf9] px-1 pb-1 pt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className=" ui-section-title">{title}</h2>
-          <span className="font-sans ui-helper font-medium tabular-nums text-brand-muted">{count}</span>
+          <h2 className=" ui-section-title legacy-size-text_base">{title}</h2>
+          <span className="font-sans ui-helper font-medium tabular-nums text-brand-muted legacy-size-text_sm">{count}</span>
         </div>
       </div>
       <div
@@ -88,13 +88,13 @@ export function KanbanBoard({
                           onEmptyTrash()
                         }
                       }}
-                      className="ui-button ui-danger-quiet w-full"
+                      className="ui-button ui-danger-quiet w-full legacy-size-text_xs"
                     >
                       Empty trash
                     </button>
                   )}
                   {visibleTrash.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center ui-meta text-[#4d635c] dark:border-track-700">
+                    <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center ui-meta text-[#4d635c] dark:border-track-700 legacy-size-text_xs">
                       {searching ? 'No matches in trash' : 'No deleted jobs'}
                     </p>
                   ) : (
@@ -144,7 +144,7 @@ export function KanbanBoard({
                 }`}
               >
                 {columnJobs.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center ui-meta text-[#4d635c] dark:border-track-700">
+                  <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center ui-meta text-[#4d635c] dark:border-track-700 legacy-size-text_xs">
                     {searching ? 'No matches in this column' : 'Drop jobs here'}
                   </p>
                 ) : (

@@ -5,7 +5,7 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { boardLook } from '../components/BoardLook'
 
 const focusClass = "ui-focus"
-const inputClass = "ui-field mt-1.5"
+const inputClass = "ui-field mt-1.5 legacy-size-text_sm"
 
 export function AuthPage() {
   const { signIn, signUp } = useAuth()
@@ -43,7 +43,7 @@ export function AuthPage() {
         <div className={`ui-panel text-center`}>
           <div className="mb-4 flex justify-center"><AppLogo tone="brand" /></div>
           <p className={`mb-2 ${boardLook.label}`}>ApplyTrack</p>
-          <h1 className="ui-dialog-title">Your workspace is ready</h1>
+          <h1 className="ui-title legacy-size-text__1_75rem_">Your workspace is ready</h1>
           <p className={`mt-3 ${boardLook.body}`}>Track your applications on this device. Your changes are saved locally.</p>
           <a href="/" className={`mt-6 ${boardLook.button} ${focusClass}`}>Continue to Board</a>
         </div>
@@ -60,7 +60,7 @@ export function AuthPage() {
             <div>
               <p className={`mb-1 ${boardLook.label}`}>ApplyTrack</p>
               <h1 className={boardLook.headline}>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
-              <p className="mt-2 ui-description">{mode === 'signin' ? 'Sign in to sync across devices' : 'Keep your job search in sync across devices'}</p>
+              <p className="mt-2 ui-description legacy-size-text_sm">{mode === 'signin' ? 'Sign in to sync across devices' : 'Keep your job search in sync across devices'}</p>
             </div>
           </div>
 
@@ -91,14 +91,14 @@ export function AuthPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4" aria-busy={loading}>
             {error && (
-              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 ui-helper !text-red-700">{error}</p>
+              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 ui-helper !text-red-700 legacy-size-text_sm">{error}</p>
             )}
             {message && (
-              <p role="status" className="rounded-lg border border-brand-primary/25 bg-brand-mist p-3 ui-helper !text-brand-ink">{message}</p>
+              <p role="status" className="rounded-lg border border-brand-primary/25 bg-brand-mist p-3 ui-helper !text-brand-ink legacy-size-text_sm">{message}</p>
             )}
 
             <label className="ui-label block">
-              <span className="ui-label font-medium text-brand-muted">Email</span>
+              <span className="ui-label font-medium text-brand-muted legacy-size-text_sm">Email</span>
               <input
                 type="email"
                 name="email"
@@ -112,7 +112,7 @@ export function AuthPage() {
             </label>
 
             <label className="ui-label block">
-              <span className="ui-label font-medium text-brand-muted">Password</span>
+              <span className="ui-label font-medium text-brand-muted legacy-size-text_sm">Password</span>
               <input
                 type="password"
                 name="password"

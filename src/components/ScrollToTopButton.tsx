@@ -33,7 +33,7 @@ export function ScrollToTopButton() {
     <button
       type="button"
       onClick={scrollPageToTop}
-      className="ui-button ui-secondary ui-icon-button fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 z-40 lg:bottom-8 lg:left-[calc(var(--sidebar-width)+1rem)]"
+      className="ui-back-to-top ui-button ui-secondary ui-icon-button fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-40 lg:bottom-8"
       aria-label="Back to top"
     >
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>

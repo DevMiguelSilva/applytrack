@@ -16,9 +16,9 @@ import {
 } from '../types/job'
 
 
-const fieldLabel = "ui-label"
+const fieldLabel = "ui-label legacy-size-text_sm"
 const fieldControl =
-  "ui-field mt-1"
+  "ui-field mt-1 legacy-size-text_sm"
 
 export function AddJobPage() {
   const navigate = useNavigate()
@@ -113,7 +113,7 @@ export function AddJobPage() {
       <SectionHeader title="Add application" description="Paste a job posting or enter its details to add it to your board." />
 
       <section className={`ui-panel space-y-3`}>
-        <h2 className=" ui-section-title">Quick add with AI</h2>
+        <h2 className=" ui-section-title legacy-size-text_base">Quick add with AI</h2>
         <textarea
           value={pasteText}
           onChange={(e) => {
@@ -142,7 +142,7 @@ export function AddJobPage() {
 
       <form onSubmit={handleSubmit} className={`ui-panel space-y-4`}>
         {error && (
-          <p className="ui-helper !text-red-700" role="alert">
+          <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
             {error}
           </p>
         )}
@@ -233,7 +233,7 @@ export function AddJobPage() {
         {form.jdSummary && (
           <div className="rounded-lg border border-[#e6eeeb] bg-[#f7fbf9] p-3">
             <span className={fieldLabel}>AI summary</span>
-            <p className="mt-1 ui-body leading-relaxed text-brand-ink">{form.jdSummary}</p>
+            <p className="mt-1 ui-body leading-relaxed text-brand-ink legacy-size-text_sm">{form.jdSummary}</p>
           </div>
         )}
 
@@ -265,7 +265,7 @@ export function AddJobPage() {
             <span className={fieldLabel}>Extracted skills</span>
             <div className="mt-2 flex flex-wrap gap-2">
               {form.extractedSkills.map((skill) => (
-                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink">
+                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink legacy-size-text_sm">
                   {skill}
                 </span>
               ))}

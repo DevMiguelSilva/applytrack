@@ -14,14 +14,14 @@ import {
 
 
 const rowBtn =
-  "ui-button ui-secondary ui-compact"
+  "ui-button ui-secondary ui-compact legacy-size-text_sm"
 const rowRun =
-  "ui-button ui-secondary ui-compact"
+  "ui-button ui-secondary ui-compact legacy-size-text_sm"
 const rowDanger =
-  "ui-button ui-danger-quiet ui-compact ui-mobile-delete"
-const fieldLabel = "ui-label"
+  "ui-button ui-danger-quiet ui-compact ui-mobile-delete legacy-size-text_sm"
+const fieldLabel = "ui-label legacy-size-text_sm"
 const fieldControl =
-  "ui-field mt-1"
+  "ui-field mt-1 legacy-size-text_sm"
 
 type FeedDraft = { name: string; url: string; source: PortalSource }
 
@@ -277,16 +277,16 @@ export function PortalsPage() {
 
       <section className={`ui-panel space-y-4`}>
         <div className="space-y-1">
-          <h2 className=" ui-section-title">Your feeds</h2>
-          <p className="ui-meta text-brand-muted">
+          <h2 className=" ui-section-title legacy-size-text_base">Your feeds</h2>
+          <p className="ui-meta text-brand-muted legacy-size-text_xs">
             {checkedActiveCount} of {activeFeeds.length} active feeds checked today.
           </p>
         </div>
 
         {feeds.length === 0 ? (
           <div className="rounded-[1.25rem] border border-dashed border-[#e6eeeb] bg-white p-8 text-center">
-            <h3 className=" ui-section-title">No portal feeds yet</h3>
-            <p className="mt-2 ui-helper text-brand-muted">Add a job-search URL to keep it ready for your next search session.</p>
+            <h3 className=" ui-section-title legacy-size-text_lg">No portal feeds yet</h3>
+            <p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">Add a job-search URL to keep it ready for your next search session.</p>
           </div>
         ) : (
           <ul className="space-y-3">
@@ -326,7 +326,7 @@ export function PortalsPage() {
                             setEditingId(null)
                             setError(null)
                           }}
-                          className="ui-button ui-secondary"
+                          className="ui-button ui-secondary legacy-size-text_sm"
                         >
                           Cancel
                         </button>
@@ -377,15 +377,15 @@ export function PortalsPage() {
                           <p className="font-medium text-brand-ink">
                             {feed.name || 'Untitled feed'}
                             {feed.active ? (
-                              <span className="ml-2 ui-meta font-medium text-[#23745e]">active</span>
+                              <span className="ml-2 ui-meta font-medium text-[#23745e] legacy-size-text_xs">active</span>
                             ) : (
-                              <span className="ml-2 ui-meta text-brand-muted">paused</span>
+                              <span className="ml-2 ui-meta text-brand-muted legacy-size-text_xs">paused</span>
                             )}
                             {checked && (
-                              <span className="ml-2 ui-meta text-[#23745e]">checked today ✓</span>
+                              <span className="ml-2 ui-meta text-[#23745e] legacy-size-text_xs">checked today ✓</span>
                             )}
                           </p>
-                          <p className="mt-1 truncate ui-meta leading-relaxed text-brand-muted">
+                          <p className="mt-1 truncate ui-meta leading-relaxed text-brand-muted legacy-size-text_xs">
                             {PORTAL_SOURCE_LABELS[feed.source]} · {feed.url}
                           </p>
                         </div>
@@ -438,7 +438,7 @@ export function PortalsPage() {
             </button>
           ) : (
             <form onSubmit={handleAdd} className="space-y-3">
-              <p className="ui-section-title">New portal feed</p>
+              <p className="ui-section-title legacy-size-text_base">New portal feed</p>
               <FeedFields draft={draft} setDraft={setDraft} />
               <div className="m-actions flex flex-wrap gap-2">
                 <button type="submit" data-role="primary" className="ui-button ui-primary">
@@ -452,7 +452,7 @@ export function PortalsPage() {
                     setDraft(emptyDraft)
                     setError(null)
                   }}
-                  className="ui-button ui-secondary"
+                  className="ui-button ui-secondary legacy-size-text_sm"
                 >
                   Cancel
                 </button>
@@ -472,14 +472,14 @@ export function PortalsPage() {
         }}
         className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg backdrop:bg-brand-ink/30"
       >
-        <h2 id="delete-portal-title" className=" ui-dialog-title">Delete saved portal?</h2>
-        <p id="delete-portal-description" className="mt-3 ui-helper text-brand-muted [overflow-wrap:anywhere]">
+        <h2 id="delete-portal-title" className=" ui-dialog-title legacy-size-text_lg">Delete saved portal?</h2>
+        <p id="delete-portal-description" className="mt-3 ui-helper text-brand-muted [overflow-wrap:anywhere] legacy-size-text_sm">
           Delete “{deletingFeed?.name.trim() || 'Untitled feed'}” from your saved portals? This cannot be undone.
         </p>
-        {deleteError && <p role="alert" className="mt-3 ui-helper !text-red-700 [overflow-wrap:anywhere]">{deleteError}</p>}
+        {deleteError && <p role="alert" className="mt-3 ui-helper !text-red-700 [overflow-wrap:anywhere] legacy-size-text_sm">{deleteError}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="ui-button ui-secondary">Cancel</button>
-          <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="ui-button ui-danger-quiet">
+          <button ref={cancelDeleteButton} type="button" disabled={deleting} onClick={cancelDelete} className="ui-button ui-secondary legacy-size-text_sm">Cancel</button>
+          <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="ui-button ui-danger-quiet legacy-size-text_sm">
             {deleting ? 'Deleting…' : 'Delete portal'}
           </button>
         </div>

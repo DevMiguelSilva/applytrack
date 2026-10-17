@@ -17,14 +17,14 @@ import { createEmptySavedSearch, type SavedSearch } from '../types/job'
 
 
 const rowBtn =
-  "ui-button ui-secondary ui-compact"
+  "ui-button ui-secondary ui-compact legacy-size-text_sm"
 const rowRun =
-  "ui-button ui-primary ui-compact"
+  "ui-button ui-primary ui-compact legacy-size-text_sm"
 const rowDanger =
-  "ui-button ui-danger-quiet ui-compact ui-mobile-delete"
-const fieldLabel = "ui-label"
+  "ui-button ui-danger-quiet ui-compact ui-mobile-delete legacy-size-text_sm"
+const fieldLabel = "ui-label legacy-size-text_sm"
 const fieldControl =
-  "ui-field mt-1"
+  "ui-field mt-1 legacy-size-text_sm"
 
 const emptyDraft = {
   label: '',
@@ -340,7 +340,7 @@ export function InboxPage() {
         </div>} />
 
       <div className={`${boardLook.card} px-5 py-4`}>
-        <p className="ui-body text-brand-ink">
+        <p className="ui-helper !text-brand-ink legacy-size-text_sm">
           <span className="font-semibold tabular-nums">{newCount}</span>
           <span className="text-brand-muted"> ready to review</span>
           {newCount > 0 && (
@@ -351,7 +351,7 @@ export function InboxPage() {
             </span>
           )}
         </p>
-        <p className="mt-1 ui-meta text-brand-muted">
+        <p className="mt-1 ui-meta text-brand-muted legacy-size-text_xs">
           {activeSearches.length === 0
             ? searches.length === 0
               ? 'No saved searches yet.'
@@ -363,7 +363,7 @@ export function InboxPage() {
       </div>
 
       {(error || refreshError) && (
-        <p className="ui-helper !text-red-700" role="alert">
+        <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
           {error || refreshError}
         </p>
       )}
@@ -372,7 +372,7 @@ export function InboxPage() {
 
       {showSearches && (
         <section className={`ui-panel space-y-4`}>
-          <h2 className=" ui-section-title">Saved searches</h2>
+          <h2 className=" ui-section-title legacy-size-text_base">Saved searches</h2>
           <ul className="space-y-3">
             {searches.map((search, index) => (
               <li
@@ -415,7 +415,7 @@ export function InboxPage() {
               </button>
             ) : (
               <form onSubmit={handleAddSearch} className="space-y-3">
-                <p className="ui-section-title">New saved search</p>
+                <p className="ui-section-title legacy-size-text_base">New saved search</p>
                 <SearchFields draft={draft} setDraft={setDraft} />
                 <div className="m-actions flex flex-wrap gap-2">
                   <button type="submit" data-role="primary" className="ui-button ui-primary">
@@ -461,23 +461,23 @@ export function InboxPage() {
                   <p className={`ui-helper ${seenBefore ? 'text-[#8a6230]' : 'text-brand-muted'}`}>
                     {seenBefore ? 'Seen before' : 'New'}
                   </p>
-                  <h3 className="mt-2 ui-card-title">
+                  <h3 className="mt-2 ui-inbox-job-title legacy-size-text_base">
                     {job.role || 'Untitled role'}
                   </h3>
-                  <p className="mt-1 truncate ui-helper text-brand-muted">{job.company || 'Unknown company'}</p>
+                  <p className="mt-1 truncate ui-meta text-brand-muted legacy-size-text_sm">{job.company || 'Unknown company'}</p>
                   {job.location.trim() && (
-                    <p className="truncate ui-helper text-brand-muted">{job.location}</p>
+                    <p className="truncate ui-meta text-brand-muted legacy-size-text_sm">{job.location}</p>
                   )}
-                  {job.salary.trim() && <p className="mt-2 ui-body text-brand-ink">{job.salary}</p>}
+                  {job.salary.trim() && <p className="mt-2 ui-meta !text-brand-ink legacy-size-text_sm">{job.salary}</p>}
                   {searchName && (
-                    <p className="mt-2 ui-helper text-brand-muted">Found by {searchName}</p>
+                    <p className="mt-2 ui-meta text-brand-muted legacy-size-text_sm">Found by {searchName}</p>
                   )}
                   {job.jobUrl && (
                     <a
                       href={job.jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ui-inline mt-2"
+                      className="ui-inline ui-posting-link mt-2 legacy-size-text_sm"
                     >
                       Open original posting
                     </a>
@@ -488,7 +488,7 @@ export function InboxPage() {
                     {skills.map((skill) => (
                       <span
                         key={skill}
-                        className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink"
+                        className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"
                       >
                         {skill}
                       </span>
@@ -623,12 +623,12 @@ function SavedSearchBody({
           <p className="font-medium text-brand-ink">
             {name}
             {search.active ? (
-              <span className="ml-2 ui-meta font-medium text-[#23745e]">active</span>
+              <span className="ml-2 ui-meta font-medium text-[#23745e] legacy-size-text_xs">active</span>
             ) : (
-              <span className="ml-2 ui-meta text-brand-muted">paused</span>
+              <span className="ml-2 ui-meta text-brand-muted legacy-size-text_xs">paused</span>
             )}
           </p>
-          <p className="mt-1 ui-meta leading-relaxed text-brand-muted">{meta}</p>
+          <p className="mt-1 ui-meta leading-relaxed text-brand-muted legacy-size-text_xs">{meta}</p>
         </div>
       </div>
       <div className="search-icons">

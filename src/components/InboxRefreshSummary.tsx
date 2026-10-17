@@ -5,7 +5,7 @@ export function InboxRefreshSummary({ report, busy, retryFailed, retrySave }: { 
   const failed = report.outcomes.filter(outcome => outcome.state !== 'success')
   const returned = new Set(successful.flatMap(outcome => outcome.response?.results.map(job => job.externalId) ?? [])).size
   const title = report.persistence === 'failed' ? 'Results fetched, but not saved' : !failed.length ? returned ? 'Search refresh complete' : 'No matches this time' : successful.length ? 'Some searches completed' : 'Search refresh could not complete'
-  return <section className="ui-panel  space-y-4" aria-label="Search refresh summary">
+  return <section className="ui-panel space-y-4 legacy-size-text_sm" aria-label="Search refresh summary">
     <div role="status" aria-live="polite">
       <h2 className="ui-card-title">{title}</h2>
       <p className="mt-1 ui-helper text-brand-muted">{successful.length} of {report.outcomes.length} search locations completed · {returned} listing{returned === 1 ? '' : 's'} returned.</p>
@@ -16,8 +16,8 @@ export function InboxRefreshSummary({ report, busy, retryFailed, retrySave }: { 
       {failed.map(outcome => <li key={outcome.id} className="rounded-lg bg-brand-mist p-3">
         <p className="break-words font-medium">{outcome.search.label || outcome.search.query} · {outcome.location}</p>
         <p className="mt-1 ui-helper text-brand-muted">{outcome.state === 'not_run' ? 'Not run: requests stopped to avoid further provider failures. ' : ''}{outcome.error?.message}</p>
-        {outcome.error?.retryAfterSeconds !== undefined && <p className="mt-1 ui-meta text-brand-muted">Provider requested a wait of {outcome.error.retryAfterSeconds} seconds when this response was received.</p>}
-        {outcome.error?.requestId && <p className="mt-1 break-all ui-meta text-brand-muted">Reference: {outcome.error.requestId.slice(0, 12)}</p>}
+        {outcome.error?.retryAfterSeconds !== undefined && <p className="mt-1 ui-meta text-brand-muted legacy-size-text_xs">Provider requested a wait of {outcome.error.retryAfterSeconds} seconds when this response was received.</p>}
+        {outcome.error?.requestId && <p className="mt-1 break-all ui-meta text-brand-muted legacy-size-text_xs">Reference: {outcome.error.requestId.slice(0, 12)}</p>}
       </li>)}
     </ul>}
     <div className="flex flex-wrap gap-2">

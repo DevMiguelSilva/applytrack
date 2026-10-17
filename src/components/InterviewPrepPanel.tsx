@@ -12,13 +12,13 @@ export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
   const tailored = getForJob(job.id)
 
   const quietBtn =
-    "ui-button ui-secondary"
+    "ui-button ui-secondary legacy-size-text_sm"
 
   return (
     <section className="ui-panel  space-y-4">
       <div>
-        <h2 className=" ui-section-title">Interview prep</h2>
-        <p className="mt-1 ui-helper text-brand-muted">
+        <h2 className=" ui-section-title legacy-size-text_base">Interview prep</h2>
+        <p className="mt-1 ui-helper text-brand-muted legacy-size-text_sm">
           Tailored resume for this call. Interview dates and your comments stay in the sections above.
         </p>
       </div>
@@ -26,7 +26,7 @@ export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
       {tailored ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className=" ui-label">Tailored resume</h3>
+            <h3 className=" ui-label legacy-size-text_sm">Tailored resume</h3>
             <button
               type="button"
               className={quietBtn}
@@ -40,17 +40,17 @@ export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
               Download DOCX
             </button>
           </div>
-          <p className="ui-body font-medium text-brand-ink">{tailored.tailoredCv.headline}</p>
-          <p className="ui-body leading-relaxed text-brand-ink">{tailored.tailoredCv.summary}</p>
+          <p className="ui-body font-medium text-brand-ink legacy-size-text_sm">{tailored.tailoredCv.headline}</p>
+          <p className="ui-body leading-relaxed text-brand-ink legacy-size-text_sm">{tailored.tailoredCv.summary}</p>
           {tailored.gapReport && (
-            <p className="ui-helper text-brand-muted">
+            <p className="ui-helper text-brand-muted legacy-size-text_sm">
               Coverage: {tailored.gapReport.coveragePercent}% · matched{' '}
               {tailored.gapReport.matchedKeywords.slice(0, 6).join(', ')}
             </p>
           )}
         </div>
       ) : (
-        <p className="ui-helper text-brand-muted">
+        <p className="ui-helper text-brand-muted legacy-size-text_sm">
           No tailored CV yet — use Tailor below before the interview if you need one.
         </p>
       )}

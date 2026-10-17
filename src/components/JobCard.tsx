@@ -51,7 +51,7 @@ export function JobCard({
         <div className="space-y-0.5">
           <div className="flex items-start justify-between gap-2">
             <h3 className={`${boardLook.jobTitle} min-w-0 break-words`}>{job.role || 'Untitled role'}</h3>
-            <span className="shrink-0 pt-0.5 ui-meta font-medium text-brand-muted">
+            <span className="shrink-0 pt-0.5 ui-meta font-medium text-brand-muted legacy-size-text__11px_">
               {jobSourceLabel(job.source)}
             </span>
           </div>
@@ -59,18 +59,18 @@ export function JobCard({
           {location && <p className={`${boardLook.jobMeta} truncate`}>{location}</p>}
           {showPay && <p className={boardLook.jobMeta}>{pay}</p>}
           {job.status === 'interview' && job.notSelected && (
-            <p className="truncate pt-1 ui-meta font-semibold text-brand-muted">Not selected</p>
+            <p className="truncate pt-1 ui-meta font-semibold text-brand-muted legacy-size-text__11px_">Not selected</p>
           )}
           {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
-            <p className="truncate pt-1 ui-meta font-semibold text-emerald-700">
+            <p className="truncate pt-1 ui-meta font-semibold text-emerald-700 legacy-size-text__11px_">
               Waiting for an answer
             </p>
           )}
           {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
-            <p className="truncate pt-1 ui-meta font-semibold text-emerald-700">Interview booked</p>
+            <p className="truncate pt-1 ui-meta font-semibold text-emerald-700 legacy-size-text__11px_">Interview booked</p>
           )}
           {!job.jdComplete && !job.needsRescore && (
-            <p className="pt-1 ui-meta font-semibold text-[#8a6230]">Description incomplete</p>
+            <p className="pt-1 ui-meta font-semibold text-[#8a6230] legacy-size-text__11px_">Description incomplete</p>
           )}
         </div>
       </Link>
@@ -79,7 +79,7 @@ export function JobCard({
           <button
             type="button"
             onClick={() => onRestore?.(job.id)}
-            className="ui-button ui-secondary ui-compact"
+            className="ui-button ui-secondary ui-compact legacy-size-text_xs"
           >
             Restore
           </button>
@@ -90,7 +90,7 @@ export function JobCard({
                 onPurge?.(job.id)
               }
             }}
-            className="ui-button ui-danger-quiet ui-compact"
+            className="ui-button ui-danger-quiet ui-compact legacy-size-text_xs"
           >
             Delete
           </button>

@@ -110,7 +110,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       </div>
 
       {interviews.length === 0 && !adding && (
-        <p className="ui-helper text-slate-500">No interviews yet.</p>
+        <p className="ui-helper text-slate-500 legacy-size-text_sm">No interviews yet.</p>
       )}
 
       {interviews.length > 0 && (
@@ -145,17 +145,17 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                 className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${rowTone}`}
               >
                 <div className="min-w-0">
-                  <p className="ui-body font-medium text-slate-800 dark:text-slate-100">
+                  <p className="ui-helper font-medium !text-slate-800 dark:text-slate-100 legacy-size-text_sm">
                     {formatInterviewDate(round.date)}
                   </p>
                   {round.label && (
-                    <p className="truncate ui-meta text-slate-500 dark:text-slate-400">{round.label}</p>
+                    <p className="truncate ui-meta text-slate-500 dark:text-slate-400 legacy-size-text_xs">{round.label}</p>
                   )}
                 </div>
                 <div className="ui-interview-actions">
                   {readOnly ? (
                     round.done && (
-                      <span className="ui-meta font-medium text-teal-700 dark:text-teal-300">Done</span>
+                      <span className="ui-meta font-medium text-teal-700 dark:text-teal-300 legacy-size-text_xs">Done</span>
                     )
                   ) : (
                     <>
@@ -193,7 +193,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
       )}
 
       {error && (
-        <p className="ui-helper !text-amber-700 dark:!text-amber-300" role="alert">
+        <p className="ui-helper !text-amber-700 dark:!text-amber-300 legacy-size-text_sm" role="alert">
           {error}
         </p>
       )}
@@ -225,7 +225,7 @@ function DraftFields({
   return (
     <div className="grid gap-2 rounded-xl border border-[#e6eeeb] p-3 sm:grid-cols-[1fr_11rem_auto] sm:items-end">
       <label className="ui-label block">
-        <span className="ui-label text-brand-muted">Name</span>
+        <span className="ui-label text-brand-muted legacy-size-text_xs">Name</span>
         <input
           disabled={saving}
           value={labelDraft}
@@ -235,7 +235,7 @@ function DraftFields({
         />
       </label>
       <label className="ui-label block">
-        <span className="ui-label text-brand-muted">Date</span>
+        <span className="ui-label text-brand-muted legacy-size-text_xs">Date</span>
         <input
           type="date"
           disabled={saving}

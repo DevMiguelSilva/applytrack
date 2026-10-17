@@ -13,15 +13,16 @@
 .ui-app { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; color: var(--ui-ink); }
 .ui-title, .ui-section-title, .ui-dialog-title { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 600; color: var(--ui-ink); overflow-wrap: anywhere; }
 .ui-title { font-size: 28px; line-height: 34px; letter-spacing: -0.025em; }
-.ui-section-title { font-size: 18px; line-height: 24px; letter-spacing: -0.015em; }
+.ui-section-title { font-size: 16px; line-height: 24px; letter-spacing: -0.015em; }
 .ui-dialog-title { font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
-.ui-body { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; }
+.ui-body { font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; }
 .ui-description { font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 24px; color: var(--ui-muted); }
 .ui-helper, .ui-label { font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; }
 .ui-helper { color: var(--ui-muted); }
 .ui-label { font-weight: 500; color: var(--ui-muted); }
 .ui-meta { font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: 16px; }
-.ui-card-title { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; }
+.ui-card-title { font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600; }
+.ui-inbox-job-title { font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; }
 .ui-section-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .ui-heading-copy { min-width: 0; flex: 1 1 260px; }
 .ui-heading-copy .ui-description { margin-top: 8px; max-width: 640px; }
@@ -55,7 +56,7 @@
 .ui-field {
   display: block; min-height: 44px; min-width: 0; width: 100%; padding: 9px 12px; border: 1px solid var(--ui-field-line);
   border-radius: 8px; background-color: white; color: var(--ui-ink); font-family: Inter, system-ui, sans-serif;
-  font-size: 16px; line-height: 24px; font-weight: 400;
+  font-size: 14px; line-height: 20px; font-weight: 400;
 }
 input.ui-field, select.ui-field { height: 44px; }
 select.ui-field { padding-right: 36px; }
@@ -155,3 +156,27 @@ textarea.ui-field { height: auto; resize: vertical; }
   .ui-button.ui-mobile-delete,
   .ui-button.ui-mobile-delete:where(:not(:disabled):not([aria-disabled="true"])):hover { background-color: white; }
 }
+
+.ui-posting-link { font-size: 14px; line-height: 20px; }
+
+body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: calc(40vh + 8rem + env(safe-area-inset-bottom)); }
+@media (min-width: 1024px) { body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: calc(40vh + 2rem); } }
+
+/* Font-size rollback to pre-redesign 7c862b1; explicit historical sizes. */
+.legacy-size-text_sm { font-size: 14px !important; line-height: 20px; }
+.legacy-size-text_xs { font-size: 12px !important; line-height: 16px; }
+.legacy-size-text_lg { font-size: 18px !important; line-height: 28px; }
+.legacy-size-text_base { font-size: 16px !important; line-height: 24px; }
+.legacy-size-text__11px_ { font-size: 11px !important; line-height: 16px; }
+.legacy-size-text_2xl { font-size: 24px !important; line-height: 32px; }
+@media (min-width: 640px) { .legacy-size-sm_text_3xl { font-size: 30px !important; line-height: 36px; } }
+.legacy-size-text__1_75rem_ { font-size: 28px !important; line-height: 33.6px; }
+.legacy-size-text_xl { font-size: 20px !important; line-height: 28px; }
+
+.ui-cv-page .ui-title { font-size: 24px; line-height: 32px; }
+@media (min-width: 640px) { .ui-cv-page .ui-title { font-size: 30px; line-height: 36px; } }
+
+.legacy-size-15 { font-size: 15px !important; }
+
+/* Historical inherited text sizes missed by the initial JSX match. */
+.ui-cv-page > .ui-section-header .ui-description { font-size: 14px; }

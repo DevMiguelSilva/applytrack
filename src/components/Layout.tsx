@@ -30,7 +30,7 @@ export function Layout() {
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />
       </main>
-      <footer className="border-t border-[#dce8e4] py-6 text-center ui-meta text-[#4d635c]">
+      <footer className="border-t border-[#dce8e4] py-6 text-center ui-meta text-[#4d635c] legacy-size-text_xs">
         ApplyTrack · Built by Miguel Silva
       </footer>
       {showTabs && <MobileTabBar />}
