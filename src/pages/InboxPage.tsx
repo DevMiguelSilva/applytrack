@@ -1,7 +1,6 @@
 import { InboxRefreshSummary } from '../components/InboxRefreshSummary'
 import { TrashIcon } from '../components/TrashIcon'
 import { useMemo, useState, type DragEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { boardLook } from '../components/BoardLook'
 import { attachCardDragGhost } from '../components/JobCard'
 import { IconAction } from '../components/IconAction'
@@ -246,34 +245,29 @@ export function InboxPage() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
-          ← Back to board
-        </Link>
-        <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
-          <h1 className={boardLook.headline}>Inbox</h1>
-          <div className="m-actions flex flex-wrap gap-2">
-            <button type="button" onClick={() => setShowSearches((v) => !v)} className={toolbarBtn}>
-              {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
-            </button>
-            <button
-              type="button"
-              onClick={handleClearReview}
-              disabled={refreshing || newCount === 0}
-              className={toolbarBtn}
-            >
-              Clear review list
-            </button>
-            <button
-              type="button"
-              data-role="primary"
-              onClick={handleRefresh}
-              disabled={refreshing || Boolean(runningAloneId)}
-              className={refreshBtn}
-            >
-              {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
-            </button>
-          </div>
+      <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
+        <h1 className={boardLook.headline}>Inbox</h1>
+        <div className="m-actions flex flex-wrap gap-2">
+          <button type="button" onClick={() => setShowSearches((v) => !v)} className={toolbarBtn}>
+            {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={handleClearReview}
+            disabled={refreshing || newCount === 0}
+            className={toolbarBtn}
+          >
+            Clear review list
+          </button>
+          <button
+            type="button"
+            data-role="primary"
+            onClick={handleRefresh}
+            disabled={refreshing || Boolean(runningAloneId)}
+            className={refreshBtn}
+          >
+            {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
+          </button>
         </div>
       </div>
 
