@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
 import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
@@ -51,9 +51,6 @@ export function JobDetailPage() {
     return (
       <div className="text-center">
         <p className="text-slate-500">Job not found.</p>
-        <Link to="/" className="mt-2 inline-block text-track-accent hover:underline">
-          ← Back to board
-        </Link>
       </div>
     )
   }
@@ -199,10 +196,6 @@ export function JobDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
-        ← Back to board
-      </Link>
-
       <section className="rounded-[1.25rem] border border-[#e6eeeb] bg-white p-6 sm:p-8">
         <div className="m-action-row flex flex-wrap items-start justify-between gap-6">
           <div className="min-w-0">

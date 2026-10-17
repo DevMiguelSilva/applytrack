@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
 import { boardLook } from '../components/BoardLook'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -111,12 +111,7 @@ export function AddJobPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div className="space-y-3">
-        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
-          ← Back to board
-        </Link>
-        <h1 className={boardLook.headline}>Add application</h1>
-      </div>
+      <h1 className={boardLook.headline}>Add application</h1>
 
       <section className={`${boardLook.card} space-y-3 p-4 sm:p-5`}>
         <h2 className="font-display text-base font-semibold text-brand-ink">Quick add with AI</h2>

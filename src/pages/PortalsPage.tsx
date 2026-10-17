@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { boardLook } from '../components/BoardLook'
 import { IconAction } from '../components/IconAction'
 import { attachCardDragGhost } from '../components/JobCard'
@@ -257,23 +256,18 @@ export function PortalsPage() {
 
   return (
     <div className="space-y-4 font-sans text-brand-ink">
-      <div className="space-y-3">
-        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
-          ← Back to board
-        </Link>
-        <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
-          <h1 className={boardLook.headline}>Portals</h1>
-          <div className="m-actions flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-role="primary"
-              onClick={() => void handleOpenAll()}
-              disabled={activeFeeds.length === 0 || Boolean(busyFeedId)}
-              className={refreshBtn}
-            >
-              Open all active ({activeFeeds.length})
-            </button>
-          </div>
+      <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
+        <h1 className={boardLook.headline}>Portals</h1>
+        <div className="m-actions flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-role="primary"
+            onClick={() => void handleOpenAll()}
+            disabled={activeFeeds.length === 0 || Boolean(busyFeedId)}
+            className={refreshBtn}
+          >
+            Open all active ({activeFeeds.length})
+          </button>
         </div>
       </div>
 
