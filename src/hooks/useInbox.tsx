@@ -1,4 +1,7 @@
 import { CV_LIBRARY_EVENT, recoverCvTransaction } from '../lib/cvLibrary'
+import { searchHasLiveSource } from '../lib/cvSources'
+import { withLocalMutation } from '../lib/localMutation'
+import { normalizeLibrary } from '../types/cv'
 import {
   createContext,
   useCallback,
@@ -125,6 +128,11 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const current = useRef({ account, searches, jobs })
   current.current = { account, searches, jobs }
   const mutations = useRef<Promise<unknown>>(Promise.resolve())
+  const revision = useRef(0)
+  const sourcesNow = useCallback(() => isCloudSync ? live.current : {
+    library: normalizeLibrary(JSON.parse(localStorage.getItem('applytrack-master-cv') ?? 'null')),
+    searches: JSON.parse(localStorage.getItem('applytrack-saved-searches') ?? '[]') as SavedSearch[],
+  }, [isCloudSync])
   const loadedOwner = useRef(account)
   const manager = useMemo(() => { void account; return new InboxRefresh() }, [account])
   const [refreshReport, setRefreshReport] = useState<RefreshReport | null>(null)
@@ -133,9 +141,10 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const session = useRef<{ account: string; requests: SearchOutcome[]; started: number; runAlone: boolean; baseline: Map<string, InboxJob> } | null>(null)
   const refreshBusy = useRef(false)
   const validRequests = useCallback((requests: SearchOutcome[], owner: string) => current.current.account === owner && requests.every(request => {
-    const search = current.current.searches.find(entry => entry.id === request.search.id)
-    return search && searchFingerprint(search) === searchFingerprint(request.search)
-  }), [])
+    const source = sourcesNow()
+    const search = source.searches.find(entry => entry.id === request.search.id)
+    return search && searchHasLiveSource(source.library, search) && searchFingerprint(search) === searchFingerprint(request.search)
+  }), [sourcesNow])
   useEffect(() => {
     manager.invalidate()
     pending.current = null; session.current = null; refreshBusy.current = false
@@ -165,13 +174,15 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   }, [cvsByTrack])
 
   const load = useCallback(async () => {
+    const version = ++revision.current
     const owner = account
     loadedOwner.current = account
     setLoading(true)
     setInbox([]); inboxRef.current = []
     try {
       if (!isCloudSync || !supabase || !userId) {
-        setInbox(readLocal())
+        const next = await withLocalMutation(readLocal)
+        if (current.current.account === owner && version === revision.current) { inboxRef.current = next; setInbox(next) }
         return
       }
       const { data, error } = await supabase
@@ -180,12 +191,11 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .order('match_score', { ascending: false })
       if (error) throw error
-      if (current.current.account === owner) { inboxRef.current = (data ?? []).map(rowToInboxJob); setInbox(inboxRef.current) }
+      if (current.current.account === owner && version === revision.current) { inboxRef.current = (data ?? []).map(rowToInboxJob); setInbox(inboxRef.current) }
     } catch (err) {
       console.error('Failed to load inbox:', err)
-      if (current.current.account === owner) setInbox(isCloudSync ? [] : readLocal())
     } finally {
-      if (current.current.account === owner) setLoading(false)
+      if (current.current.account === owner && version === revision.current) setLoading(false)
     }
   }, [isCloudSync, userId, account])
 
@@ -193,14 +203,17 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     void load()
     const refresh = () => { void load() }
     window.addEventListener(CV_LIBRARY_EVENT, refresh)
-    return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
-  }, [load])
+    const storage = (event: StorageEvent) => { if (!isCloudSync && ['applytrack-inbox', 'applytrack-master-cv'].includes(event.key ?? '')) refresh() }
+    window.addEventListener('storage', storage)
+    return () => { window.removeEventListener(CV_LIBRARY_EVENT, refresh); window.removeEventListener('storage', storage) }
+  }, [load, isCloudSync])
 
   const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false) => {
     const owner = account
     const operation = mutations.current.catch(() => {}).then(async () => {
       const check = () => { if (current.current.account !== owner || owner === 'signed-out' || !valid()) throw new RefreshInvalidated('Searches or account changed. Refresh again.') }
       check()
+      revision.current++; setLoading(false)
       const before = inboxRef.current
       let next = transform(before)
       if (fetched && isCloudSync && supabase && userId) {
@@ -224,9 +237,14 @@ export function InboxProvider({ children }: { children: ReactNode }) {
             if (error) throw error
           })
         }
-      } else await inboxSaveStep('local', () => writeLocal(next))
+      } else next = await withLocalMutation(async () => {
+        check()
+        const updated = transform(readLocal())
+        await inboxSaveStep('local', () => writeLocal(updated))
+        return updated
+      })
       check()
-      inboxRef.current = next; setInbox(next)
+      revision.current++;setLoading(false);inboxRef.current = next; setInbox(next)
     })
     mutations.current = operation
     return operation
@@ -263,7 +281,11 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     const owner = account
     try {
       if (!retry) {
-        const list = options?.searchesOverride ?? current.current.searches
+          const source = sourcesNow()
+          const list = (options?.searchesOverride ?? source.searches).filter(search => {
+            const actual = source.searches.find(entry=>entry.id===search.id)
+            return actual && searchHasLiveSource(source.library,actual) && searchHasLiveSource(source.library,search)
+        })
         const selected = options?.onlySearchId ? list.filter(search => search.id === options.onlySearchId && search.query.trim()) : list.filter(search => search.active && search.query.trim())
         if (!selected.length) { setRefreshError('Add an active saved search with a search phrase before refreshing.'); return }
         session.current = { account: owner, requests: searchRequests(selected), started: Date.now(), runAlone: Boolean(options?.clearReviewFirst), baseline: new Map(inboxRef.current.map(item => [item.externalId, item])) }
@@ -311,8 +333,9 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const approveJob = useCallback(
     async (id: string) => {
       const owner = account
-      const item = inboxRef.current.find((i) => i.id === id)
+      const item = (isCloudSync ? inboxRef.current : await withLocalMutation(readLocal)).find((i) => i.id === id)
       if (!item) throw new Error('Inbox item not found')
+      if (item.needsCvSelection && !live.current.searches.some(search=>search.id===item.savedSearchId && searchHasLiveSource(live.current.library,search))) throw new Error('Choose a source CV in the saved search before approving this job.')
 
       // Same job shape as manual add: keep full description text; AI fills summary/skills when possible.
       let jdSummary = ''
@@ -341,8 +364,10 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       if (current.current.account !== owner || inboxRef.current.find(entry => entry.id === id)?.status !== 'new') throw new Error('This inbox item changed. Please review it again.')
       const jobText = `${role}\n${item.description}`
       // Parsing can finish after a template was deleted or a search reassigned.
-      const latest = live.current
+      const latest = sourcesNow()
       const search = latest.searches.find((entry) => entry.id === item.savedSearchId)
+      if (search && !searchHasLiveSource(latest.library,search)) throw new Error('Choose a CV in this saved search before approving its jobs.')
+      if (!search && item.matchedTrack && !latest.library.cvs[item.matchedTrack]) throw new Error('The source CV was deleted. Choose a CV before approving this job.')
       const currentMatch = pickMatch(jobText, search?.track ?? (item.matchedTrack && latest.library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), latest.library.cvs, latest.library.names)
       const track = currentMatch.track
       extractedSkills = withRequirementSignals(jobText, extractedSkills)
@@ -373,7 +398,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       await updateInboxItem(id, { status: 'approved' })
       return job.id
     },
-    [account, addJob, updateInboxItem]
+    [account, addJob, updateInboxItem, isCloudSync, sourcesNow]
   )
 
   const dismissJob = useCallback(
@@ -388,11 +413,13 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const scoredInbox = useMemo(() => inbox.map((item) => {
     if (item.status !== 'new') return item
     const search = searches.find((entry) => entry.id === item.savedSearchId)
+    if (item.needsCvSelection && !search) return {...item,matchedTrack:null,matchScore:0,matchReasons:['Source CV deleted. Choose a source before approving this job.']}
+    if (search && !searchHasLiveSource(library,search)) return {...item,matchedTrack:null,matchScore:0,matchReasons:['Choose a CV in the saved search before approving this job.']}
     try {
       const match = pickMatch(`${item.role}\n${item.description}`, search?.track ?? (item.matchedTrack && cvsByTrack[item.matchedTrack] ? item.matchedTrack : 'auto'), cvsByTrack, library.names, matchJob)
-      return { ...item, matchedTrack: match.track, matchScore: match.score, matchReasons: match.reasons }
+      return { ...item, needsCvSelection:false, matchedTrack: match.track, matchScore: match.score, matchReasons: match.reasons }
     } catch { return { ...item, matchScore: 0, matchReasons: ['Selected CV unavailable. Update the saved search before approval.'] } }
-  }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, cvsByTrack, library.names, matchJob])
+  }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, cvsByTrack, library, matchJob])
 
   const value = { inbox: loadedOwner.current === account ? scoredInbox : [], loading, refreshing, refreshError, refreshReport, newCount, refreshInbox, retryFailedSearches, retryInboxSave, clearReviewList, approveJob, dismissJob }
 

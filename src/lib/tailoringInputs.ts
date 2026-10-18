@@ -2,7 +2,7 @@ import type { MasterCvLibrary } from '../types/cv'
 import type { JobApplication } from '../types/job'
 
 export function captureTailoringInput(job: JobApplication | undefined, library: MasterCvLibrary) {
-  if (!job || job.status !== 'saved' || job.deletedAt) return null
+  if (!job || job.status !== 'saved' || job.deletedAt || job.needsCvSelection) return null
   const track = job.cvTrack ?? library.activeTrack
   const cv = library.cvs[track]
   if (!cv) return null

@@ -1,3 +1,4 @@
+import { usePermanentDelete } from '../hooks/usePermanentDelete'
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { JobApplication } from '../types/job'
@@ -12,7 +13,6 @@ interface JobCardProps {
   onDragEnd?: () => void
   trashMode?: boolean
   onRestore?: (id: string) => void
-  onPurge?: (id: string) => void
 }
 
 export function JobCard({
@@ -22,8 +22,8 @@ export function JobCard({
   onDragEnd,
   trashMode,
   onRestore,
-  onPurge,
 }: JobCardProps) {
+  const openPurge = usePermanentDelete()
   const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
   const company = job.company || 'Unknown company'
   const pay = job.salary.trim()
@@ -85,11 +85,7 @@ export function JobCard({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Permanently delete ${job.role} at ${job.company}? This cannot be undone.`)) {
-                onPurge?.(job.id)
-              }
-            }}
+            onClick={event => openPurge([job], false, event.currentTarget)}
             className="ui-button ui-danger-quiet ui-compact legacy-size-text_xs"
           >
             Delete

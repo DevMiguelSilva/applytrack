@@ -316,7 +316,7 @@ export async function buildCvDocxBlob(cv: MasterCv): Promise<Blob> {
     }),
     new Paragraph({
       spacing: { after: 40 },
-      children: [run(cv.headline || 'Software Engineer', { bold: true, size: SIZE.headline })],
+      children: [run(cv.headline || '', { bold: true, size: SIZE.headline })],
     }),
     new Paragraph({
       spacing: { after: 160 },
@@ -676,7 +676,7 @@ export function openCvPrintWindow(cv: MasterCv, title: string): void {
       @media print { body { margin: 0; max-width: none; } }
     </style></head><body>
       <h1>${escapeHtml(atsSafe(cv.contact.name))}</h1>
-      <p class="headline">${escapeHtml(atsSafe(cv.headline || 'Software Engineer'))}</p>
+      <p class="headline">${escapeHtml(atsSafe(cv.headline || ''))}</p>
       <p class="contact">${contactParts}</p>
       ${skillsHtml ? `<h2>Skills</h2>${skillsHtml}` : ''}
       ${cv.summary.trim() ? `<h2>Summary</h2><p>${escapeHtml(atsSafe(cv.summary))}</p>` : ''}

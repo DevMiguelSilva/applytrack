@@ -19,10 +19,10 @@ export interface RefreshReport {
   invalidated?: boolean
 }
 export function searchFingerprint(search: SavedSearch) {
-  return JSON.stringify([search.query, search.location, search.country, search.maxDaysOld, search.excludeTerms, search.track])
+  return JSON.stringify([search.query, search.location, search.country, search.maxDaysOld, search.excludeTerms, search.track, Boolean(search.needsCvSelection)])
 }
 export function searchRequests(searches: SavedSearch[]): SearchOutcome[] {
-  return searches.flatMap(search => expandSearchLocations(search.location).map(leg => ({
+  return searches.filter(search => !search.needsCvSelection).flatMap(search => expandSearchLocations(search.location).map(leg => ({
     id: `${search.id}:${JSON.stringify([leg.location, leg.isRemote])}`,
     search: structuredClone(search), location: leg.label,
     filters: { query: search.query, location: leg.location || undefined, country: search.country, maxDaysOld: search.maxDaysOld, excludeTerms: search.excludeTerms, requireRemote: leg.isRemote && !/\bremote\b/i.test(search.query) },

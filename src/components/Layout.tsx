@@ -7,6 +7,7 @@ import { useState, type CSSProperties } from 'react'
 import { Sidebar } from './Sidebar'
 import { readSidebarPreference, saveSidebarPreference } from '../lib/navigation'
 import { WorkspaceBar } from './WorkspaceBar'
+import { PermanentDeleteProvider } from './PermanentDeleteProvider'
 
 export function Layout() {
   const { pathname } = useLocation()
@@ -20,7 +21,7 @@ export function Layout() {
   }
 
   return (
-    <div
+    <PermanentDeleteProvider><div
       style={{ '--sidebar-width': showTabs ? collapsed ? '72px' : '240px' : '0px' } as CSSProperties}
       className={`ui-app min-h-screen ${showTabs ? 'mobile-app-shell pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[var(--sidebar-width)]' : ''}`}
     >
@@ -36,6 +37,6 @@ export function Layout() {
       {showTabs && <MobileTabBar />}
       <ScrollToTopButton />
       {showTabs && <TailoringProgress />}
-    </div>
+    </div></PermanentDeleteProvider>
   )
 }

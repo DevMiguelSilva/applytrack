@@ -1,6 +1,8 @@
+import { DeleteDialog } from '../components/DeleteDialog'
+import { useAuth } from '../hooks/useAuth'
 import { TrashIcon } from '../components/TrashIcon'
 import { SectionHeader } from '../components/SectionHeader'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { templateReferences } from '../lib/cvLibrary'
@@ -51,10 +53,37 @@ export function MasterCvPage() {
   const [copyFrom, setCopyFrom] = useState('')
   const [rename, setRename] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [replacement, setReplacement] = useState('')
+  const auth = useAuth()
+  const account = auth.isCloudEnabled ? auth.user?.id ?? 'signed-out' : 'local'
+  const liveDelete = useRef({account, revision:library.updatedAt})
+  liveDelete.current = {account, revision:library.updatedAt}
+  const deleteCapture = useRef<{account:string; revision:string; name:string; trigger:HTMLElement|null} | null>(null)
+  const deleteBusy = useRef(false)
+  const deleteVersion = useRef(0)
+  const [deletePending, setDeletePending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string|null>(null)
+  const invalidateDeletion=useCallback(()=>{deleteVersion.current++},[])
+  useEffect(() => { deleteVersion.current++; deleteBusy.current=false; setDeleting(null); setDeletePending(false); return invalidateDeletion }, [account,invalidateDeletion])
+  const closeDeletion = () => {
+    if (deleteBusy.current) return
+    setDeleting(null); setDeleteError(null)
+    requestAnimationFrame(() => deleteCapture.current?.trigger?.isConnected && deleteCapture.current.trigger.focus())
+  }
+  const confirmDeletion = async () => {
+    const captured = deleteCapture.current
+    if (!deleting || !captured || deleteBusy.current) return
+    const version=++deleteVersion.current
+    const sameOwner=()=>liveDelete.current.account===captured.account && deleteVersion.current===version
+    deleteBusy.current=true; setDeletePending(true); setDeleteError(null)
+    try {
+      await deleteTemplate(deleting,()=>sameOwner() && liveDelete.current.revision===captured.revision)
+      if (!sameOwner()) return
+      setDeleting(null); setDraft(null); setPendingAttachment(undefined)
+      requestAnimationFrame(()=>document.querySelector<HTMLSelectElement>('[aria-label="Selected CV"]')?.focus())
+    } catch { if(sameOwner())setDeleteError('Could not delete this CV template. Your draft is preserved. Please try again.') }
+    finally {if(sameOwner()){deleteBusy.current=false;setDeletePending(false)}}
+  }
   const [pendingAttachment, setPendingAttachment] = useState<ResumeAttachment | undefined>()
-  const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { if (deleting) dialog.current?.showModal(); else dialog.current?.close() }, [deleting])
 
   useEffect(() => {
     setEditingTrack(activeTrack)
@@ -141,9 +170,8 @@ export function MasterCvPage() {
   }
 
   if (loadError || !cv) return <div className={card}><p role="alert" className="ui-helper">{loadError ?? 'CV template unavailable.'}</p><button className="ui-button ui-primary" onClick={() => void reload()}>Retry loading CVs</button></div>
-  const locked = busy || importing
+  const locked = busy || importing || deletePending
   const refs = deleting ? templateReferences(library, deleting, jobs, searches) : { jobs: [], searches: [] }
-  const needsReplacement = refs.jobs.length + refs.searches.length > 0
 
   return (
     <div className="ui-page ui-cv-page mx-auto min-w-0 max-w-3xl" aria-busy={locked}>
@@ -157,17 +185,14 @@ export function MasterCvPage() {
       </form>}
       <section className={card}>
         <label className="ui-label block legacy-size-text_sm">Selected CV<select aria-label="Selected CV" disabled={locked} className={`${field} mt-2 form-select`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto ui-meta text-brand-muted legacy-size-text_xs">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }} /></div>
+        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto ui-meta text-brand-muted legacy-size-text_xs">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { deleteCapture.current={account, revision:library.updatedAt, name:getLabel(editingTrack), trigger:document.activeElement as HTMLElement}; setDeleteError(null); setDeleting(editingTrack) }} /></div>
         {rename !== null && <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="ui-label block legacy-size-text_sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className="ui-button ui-primary" disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
       </section>
-      <dialog ref={dialog} aria-labelledby="delete-cv-title" aria-describedby="delete-cv-description" aria-busy={locked} onCancel={(e) => { if (locked) e.preventDefault(); else setDeleting(null) }} className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg backdrop:bg-brand-ink/30">
-        {deleting && <div className="min-w-0 space-y-4"><h2 id="delete-cv-title" className="break-words ui-dialog-title legacy-size-text_xl">Delete {getLabel(deleting)}?</h2><p id="delete-cv-description" className="ui-helper text-brand-muted legacy-size-text_sm">This removes the template and its attached resume. Submitted application documents stay saved.</p>
-          {needsReplacement && <><p className="ui-body legacy-size-text_sm">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto ui-body legacy-size-text_sm">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
-          <label className="ui-label block legacy-size-text_sm">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1 form-select`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-          {importError && <p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{importError}</p>}
-          <div className="flex flex-wrap gap-2"><CvDeleteButton confirm label="Delete template" disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })} />{busy && <span role="status" className="self-center ui-helper text-brand-muted legacy-size-text_sm">Deleting…</span>}<button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
-        </div>}
-      </dialog>
+      <DeleteDialog open={Boolean(deleting)} title={`Delete ${deleteCapture.current?.name ?? ''}?`} pending={deletePending} error={deleteError} confirmLabel="Delete template" pendingLabel="Deleting…" onCancel={closeDeletion} onConfirm={() => void confirmDeletion()}>
+        <p>This deletes the master CV and its attached source resume. Generated resumes, cover letters and submitted application documents stay saved. Linked Saved jobs will need a CV selection before generating again; linked searches will be paused.</p>
+        <p className="mt-3">{refs.jobs.length} linked Saved jobs; {refs.searches.length} linked searches.</p>
+        {deleting === library.activeTrack && <p className="mt-3">Default for future new items: {getLabel(Object.keys(library.cvs).filter(id=>id!==deleting).sort()[0])}. Existing linked jobs and searches will not be reassigned.</p>}
+      </DeleteDialog>
       <fieldset disabled={locked} className="min-w-0 space-y-6">
       <section className="ui-panel min-w-0 space-y-4">
         <h2 className="break-words ui-section-title legacy-size-text_lg">Attach resume → fill form</h2>

@@ -9,6 +9,7 @@ import { useAuth } from './useAuth'
 import { useJobs } from './useJobs'
 import { useMasterCv } from './useMasterCv'
 import { useTailoredDocs } from './useTailoredDocs'
+import { normalizeLibrary } from '../types/cv'
 
 function useTailoringState() {
   const auth = useAuth()
@@ -27,6 +28,11 @@ function useTailoringState() {
   const snapshot = (id: string) => {
     const state = current.current
     if (state.account === 'signed-out' || state.cvs.loadError) return null
+    if (state.account === 'local') {
+      const storedJobs = JSON.parse(localStorage.getItem('job-tracker-applications') ?? '[]') as typeof state.jobs.jobs
+      const raw = localStorage.getItem('applytrack-master-cv')
+      if (raw) return captureTailoringInput(storedJobs.find(job=>job.id===id), normalizeLibrary(JSON.parse(raw)))
+    }
     return captureTailoringInput(state.jobs.getJob(id), state.cvs.library)
   }
   const validate = (id: string, fingerprint: string) => current.current.account === account && snapshot(id)?.fingerprint === fingerprint

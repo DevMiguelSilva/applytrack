@@ -1,5 +1,7 @@
 import { CopyFeedback } from '../lib/copyFeedback'
 import { resolveJobCv } from '../lib/cvLibrary'
+import { jobHasLiveSource } from '../lib/cvSources'
+import { emptyStoredCv, storedCvContent } from '../lib/storedCv'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { explainSkill } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
@@ -106,14 +108,15 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const { library, loading, loadError, getLabel } = useMasterCv()
   const { getForJob, loading: docsLoading } = useTailoredDocs()
   const doc = getForJob(job.id)
-  const masterCv = resolveJobCv(library, job, doc)
+  const liveCv = resolveJobCv(library, job, doc)
+  const canGenerate = !loading && !loadError && job.status === 'saved' && !job.deletedAt && jobHasLiveSource(library, job)
+  const masterCv = liveCv ?? storedCvContent(doc?.masterCvSnapshot) ?? storedCvContent(doc?.tailoredCv) ?? (doc?.coverLetter ? emptyStoredCv : null)
   if (loading || docsLoading) return <p className="ui-helper text-brand-muted legacy-size-text_sm">Loading application documents…</p>
-  if (job.status === 'saved' && loadError) return <p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{loadError}</p>
   if (!masterCv) return <section className="ui-panel  "><h2 className=" ui-section-title">Application document unavailable</h2><p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
-  return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} templateLabel={job.status === 'saved' ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
+  return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} canGenerate={canGenerate} templateLabel={canGenerate ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
 }
 
-function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps & { masterCv: MasterCv; templateLabel: string }) {
+function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: TailorPanelProps & { masterCv: MasterCv; templateLabel: string; canGenerate: boolean }) {
   const { updateJob } = useJobs()
   const { getForJob } = useTailoredDocs()
   const { tasks, start, retrySave } = useTailoring()
@@ -124,8 +127,9 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   const [actionLoading, setLoading] = useState<string | null>(null)
   const loading = generating ? 'tailor' : actionLoading
   const [error, setError] = useState<string | null>(null)
-  const tailoredCv = existing?.tailoredCv ?? null
+  const tailoredCv = storedCvContent(existing?.tailoredCv, existing?.masterCvSnapshot)
   const coverLetter = existing?.coverLetter ?? ''
+  const hasSavedFiles = Boolean(tailoredCv || coverLetter)
   const [gapReport, setGapReport] = useState<GapReport>(() => ({
     ...EMPTY_GAP_REPORT,
     ...(existing?.gapReport ?? {}),
@@ -145,7 +149,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
   const copyLetter = () => feedback.copy(coverLetter, text => navigator.clipboard.writeText(text))
 
   const claimedSkills = job.claimedSkills ?? []
-  const skillsLocked = job.status !== 'saved' || Boolean(job.deletedAt)
+  const skillsLocked = !canGenerate || job.status !== 'saved' || Boolean(job.deletedAt)
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
 
@@ -180,6 +184,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
 
   const runGap = () =>
     run('gap', async () => {
+      if (skillsLocked) throw new Error('Choose a CV before checking this job.')
       const gap = computeGap(claimedSkills)
       await updateJob(job.id, { matchScore: gap.coveragePercent })
       setGapReport(gap)
@@ -270,7 +275,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
 
   const onTailorClick = () => {
     if (loading) return
-    if (!tailoredCv) {
+    if (!hasSavedFiles) {
       void runTailor()
       return
     }
@@ -301,7 +306,7 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
       })
     })
 
-  const claimedKeywords = gapReport.claimedKeywords ?? []
+  const claimedKeywords = useMemo(() => gapReport.claimedKeywords ?? [], [gapReport.claimedKeywords])
   const gapSkills = useMemo<GapSkill[]>(() => {
     if (gapReport.skills?.length) return gapReport.skills
     return [
@@ -390,20 +395,21 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
     <div className="ui-panel space-y-4">
       <div>
         <h2 className=" ui-section-title legacy-size-text_base">ATS tailor & export</h2>
-        <p className="mt-1 ui-helper text-brand-muted legacy-size-text_sm">
+        {job.status === 'saved' && !canGenerate && <p className="mt-2 ui-helper legacy-size-text_sm">{job.deletedAt ? 'Restore this application before generating again. Saved files remain available.' : hasSavedFiles ? 'Source CV deleted. Your saved files are available; choose a CV to generate again.' : 'Choose a CV before generating application files.'}</p>}
+        {(canGenerate || job.status !== 'saved') && <p className="mt-1 ui-helper text-brand-muted legacy-size-text_sm">
           Using <span className="text-brand-ink">{templateLabel}</span> master CV. One
           button writes the resume and the cover letter. Click it again to show or hide both.
           {skillsLocked
             ? ' Skill claims stay as they were when you applied.'
             : ' Re-run updates both.'}
-        </p>
+        </p>}
       </div>
 
       <div className="m-actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <button
           type="button"
           data-role="quiet"
-          disabled={!!loading}
+          disabled={!!loading || skillsLocked}
           onClick={onGapClick}
           className="ui-button ui-primary m-action"
         >
@@ -412,11 +418,11 @@ function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps &
         <button
           type="button"
           data-role="primary"
-          disabled={!!loading}
+          disabled={!!loading || (!hasSavedFiles && skillsLocked)}
           onClick={onTailorClick}
-          className={`${tailoredCv ? quietBtn : pasteBtn} m-action w-full sm:w-auto`}
+          className={`${hasSavedFiles ? quietBtn : pasteBtn} m-action w-full sm:w-auto`}
         >
-          {loading === 'tailor' ? 'Tailoring…' : tailoredCv ? (showTailor ? 'Hide files' : 'See files') : 'Tailor'}
+          {loading === 'tailor' ? 'Tailoring…' : hasSavedFiles ? (showTailor ? 'Hide files' : 'See files') : 'Tailor'}
         </button>
       </div>
 

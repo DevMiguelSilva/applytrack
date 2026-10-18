@@ -399,7 +399,7 @@ export function InboxPage() {
                   onDragEnd={handleSearchDragEnd}
                   onRun={() => void handleRunAlone(search.id)}
                   onEdit={() => startEdit(search)}
-                  onToggleActive={() => void updateSearch(search.id, { active: !search.active })}
+                  onToggleActive={() => void updateSearch(search.id, { active: !search.active }).catch(error=>setError(error instanceof Error ? error.message : 'Could not update search.'))}
                   onDelete={event => requestDeleteSearch(search, event.currentTarget)}
                   onSave={() => void saveEdit(search.id)}
                   onCancel={() => setEditingId(null)}
@@ -584,7 +584,7 @@ function SavedSearchBody({
   if (editing) {
     return (
       <div className="space-y-2.5">
-        <SearchFields draft={editDraft} setDraft={setEditDraft} />
+        {search.needsCvSelection && <p className="ui-helper legacy-size-text_sm">Source CV deleted. Choose a CV, save, then explicitly activate this search.</p>}<SearchFields draft={editDraft} setDraft={setEditDraft} />
         <div className="m-actions flex flex-wrap gap-2">
           <button type="button" data-role="primary" onClick={onSave} className="ui-button ui-primary">
             Save changes
@@ -594,7 +594,7 @@ function SavedSearchBody({
           </button>
         </div>
         <div className="search-mobile-only border-t border-[#e6eeeb] pt-3">
-          <button type="button" onClick={onToggleActive} className={rowBtn}>
+          <button type="button" onClick={onToggleActive} disabled={search.needsCvSelection} className={rowBtn}>
             {search.active ? 'Pause' : 'Activate'}
           </button>
           <button type="button" onClick={onDelete} className={rowDanger}>
@@ -632,13 +632,13 @@ function SavedSearchBody({
         </div>
       </div>
       <div className="search-icons">
-        <IconAction label={running ? 'Running' : 'Run'} primary busy={running} disabled={busy} onClick={onRun}>
+        <IconAction label={running ? 'Running' : 'Run'} primary busy={running} disabled={busy || search.needsCvSelection} onClick={onRun}>
           <PlayIcon />
         </IconAction>
         <IconAction label="Edit" onClick={onEdit}>
           <PencilIcon />
         </IconAction>
-        <IconAction label={search.active ? 'Pause' : 'Activate'} onClick={onToggleActive}>
+        <IconAction label={search.active ? 'Pause' : 'Activate'} disabled={search.needsCvSelection} onClick={onToggleActive}>
           {search.active ? <PauseIcon /> : <PlayIcon />}
         </IconAction>
         <IconAction label="Delete" danger onClick={onDelete}>
@@ -646,7 +646,7 @@ function SavedSearchBody({
         </IconAction>
       </div>
       <div className="search-pair">
-        <button type="button" disabled={busy} onClick={onRun} className={rowRun}>
+        <button type="button" disabled={busy || search.needsCvSelection} onClick={onRun} className={rowRun}>
           {running ? 'Running…' : 'Run alone'}
         </button>
         <button type="button" onClick={onEdit} className={rowBtn}>
@@ -690,7 +690,7 @@ function searchMeta(search: SavedSearch, getLabel: (id: string) => string) {
       .join(' · '),
     `last ${search.maxDaysOld}d`,
     search.country.toUpperCase(),
-    `CV: ${search.track === 'auto' ? 'Auto (best match)' : getLabel(search.track)}`,
+    search.needsCvSelection ? "CV: source deleted — choose a CV" : `CV: ${search.track === 'auto' ? 'Auto (best match)' : getLabel(search.track)}`,
     search.excludeTerms?.trim() ? `exclude: ${search.excludeTerms.trim()}` : '',
   ]
     .filter(Boolean)
@@ -761,6 +761,7 @@ function SearchFields({
           className={`${fieldControl} form-select`}
         >
           <option value="auto">Auto (best match)</option>
+          {draft.track !== 'auto' && !library.cvs[draft.track] && <option value={draft.track} disabled>Source CV deleted — choose a CV</option>}
           {Object.keys(library.cvs).map((track) => (
             <option key={track} value={track}>
               {getLabel(track)}

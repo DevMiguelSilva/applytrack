@@ -4,6 +4,7 @@ import { addCvTemplate, cvLabel, deleteLocalCv, recoverCvTransaction, CV_LIBRARY
 import { getErrorMessage } from '../lib/errorMessage'
 import { createDefaultLibrary, normalizeLibrary, type CvTrack, type MasterCv, type MasterCvLibrary, type ResumeAttachment } from '../types/cv'
 import { useAuth } from './useAuth'
+import { withLocalMutation } from '../lib/localMutation'
 
 const LOCAL_KEY = 'applytrack-master-cv'
 function nextRevision(previous: string | null): string {
@@ -38,7 +39,7 @@ interface MasterCvContextValue {
   updateMasterCv: (updates: Partial<MasterCv>) => Promise<void>
   addTemplate: (name: string, copyFrom?: string) => Promise<void>
   renameTemplate: (id: string, name: string) => Promise<void>
-  deleteTemplate: (id: string, replacement?: string) => Promise<void>
+  deleteTemplate: (id: string, validate?: () => boolean) => Promise<void>
 }
 const MasterCvContext = createContext<MasterCvContextValue | null>(null)
 function readLocal() {
@@ -87,8 +88,7 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
           }
         }
       } else {
-        next = readLocal()
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(next))
+        next = await withLocalMutation(()=>{const stored=readLocal();localStorage.setItem(LOCAL_KEY,JSON.stringify(stored));return stored})
       }
       if (generation.current !== version) return
       cloudRevision.current = revision
@@ -102,6 +102,7 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     }
   }, [cloud, user])
   useEffect(() => { void reload() }, [reload])
+  useEffect(()=>{const refresh=(event:StorageEvent)=>{if(!cloud && event.key===LOCAL_KEY)void reload()};window.addEventListener('storage',refresh);return()=>window.removeEventListener('storage',refresh)},[cloud,reload])
 
   const runMutation = useCallback((operation: (value: MasterCvLibrary) => Promise<MasterCvLibrary>) => {
     const version = generation.current
@@ -127,9 +128,11 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
       if (!data) throw new Error('Your CV library changed in another session. Your draft is preserved; reload before saving.')
       if (generation.current === version) cloudRevision.current = data.updated_at
     } else {
-      const stored = localStorage.getItem(LOCAL_KEY)
-      if (stored && canonical(JSON.parse(stored)) !== canonical(value)) throw new Error('Your CV library changed in another tab. Your draft is preserved; reload before saving.')
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(next))
+      await withLocalMutation(() => {
+        const stored = localStorage.getItem(LOCAL_KEY)
+        if (stored && canonical(JSON.parse(stored)) !== canonical(value)) throw new Error('Your CV library changed in another tab. Your draft is preserved; reload before saving.')
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(next))
+      })
     }
     return next
   }), [cloud, user, runMutation])
@@ -157,17 +160,21 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     if (!value.cvs[id]) throw new Error('This CV template no longer exists.')
     return {...value, names:{...value.names, [id]:name.trim()}}
   }), [persist])
-  const deleteTemplate = useCallback(async (id: string, replacement?: string) => {
+  const deleteTemplate = useCallback(async (id: string, validate: () => boolean = () => true) => {
     await runMutation(async (value) => {
       const version = generation.current
+      if (!validate()) throw new Error('The deletion target changed.')
       if (cloud && supabase && user) {
-        const {data, error} = await supabase.rpc('delete_cv_template', {p_template_id:id, p_replacement_id:replacement ?? null, p_expected_document:value})
+        const {data, error} = await supabase.rpc('delete_cv_template_v2', {p_template_id:id, p_expected_document:value, p_owner_id:user.id})
         if (error) throw error
         const next = normalizeLibrary(data)
         if (generation.current === version) cloudRevision.current = next.updatedAt
         return next
       }
-      return deleteLocalCv(localStorage, value, id, replacement)
+      return withLocalMutation(() => {
+        if (generation.current !== version || !validate()) throw new Error('The deletion target changed.')
+        return deleteLocalCv(localStorage, value, id)
+      })
     })
     window.dispatchEvent(new Event(CV_LIBRARY_EVENT))
   }, [cloud, user, runMutation])
