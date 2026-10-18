@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
 import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { TailorPanel } from '../components/TailorPanel'
+import { useAuth } from '../hooks/useAuth'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
@@ -17,6 +18,8 @@ export function JobDetailPage() {
   const { getJob, deleteJob, restoreJob, purgeJob, updateJob, moveJob } = useJobs()
   const { getCv, activeTrack, library, getLabel } = useMasterCv()
   const { getForJob } = useTailoredDocs()
+  const { user, isCloudEnabled } = useAuth()
+  const account = isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
   const job = id ? getJob(id) : undefined
   const hasResume = Boolean(id && getForJob(id)?.tailoredCv)
   const [showFullJd, setShowFullJd] = useState(false)
@@ -30,6 +33,97 @@ export function JobDetailPage() {
   const [notesDraft, setNotesDraft] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
+
+  const [trashTarget, setTrashTarget] = useState<{ id: string; account: string; role: string; company: string } | null>(null)
+  const [sendingTrash, setSendingTrash] = useState(false)
+  const [trashError, setTrashError] = useState(false)
+  const trashDialog = useRef<HTMLDialogElement>(null)
+  const trashCancel = useRef<HTMLButtonElement>(null)
+  const trashConfirm = useRef<HTMLButtonElement>(null)
+  const trashTrigger = useRef<HTMLButtonElement | null>(null)
+  const trashAttempt = useRef(0)
+  const trashPending = useRef(false)
+  const trashSuccess = useRef<string | null>(null)
+  const trashExpected = useRef<string | null>(null)
+  const latestTrashContext = useRef({ id, account, job })
+  latestTrashContext.current = { id, account, job }
+
+  const closeTrash = () => {
+    if (trashPending.current) return
+    trashAttempt.current += 1
+    trashDialog.current?.close()
+    setTrashTarget(null)
+    setTrashError(false)
+    if (trashTrigger.current?.isConnected) trashTrigger.current.focus()
+  }
+
+  useEffect(() => {
+    if (!trashTarget) return
+    if (id !== trashTarget.id || account !== trashTarget.account || !job || (job.deletedAt && job.deletedAt !== trashExpected.current)) {
+      trashAttempt.current += 1
+      trashPending.current = false
+      trashSuccess.current = null
+      trashDialog.current?.close()
+      setTrashTarget(null)
+      setSendingTrash(false)
+      setTrashError(false)
+      return
+    }
+    if (trashSuccess.current && job.deletedAt === trashSuccess.current) {
+      trashAttempt.current += 1
+      trashPending.current = false
+      trashDialog.current?.close()
+      setTrashTarget(null)
+      setSendingTrash(false)
+      navigate('/')
+    }
+  }, [id, account, job, trashTarget, sendingTrash, navigate])
+
+  useEffect(() => {
+    if (trashTarget) {
+      trashDialog.current?.showModal()
+      trashCancel.current?.focus()
+    }
+  }, [trashTarget])
+
+  useEffect(() => () => { trashAttempt.current += 1; trashPending.current = false }, [])
+
+  const confirmTrash = async () => {
+    if (!trashTarget || trashPending.current) return
+    const target = trashTarget
+    const valid = () => {
+      const current = latestTrashContext.current
+      return current.id === target.id && current.account === target.account && current.job?.id === target.id && !current.job.deletedAt
+    }
+    if (!valid()) { closeTrash(); return }
+    const attempt = ++trashAttempt.current
+    trashPending.current = true
+    trashSuccess.current = null
+    trashExpected.current = null
+    setSendingTrash(true)
+    setTrashError(false)
+    try {
+      const deletedAt = await deleteJob(target.id, deletedAt => {
+        trashExpected.current = deletedAt
+        return attempt === trashAttempt.current && valid()
+      })
+      if (attempt !== trashAttempt.current) return
+      const current = latestTrashContext.current
+      if (current.id !== target.id || current.account !== target.account || !current.job) return
+      trashSuccess.current = deletedAt
+      // Keep pending until the committed job reaches this render. Its timestamp
+      // distinguishes this operation from an unrelated Trash update.
+      if (current.job.deletedAt && current.job.deletedAt !== deletedAt) {
+        trashPending.current = false
+      }
+      setSendingTrash(false)
+    } catch {
+      if (attempt !== trashAttempt.current) return
+      trashPending.current = false
+      setSendingTrash(false)
+      if (valid()) setTrashError(true)
+    }
+  }
 
   const matchPercent = useMemo(() => {
     if (!job) return null
@@ -55,11 +149,12 @@ export function JobDetailPage() {
     )
   }
 
-  const handleDelete = async () => {
-    if (confirm(`Move ${job.role} at ${job.company} to Trash?`)) {
-      await deleteJob(job.id)
-      navigate('/')
-    }
+  const handleDelete = (event: React.MouseEvent<HTMLButtonElement>) => {
+    trashExpected.current = null
+    trashTrigger.current = event.currentTarget
+    trashSuccess.current = null
+    setTrashError(false)
+    setTrashTarget({ id: job.id, account, role: job.role || 'Untitled role', company: job.company || 'Unknown company' })
   }
 
   const handleRestore = async () => {
@@ -574,6 +669,23 @@ export function JobDetailPage() {
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
       {job.status === 'saved' && !job.deletedAt && <label className="ui-label block legacy-size-text_sm">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
       {job.jdComplete && <TailorPanel job={job} />}
+      <dialog ref={trashDialog} aria-labelledby="trash-job-title" aria-describedby="trash-job-description" aria-busy={sendingTrash || trashPending.current}
+        onKeyDown={event => {
+          if (event.key !== 'Tab') return
+          if (trashPending.current) { event.preventDefault(); return }
+          if (event.shiftKey && document.activeElement === trashCancel.current) { event.preventDefault(); trashConfirm.current?.focus() }
+          else if (!event.shiftKey && document.activeElement === trashConfirm.current) { event.preventDefault(); trashCancel.current?.focus() }
+        }}
+        onCancel={event => { event.preventDefault(); closeTrash() }}
+        className="ui-panel ui-dialog w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto backdrop:bg-brand-ink/30">
+        <h2 id="trash-job-title" className="ui-dialog-title legacy-size-text_lg">Send to trash?</h2>
+        <p id="trash-job-description" className="mt-3 ui-helper legacy-size-text_sm [overflow-wrap:anywhere]">Send ‘{trashTarget?.role}’ at ‘{trashTarget?.company}’ to Trash? You can restore this application from Trash.</p>
+        {trashError && <p role="alert" className="mt-3 ui-helper legacy-size-text_sm !text-red-700">Could not send this application to Trash. Please try again.</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <button ref={trashCancel} type="button" disabled={trashPending.current} onClick={closeTrash} className="ui-button ui-secondary">Cancel</button>
+          <button ref={trashConfirm} type="button" disabled={trashPending.current} onClick={() => void confirmTrash()} className="ui-button ui-danger-quiet">{trashPending.current ? 'Sending…' : 'Send to trash'}</button>
+        </div>
+      </dialog>
     </div>
   )
 }

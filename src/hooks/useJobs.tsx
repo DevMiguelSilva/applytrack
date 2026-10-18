@@ -32,7 +32,7 @@ interface JobsContextValue {
   addJob: (job: JobApplication) => Promise<void>
   updateJob: (id: string, updates: Partial<JobApplication>, validate?: () => boolean) => Promise<void>
   /** Soft-delete → Trash (recoverable). */
-  deleteJob: (id: string) => Promise<void>
+  deleteJob: (id: string, validate?: (deletedAt: string) => boolean) => Promise<string>
   restoreJob: (id: string) => Promise<void>
   /** Permanently remove from trash. */
   purgeJob: (id: string) => Promise<void>
@@ -243,8 +243,10 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   }, [owner])
 
   const deleteJob = useCallback(
-    async (id: string) => {
-      await updateJob(id, { deletedAt: new Date().toISOString() })
+    async (id: string, validate: (deletedAt: string) => boolean = () => true) => {
+      const deletedAt = new Date().toISOString()
+      await updateJob(id, { deletedAt }, () => validate(deletedAt))
+      return deletedAt
     },
     [updateJob]
   )
