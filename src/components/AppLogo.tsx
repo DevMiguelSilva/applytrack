@@ -1,5 +1,5 @@
 /** Kanban-column mark. Brand tone is the board palette; sky stays on other pages. */
-export function AppLogo({ size = 'md', tone = 'sky' }: { size?: 'sm' | 'md'; tone?: 'sky' | 'brand' }) {
+export function AppLogo({ size = 'md', tone = 'sky', className = '' }: { size?: 'sm' | 'md'; tone?: 'sky' | 'brand'; className?: string }) {
   const box = size === 'sm' ? 'h-8 w-8 rounded-lg' : 'h-9 w-9 rounded-xl'
   const icon = size === 'sm' ? 'h-4 w-4' : 'h-[18px] w-[18px]'
   const toneClass =
@@ -9,7 +9,7 @@ export function AppLogo({ size = 'md', tone = 'sky' }: { size?: 'sm' | 'md'; ton
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center ${toneClass} ${box}`}
+      className={`inline-flex shrink-0 items-center justify-center ${toneClass} ${box} ${className}`}
       aria-hidden
     >
       <svg viewBox="0 0 24 24" className={icon} fill="none" aria-hidden>

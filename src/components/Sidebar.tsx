@@ -23,7 +23,7 @@ export function Sidebar({ collapsed, toggle }: { collapsed: boolean; toggle: () 
   const label = (text: string) => <span className={collapsed ? 'sr-only' : ''}>{text}</span>
   const accountLabel = user ? 'Sign out' : 'Sign in'
   return <aside aria-label="Application sidebar" data-collapsed={collapsed} className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto px-3 py-4 lg:flex">
-    <div className="sidebar-brand"><Hint label="ApplyTrack" compact={collapsed}><Brand compact={collapsed} /></Hint></div>
+    <div className="sidebar-brand"><Hint label="ApplyTrack" compact={collapsed}><Brand compact={collapsed} appearance="navigation" /></Hint></div>
     <div className="sidebar-toggle-row">
       <Hint label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} compact={collapsed}>
         <button type="button" className={control} onClick={toggle} aria-expanded={!collapsed} aria-controls="desktop-destinations"><NavigationIcon name={collapsed ? 'expand' : 'collapse'} />{label(collapsed ? 'Expand sidebar' : 'Collapse sidebar')}</button>
