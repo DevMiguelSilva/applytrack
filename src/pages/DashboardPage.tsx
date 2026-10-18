@@ -89,19 +89,17 @@ export function DashboardPage() {
       <div className="dashboard-overview">
         <header className="board-welcome">
           <div>
-            <p className="ui-label mb-2 hidden lg:block">ApplyTrack</p>
+            <p className="ui-label mb-2">ApplyTrack</p>
             <h1 className="ui-title">
-              <span className="lg:hidden">Board</span>
-              <span className="hidden lg:inline">Find · Tailor · <span className="text-[#23745e]">Track</span></span>
+              Find · Tailor · <span className="text-[#23745e]">Track</span>
             </h1>
             <p className="ui-description mt-2">
-              <span className="lg:hidden">Track your applications and move jobs through each stage.</span>
-              <span className="hidden lg:inline">Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place.</span>
+              Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place.
             </p>
           </div>
         </header>
 
-      <section className={`${boardLook.card} ${boardLook.cardPad}`}>
+      <section className={`hidden lg:block ${boardLook.card} ${boardLook.cardPad}`}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className={boardLook.streakTitle}>Application streak</h2>
           <div className="flex flex-wrap gap-4 ui-body legacy-size-text_sm">
