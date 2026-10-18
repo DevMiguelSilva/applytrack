@@ -28,6 +28,7 @@ export interface JobRow {
   saved_search_id?: string | null
   match_score?: number | null
   cv_track?: string | null
+  needs_cv_selection?: boolean | null
   jd_complete?: boolean | null
   needs_rescore?: boolean | null
   deleted_at?: string | null
@@ -46,6 +47,7 @@ export interface ProfileRow {
 }
 
 export interface SavedSearchRow {
+  needs_cv_selection?: boolean | null
   id: string
   user_id: string
   label?: string
@@ -66,6 +68,7 @@ export interface SavedSearchRow {
 }
 
 export interface InboxRow {
+  needs_cv_selection?: boolean | null
   id: string
   user_id: string
   external_id: string
@@ -142,6 +145,7 @@ export function rowToJob(row: JobRow): JobApplication {
     savedSearchId: row.saved_search_id ?? null,
     matchScore: row.match_score ?? null,
     cvTrack: asCvTrack(row.cv_track),
+    needsCvSelection: row.needs_cv_selection === true,
     jdComplete: resolveJdComplete({
       jdComplete: row.jd_complete ?? undefined,
       source: row.source ?? 'manual',
@@ -177,6 +181,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     saved_search_id: job.savedSearchId,
     match_score: job.matchScore,
     cv_track: job.cvTrack,
+    needs_cv_selection: job.needsCvSelection === true,
     jd_complete: job.jdComplete,
     needs_rescore: job.needsRescore === true,
     deleted_at: job.deletedAt,
@@ -206,6 +211,7 @@ export function profileToRow(profile: UserProfile, userId: string) {
 
 export function rowToSavedSearch(row: SavedSearchRow): SavedSearch {
   return {
+    needsCvSelection: row.needs_cv_selection === true,
     id: row.id,
     label: row.label ?? '',
     query: coalesceSearchQuery({
@@ -244,6 +250,7 @@ export function savedSearchToRow(
     max_days_old: search.maxDaysOld,
     exclude_terms: search.excludeTerms ?? '',
     track: search.track,
+    needs_cv_selection: search.needsCvSelection === true,
     active: search.active,
     sort_order: search.sortOrder,
     updated_at: new Date().toISOString(),
@@ -252,6 +259,7 @@ export function savedSearchToRow(
 
 export function rowToInboxJob(row: InboxRow): InboxJob {
   return {
+    needsCvSelection: row.needs_cv_selection === true,
     id: row.id,
     externalId: row.external_id,
     source: row.source,
@@ -291,6 +299,7 @@ export function inboxJobToRow(
     match_score: job.matchScore,
     match_reasons: job.matchReasons,
     matched_track: job.matchedTrack,
+    needs_cv_selection: job.needsCvSelection === true,
     status: job.status,
     saved_search_id: job.savedSearchId,
     seen_count: job.seenCount > 0 ? job.seenCount : 1,

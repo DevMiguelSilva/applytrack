@@ -10,9 +10,10 @@ function moduleUrl(path, replacements = {}) {
   return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 }
 const typesUrl = moduleUrl('../src/types/cv.ts')
+const mutationUrl = moduleUrl('../src/lib/localMutation.ts')
 const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary } = await import(typesUrl)
-const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl }))
-const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl }))
+const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
+const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
 
 test('legacy and dynamic libraries retain CV content, IDs, names and attachments', () => {
   const legacy = createDefaultLibrary()
@@ -31,27 +32,21 @@ test('legacy and dynamic libraries retain CV content, IDs, names and attachments
   assert.equal(normalizeLibrary(migrated.cvs.frontend).cvs.frontend.contact.name, migrated.cvs.frontend.contact.name)
 })
 
-test('deletion reassigns Saved references only and preserves historical documents', () => {
+test('deletion archives Saved references, pauses explicit searches and preserves history', () => {
   const library = createDefaultLibrary()
-  const jobs = [{ id: 'saved', status: 'saved', cvTrack: null }, { id: 'submitted', status: 'applied', cvTrack: 'powerPlatform' }]
-  const searches = [{ id: 'search', track: 'powerPlatform' }, { id: 'auto', track: 'auto' }]
-  const inbox = [{ id: 'inbox', matchedTrack: 'powerPlatform', matchScore: 90 }]
-  assert.throws(() => removeCvTemplate(library, 'powerPlatform', undefined, jobs, searches, inbox), /replacement/)
-  const next = removeCvTemplate(library, 'powerPlatform', 'frontend', jobs, searches, inbox)
-  assert.equal(next.jobs[0].cvTrack, 'frontend')
-  assert.equal(next.jobs[0].needsRescore, true)
-  assert.equal(next.jobs[0].matchScore, null)
-  assert.deepEqual(next.jobs[1], jobs[1])
-  assert.equal(next.searches[0].track, 'frontend')
-  assert.equal(next.searches[1].track, 'auto')
-  assert.equal(next.inbox[0].matchedTrack, 'frontend')
-  assert.throws(() => removeCvTemplate(next.library, 'frontend', undefined, [], [], []), /at least one/)
-  const snapshot = createEmptyMasterCv({ summary: 'Submitted original' })
-  assert.equal(resolveJobCv(next.library, jobs[1], { masterCvSnapshot: snapshot }), snapshot)
-  assert.equal(resolveJobCv(next.library, jobs[1]), null)
-  assert.equal(resolveJobCv(next.library, next.jobs[0]), next.library.cvs.frontend)
+  const jobs = [{ id:'saved', status:'saved', cvTrack:null, matchScore:86 },{id:'submitted',status:'applied',cvTrack:'powerPlatform'}]
+  const searches=[{id:'search',track:'powerPlatform',active:true},{id:'auto',track:'auto',active:true}]
+  const inbox=[{id:'new',status:'new',savedSearchId:'search',matchedTrack:'powerPlatform',matchScore:90},{id:'history',status:'approved',matchedTrack:'powerPlatform',matchScore:90}]
+  const next=removeCvTemplate(library,'powerPlatform',jobs,searches,inbox)
+  assert.equal(next.jobs[0].cvTrack,'powerPlatform');assert.equal(next.jobs[0].needsCvSelection,true);assert.equal(next.jobs[0].matchScore,86)
+  assert.deepEqual(next.jobs[1],jobs[1])
+  assert.equal(next.searches[0].track,'powerPlatform');assert.equal(next.searches[0].active,false);assert.equal(next.searches[0].needsCvSelection,true)
+  assert.deepEqual(next.searches[1],searches[1]);assert.equal(next.inbox[0].matchedTrack,null);assert.equal(next.inbox[0].needsCvSelection,true);assert.deepEqual(next.inbox[1],inbox[1])
+  assert.throws(()=>removeCvTemplate(next.library,'frontend',[],[],[]),/at least one/)
+  const snapshot=createEmptyMasterCv({summary:'Submitted original'})
+  assert.equal(resolveJobCv(next.library,jobs[1],{masterCvSnapshot:snapshot}),snapshot)
+  assert.equal(resolveJobCv(next.library,jobs[1]),null);assert.equal(resolveJobCv(next.library,next.jobs[0]),null)
 })
-
 test('Auto scores every current template and keeps legacy tie preference', () => {
   const blank = createEmptyMasterCv()
   assert.equal(scoreDualTracks('', { frontend: blank, powerPlatform: blank, custom: blank }).bestTrack, 'powerPlatform')
@@ -85,11 +80,11 @@ test('local deletion rolls back every record after a write failure and recovers 
     if (key === 'applytrack-saved-searches' && fail) { fail = false; throw new Error('Disk full') }
     values.set(key, value)
   } }
-  assert.throws(() => deleteLocalCv(storage, library, 'powerPlatform', 'frontend'), /Disk full/)
+  assert.throws(() => deleteLocalCv(storage, library, 'powerPlatform'), /Disk full/)
   assert.deepEqual(values, before)
   storage.setItem('applytrack-cv-library-transaction', JSON.stringify([...before.values()]))
   storage.setItem('applytrack-master-cv', '{}')
   recoverCvTransaction(storage)
   assert.deepEqual(values, before)
-  assert.equal(deleteLocalCv(storage, library, 'powerPlatform', 'frontend').activeTrack, 'frontend')
+  assert.equal(deleteLocalCv(storage, library, 'powerPlatform').activeTrack, 'frontend')
 })

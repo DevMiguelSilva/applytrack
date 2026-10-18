@@ -52,7 +52,7 @@ function hitColumnLabel(trashed: boolean, job: JobApplication): string {
 }
 
 export function DashboardPage() {
-  const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, purgeJob, emptyTrash, loading } =
+  const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, loading } =
     useJobs()
   const { getForJob } = useTailoredDocs()
   const narrow = useNarrowBoard()
@@ -263,8 +263,6 @@ export function DashboardPage() {
             columns={boardColumns}
             trashedJobs={trashedJobs}
             onRestoreJob={restoreJob}
-            onPurgeJob={purgeJob}
-            onEmptyTrash={emptyTrash}
           />
         )}
       </section>

@@ -47,6 +47,7 @@ export interface JobApplication {
   savedSearchId: string | null
   matchScore: number | null
   cvTrack: CvTrack | null
+  needsCvSelection: boolean
   /**
    * False when JD is an API listing preview/snippet (Adzuna, etc.).
    * True after the full posting is parsed and scored.
@@ -86,6 +87,7 @@ export interface ParsedJobPosting {
 }
 
 export interface SavedSearch {
+  needsCvSelection: boolean
   id: string
   /** Friendly name shown in the UI (e.g. "React Toronto"). */
   label: string
@@ -106,6 +108,7 @@ export interface SavedSearch {
 }
 
 export interface InboxJob {
+  needsCvSelection?: boolean
   id: string
   externalId: string
   source: string
@@ -276,6 +279,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     savedSearchId: null,
     matchScore: null,
     cvTrack: null,
+    needsCvSelection: false,
     jdComplete: true,
     needsRescore: false,
     deletedAt: null,
@@ -339,6 +343,7 @@ export function guessJobSourceFromUrl(url: string): PortalJobSource {
 export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): SavedSearch {
   const now = new Date().toISOString()
   return {
+    needsCvSelection: false,
     id: crypto.randomUUID(),
     label: '',
     query: '',
@@ -355,7 +360,7 @@ export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): Sa
   }
 }
 
-export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt'>[] = [
+export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'needsCvSelection'>[] = [
   {
     label: 'React Toronto',
     query: 'React TypeScript',

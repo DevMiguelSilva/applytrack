@@ -1,3 +1,4 @@
+import { usePermanentDelete } from '../hooks/usePermanentDelete'
 import { useState } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
 import { STATUS_CONFIG } from '../types/job'
@@ -33,8 +34,6 @@ interface KanbanBoardProps {
   columns?: BoardColumn[]
   trashedJobs?: JobApplication[]
   onRestoreJob?: (id: string) => void
-  onPurgeJob?: (id: string) => void
-  onEmptyTrash?: () => void
 }
 
 export function KanbanBoard({
@@ -44,9 +43,8 @@ export function KanbanBoard({
   columns = ['saved', 'applied', 'interview', 'offer'],
   trashedJobs = [],
   onRestoreJob,
-  onPurgeJob,
-  onEmptyTrash,
 }: KanbanBoardProps) {
+  const openPurge = usePermanentDelete()
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<JobStatus | null>(null)
   const single = columns.length === 1
@@ -66,7 +64,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className={boardLook.kanban}>
+    <div className={boardLook.kanban} data-trash-focus tabIndex={-1}>
       <div className={rowClass}>
         {columns.map((column) => {
           if (column === 'trash') {
@@ -74,20 +72,10 @@ export function KanbanBoard({
               <div key="trash" className={colClass}>
                 <ColumnHead title="Trash" count={visibleTrash.length} />
                 <div className={`${listTop} min-h-[7rem] space-y-2`}>
-                  {trashedJobs.length > 0 && onEmptyTrash && (
+                  {trashedJobs.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        const count = trashedJobs.length
-                        const label = count === 1 ? '1 job' : `${count} jobs`
-                        if (
-                          confirm(
-                            `Permanently delete ${label} in trash? This cannot be undone.`
-                          )
-                        ) {
-                          onEmptyTrash()
-                        }
-                      }}
+                      onClick={event => openPurge(trashedJobs, true, event.currentTarget)}
                       className="ui-button ui-danger-quiet w-full legacy-size-text_xs"
                     >
                       Empty trash
@@ -104,7 +92,6 @@ export function KanbanBoard({
                         job={job}
                         trashMode
                         onRestore={onRestoreJob}
-                        onPurge={onPurgeJob}
                       />
                     ))
                   )}

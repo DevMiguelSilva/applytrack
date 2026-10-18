@@ -9,10 +9,15 @@ import {
   type ReactNode,
 } from 'react'
 import { mergeTailoredDocument } from '../lib/documentPersistence'
-import { rowToTailoredDocument, tailoredDocumentToRow } from '../lib/database'
+import { jobToRow, rowToTailoredDocument, tailoredDocumentToRow } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { TailoredDocument } from '../types/cv'
 import { useAuth } from './useAuth'
+import { JOBS_CHANGED } from '../lib/purgeJobs'
+import { recoverCvTransaction } from '../lib/cvLibrary'
+import { withLocalMutation } from '../lib/localMutation'
+import { useJobs } from './useJobs'
+import { useMasterCv } from './useMasterCv'
 
 const LOCAL_KEY = 'applytrack-tailored-docs'
 
@@ -26,6 +31,7 @@ interface TailoredDocsContextValue {
 const TailoredDocsContext = createContext<TailoredDocsContextValue | null>(null)
 
 function readLocal(): TailoredDocument[] {
+  recoverCvTransaction(localStorage)
   try {
     const stored = localStorage.getItem(LOCAL_KEY)
     return stored ? (JSON.parse(stored) as TailoredDocument[]) : []
@@ -39,6 +45,10 @@ function writeLocal(docs: TailoredDocument[]) {
 }
 
 export function TailoredDocsProvider({ children }: { children: ReactNode }) {
+  const { getJob } = useJobs()
+  const { library } = useMasterCv()
+  const liveSource = useRef({getJob,library})
+  liveSource.current={getJob,library}
   const { user, isCloudEnabled } = useAuth()
   const userId = user?.id
   const [docs, setDocs] = useState<TailoredDocument[]>([])
@@ -50,9 +60,11 @@ export function TailoredDocsProvider({ children }: { children: ReactNode }) {
   const ownerRef = useRef(owner)
   ownerRef.current = owner
   const saves = useRef<Promise<unknown>>(Promise.resolve())
+  const revision = useRef(0)
   const isCloudSync = isCloudEnabled && Boolean(userId)
 
   const load = useCallback(async () => {
+    const version = ++revision.current
     const account = owner
     loadedOwner.current = account
     setLoading(true)
@@ -60,7 +72,8 @@ export function TailoredDocsProvider({ children }: { children: ReactNode }) {
     docsRef.current = []
     try {
       if (!isCloudSync || !supabase || !userId) {
-        setDocs(readLocal())
+        const next=await withLocalMutation(readLocal)
+        if(ownerRef.current===account && version===revision.current){docsRef.current=next;setDocs(next)}
         return
       }
       const { data, error } = await supabase
@@ -69,23 +82,28 @@ export function TailoredDocsProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
       if (error) throw error
-      if (ownerRef.current === account) { docsRef.current = (data ?? []).map(rowToTailoredDocument); setDocs(docsRef.current) }
+      if (ownerRef.current === account && version === revision.current) { docsRef.current = (data ?? []).map(rowToTailoredDocument); setDocs(docsRef.current) }
     } catch (err) {
       console.error('Failed to load tailored docs:', err)
-      if (ownerRef.current === account) setDocs(isCloudSync ? [] : readLocal())
     } finally {
-      if (ownerRef.current === account) setLoading(false)
+      if (ownerRef.current === account && version === revision.current) setLoading(false)
     }
   }, [isCloudSync, userId, owner])
 
   useEffect(() => {
-    load()
-  }, [load])
+    void load()
+    const refresh = () => { void load() }
+    window.addEventListener(JOBS_CHANGED, refresh)
+    const storage=(event:StorageEvent)=>{if(!isCloudSync && event.key==='applytrack-tailored-docs')refresh()}
+    window.addEventListener('storage',storage)
+    return () => { window.removeEventListener(JOBS_CHANGED, refresh); window.removeEventListener('storage',storage) }
+  }, [load, isCloudSync])
 
   const saveDoc = useCallback(
     (doc: TailoredDocument, validate: () => boolean = () => true) => {
       const account = owner
       const operation = saves.current.catch(() => {}).then(async () => {
+        revision.current++;setLoading(false)
         const check = () => {
           if (ownerRef.current !== account || account === 'signed-out') throw new Error('Account changed')
           if (!validate()) throw new Error('This job or its CV changed. Restart tailoring.')
@@ -93,13 +111,22 @@ export function TailoredDocsProvider({ children }: { children: ReactNode }) {
         check()
         const nextDoc = { ...doc, updatedAt: new Date().toISOString() }
         if (isCloudSync && supabase && userId) {
-          const { error } = await supabase.from('tailored_documents').upsert(tailoredDocumentToRow(nextDoc, userId), { onConflict: 'user_id,job_application_id' })
+          const job=liveSource.current.getJob(doc.jobApplicationId)
+          if(!job)throw new Error('Application no longer exists')
+          const { error } = await supabase.rpc('save_tailored_document_v2',{p_document:tailoredDocumentToRow(nextDoc,userId),p_expected_job:jobToRow(job,userId),p_expected_library:liveSource.current.library,p_owner_id:userId})
           if (error) throw error
         }
         check()
-        const next = mergeTailoredDocument(docsRef.current, nextDoc)
-        if (!isCloudSync) writeLocal(next)
+        const next = isCloudSync ? mergeTailoredDocument(docsRef.current, nextDoc) : await withLocalMutation(() => {
+          check()
+          const jobs = JSON.parse(localStorage.getItem('job-tracker-applications') ?? '[]') as { id: string; status: string; deletedAt?: string | null; needsCvSelection?: boolean }[]
+          if (!jobs.some(job => job.id === doc.jobApplicationId && job.status === 'saved' && !job.deletedAt && !job.needsCvSelection)) throw new Error('Application or source no longer available.')
+          const updated = mergeTailoredDocument(readLocal(), nextDoc)
+          writeLocal(updated)
+          return updated
+        })
         docsRef.current = next
+        revision.current++;setLoading(false)
         setDocs(next)
       })
       saves.current = operation

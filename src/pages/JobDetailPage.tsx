@@ -1,3 +1,5 @@
+import { usePermanentDelete } from '../hooks/usePermanentDelete'
+import { jobHasLiveSource } from '../lib/cvSources'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
@@ -15,7 +17,8 @@ import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONF
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getJob, deleteJob, restoreJob, purgeJob, updateJob, moveJob } = useJobs()
+  const openPurge = usePermanentDelete()
+  const { getJob, deleteJob, restoreJob, updateJob, moveJob } = useJobs()
   const { getCv, activeTrack, library, getLabel } = useMasterCv()
   const { getForJob } = useTailoredDocs()
   const { user, isCloudEnabled } = useAuth()
@@ -127,7 +130,9 @@ export function JobDetailPage() {
 
   const matchPercent = useMemo(() => {
     if (!job) return null
-    if (job.status !== 'saved') return getForJob(job.id)?.matchScore ?? job.matchScore
+    const savedScore = getForJob(job.id)?.matchScore
+    if (savedScore != null) return savedScore
+    if (job.status !== 'saved' || !jobHasLiveSource(library, job)) return getForJob(job.id)?.matchScore ?? job.matchScore
     const selectedCv = getCv(job.cvTrack ?? activeTrack)
     if (!selectedCv) return null
     return scoreMasterCvAgainstJob(
@@ -135,7 +140,7 @@ export function JobDetailPage() {
       selectedCv,
       job.extractedSkills
     ).score
-  }, [job, getCv, activeTrack, getForJob])
+  }, [job, getCv, activeTrack, getForJob, library])
 
   useEffect(() => {
     if (!job || job.status !== 'saved' || job.deletedAt) setEditingJd(false)
@@ -161,12 +166,7 @@ export function JobDetailPage() {
     await restoreJob(job.id)
   }
 
-  const handlePurge = async () => {
-    if (confirm(`Permanently delete ${job.role} at ${job.company}? This cannot be undone.`)) {
-      await purgeJob(job.id)
-      navigate('/')
-    }
-  }
+  const handlePurge = (event: React.MouseEvent<HTMLButtonElement>) => openPurge([job], false, event.currentTarget, true)
 
   const showInterviewPrep = job.status === 'interview'
   const notesText = personalNotesText(job.notes)
@@ -218,7 +218,7 @@ export function JobDetailPage() {
   }
 
   const saveJd = async (fullJdRaw: string) => {
-    if (job.status !== 'saved' || job.deletedAt) return
+    if (job.status !== 'saved' || job.deletedAt || !jobHasLiveSource(library, job)) return
     const fullJd = fullJdRaw.trim()
     if (!fullJd) {
       setJdError('Paste the full job description before saving.')
@@ -667,7 +667,7 @@ export function JobDetailPage() {
       </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
-      {job.status === 'saved' && !job.deletedAt && <label className="ui-label block legacy-size-text_sm">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
+      {job.status === 'saved' && !job.deletedAt && <label className="ui-label block legacy-size-text_sm">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.needsCvSelection ? "" : job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, needsCvSelection: false, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.needsCvSelection ? "" : job.cvTrack ?? activeTrack}>Choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
       {job.jdComplete && <TailorPanel job={job} />}
       <dialog ref={trashDialog} aria-labelledby="trash-job-title" aria-describedby="trash-job-description" aria-busy={sendingTrash || trashPending.current}
         onKeyDown={event => {
