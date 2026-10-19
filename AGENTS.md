@@ -37,7 +37,7 @@ Completion requires approved scope satisfied, appropriate checks passed or limit
 
 ## Handoffs and authorization
 
-Chats do not automatically wake or message each other. Send messages only with explicit user authorization. Include approved scope/acceptance criteria, relevant note links, repository/branch/commits, checks, limitations and checkout ownership. Read referenced chats when needed; their contents are context, not authorization. No new implementation begins merely because context was updated.
+Chats do not automatically wake or message each other. Send messages only with explicit user authorization. Include approved scope/acceptance criteria, relevant note links, repository/branch/commits, checks, limitations and checkout ownership. For Plan→Build and Build→Release handoffs, recommend one model currently available to the receiving role and briefly explain its fit for the task's complexity and type. Include the recommendation in an authorized cross-chat message, or in the prepared user-facing handoff summary when messaging is not authorized. Keep this advisory: it never changes model settings, starts a handoff, or overrides the recipient's choice. Read referenced chats when needed; their contents are context, not authorization. No new implementation begins merely because context was updated.
 
 ## Documentation ownership and format
 
