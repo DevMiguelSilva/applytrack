@@ -1,5 +1,6 @@
 import { usePermanentDelete } from '../hooks/usePermanentDelete'
 import { jobHasLiveSource } from '../lib/cvSources'
+import { sameTrashTimestamp } from '../lib/trashTimestamp'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
@@ -62,7 +63,7 @@ export function JobDetailPage() {
 
   useEffect(() => {
     if (!trashTarget) return
-    if (id !== trashTarget.id || account !== trashTarget.account || !job || (job.deletedAt && job.deletedAt !== trashExpected.current)) {
+    if (id !== trashTarget.id || account !== trashTarget.account || !job || (job.deletedAt && !sameTrashTimestamp(job.deletedAt, trashExpected.current))) {
       trashAttempt.current += 1
       trashPending.current = false
       trashSuccess.current = null
@@ -72,7 +73,7 @@ export function JobDetailPage() {
       setTrashError(false)
       return
     }
-    if (trashSuccess.current && job.deletedAt === trashSuccess.current) {
+    if (trashSuccess.current && sameTrashTimestamp(job.deletedAt, trashSuccess.current)) {
       trashAttempt.current += 1
       trashPending.current = false
       trashDialog.current?.close()
@@ -116,7 +117,7 @@ export function JobDetailPage() {
       trashSuccess.current = deletedAt
       // Keep pending until the committed job reaches this render. Its timestamp
       // distinguishes this operation from an unrelated Trash update.
-      if (current.job.deletedAt && current.job.deletedAt !== deletedAt) {
+      if (current.job.deletedAt && !sameTrashTimestamp(current.job.deletedAt, deletedAt)) {
         trashPending.current = false
       }
       setSendingTrash(false)
