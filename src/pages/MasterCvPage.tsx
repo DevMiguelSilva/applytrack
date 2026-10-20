@@ -42,6 +42,7 @@ export function MasterCvPage() {
   const [editingTrack, setEditingTrack] = useState<CvTrack>(activeTrack)
   const [draft, setDraft] = useState<MasterCv | null>(null)
   const [saved, setSaved] = useState(false)
+  const resumeFileInput = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
@@ -195,13 +196,30 @@ export function MasterCvPage() {
       </DeleteDialog>
       <fieldset disabled={locked} className="min-w-0 space-y-6">
       <section className="ui-panel min-w-0 space-y-4">
-        <h2 className="break-words ui-section-title legacy-size-text_lg">Attach resume → fill form</h2>
+        <div className="cv-import-heading">
+          <h2 className="break-words ui-section-title legacy-size-text_lg">Attach resume → fill form</h2>
+          <button
+            type="button"
+            className="ui-button ui-secondary ui-icon-button"
+            aria-label="Choose a resume file"
+            title="Choose a resume file"
+            disabled={locked}
+            onClick={() => resumeFileInput.current?.click()}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
         <input
+          ref={resumeFileInput}
           type="file"
           accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           disabled={locked}
           onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
-          className="ui-file w-full"
+          className="cv-file-input-hidden"
+          tabIndex={-1}
+          aria-hidden="true"
         />
         {attachment && (
           <p className="break-words ui-meta text-brand-muted legacy-size-text_xs">
