@@ -109,176 +109,178 @@ export function AddJobPage() {
     : 'indeed'
 
   return (
-    <div className="ui-page mx-auto max-w-3xl">
+    <div className="ui-page add-job-page mx-auto min-w-0 w-full">
       <SectionHeader title="Add application" description="Paste a job posting or enter its details to add it to your board." />
 
-      <section className={`ui-panel space-y-3`}>
-        <h2 className=" ui-section-title legacy-size-text_base">Quick add with AI</h2>
-        <textarea
-          value={pasteText}
-          onChange={(e) => {
-            const value = e.target.value
-            setPasteText(value)
-            setForm((prev) => ({ ...prev, jobDescription: value }))
-          }}
-          rows={8}
-          placeholder="Paste the complete job posting here…"
-          className={fieldControl}
-        />
-        <div className="m-actions">
-          <button
-            type="button"
-            data-role="primary"
-            onClick={handleParseAndFill}
-            disabled={parsing || !pasteText.trim()}
-            aria-busy={parsing}
-            className="ui-button ui-primary"
-          >
-            {parsing ? 'Parsing…' : 'Parse with AI'}
-          </button>
-        </div>
-        {parsing && <LoadingSpinner label="Extracting job details…" />}
-      </section>
-
-      <form onSubmit={handleSubmit} className={`ui-panel space-y-4`}>
-        {error && (
-          <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
-            {error}
-          </p>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="ui-label block">
-            <span className={fieldLabel}>
-              Company <span className="text-red-700">*</span>
-            </span>
-            <input
-              value={form.company}
-              onChange={(e) => update('company', e.target.value)}
-              className={fieldControl}
-              required
-            />
-          </label>
-          <label className="ui-label block">
-            <span className={fieldLabel}>
-              Role <span className="text-red-700">*</span>
-            </span>
-            <input
-              value={form.role}
-              onChange={(e) => update('role', e.target.value)}
-              className={fieldControl}
-              required
-            />
-          </label>
-          <label className="ui-label block">
-            <span className={fieldLabel}>Location</span>
-            <input
-              value={form.location}
-              onChange={(e) => update('location', e.target.value)}
-              className={fieldControl}
-            />
-          </label>
-          <label className="ui-label block">
-            <span className={fieldLabel}>Salary</span>
-            <input
-              value={form.salary}
-              onChange={(e) => update('salary', e.target.value)}
-              className={fieldControl}
-            />
-          </label>
-          <label className="sm:col-span-2 ui-label block">
-            <span className={fieldLabel}>Job URL</span>
-            <input
-              type="url"
-              value={form.jobUrl}
-              onChange={(e) => setJobUrl(e.target.value)}
-              className={fieldControl}
-            />
-          </label>
-          <label className="ui-label block">
-            <span className={fieldLabel}>Portal</span>
-            <select
-              value={sourceValue}
-              onChange={(e) => {
-                setSourceLocked(true)
-                update('source', e.target.value)
-              }}
-              className={`${fieldControl} form-select`}
-            >
-              {PORTAL_JOB_SOURCE_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {JOB_SOURCE_LABELS[value]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ui-label block">
-            <span className={fieldLabel}>
-              Master CV <span className="text-red-700">*</span>
-            </span>
-            <select
-              value={form.cvTrack ?? activeTrack}
-              onChange={(e) => update('cvTrack', e.target.value as CvTrack)}
-              className={`${fieldControl} form-select`}
-            >
-              {Object.keys(library.cvs).map((track) => (
-                <option key={track} value={track}>
-                  {getLabel(track)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {form.jdSummary && (
-          <div className="rounded-lg border border-[#e6eeeb] bg-[#f7fbf9] p-3">
-            <span className={fieldLabel}>AI summary</span>
-            <p className="mt-1 ui-body leading-relaxed text-brand-ink legacy-size-text_sm">{form.jdSummary}</p>
-          </div>
-        )}
-
-        <label className="ui-label block">
-          <span className={fieldLabel}>Full job description</span>
+      <div className="add-job-layout">
+        <section className="ui-panel add-job-posting space-y-3">
+          <h2 className=" ui-section-title legacy-size-text_base">Quick add with AI</h2>
           <textarea
-            value={form.jobDescription}
+            value={pasteText}
             onChange={(e) => {
-              update('jobDescription', e.target.value)
-              setPasteText(e.target.value)
+              const value = e.target.value
+              setPasteText(value)
+              setForm((prev) => ({ ...prev, jobDescription: value }))
             }}
             rows={8}
+            placeholder="Paste the complete job posting here…"
             className={fieldControl}
           />
-        </label>
-
-        <label className="ui-label block">
-          <span className={fieldLabel}>Personal notes</span>
-          <textarea
-            value={form.notes}
-            onChange={(e) => update('notes', e.target.value)}
-            rows={2}
-            className={fieldControl}
-          />
-        </label>
-
-        {form.extractedSkills.length > 0 && (
-          <div>
-            <span className={fieldLabel}>Extracted skills</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {form.extractedSkills.map((skill) => (
-                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink legacy-size-text_sm">
-                  {skill}
-                </span>
-              ))}
-            </div>
+          <div className="m-actions">
+            <button
+              type="button"
+              data-role="primary"
+              onClick={handleParseAndFill}
+              disabled={parsing || !pasteText.trim()}
+              aria-busy={parsing}
+              className="ui-button ui-primary"
+            >
+              {parsing ? 'Parsing…' : 'Parse with AI'}
+            </button>
           </div>
-        )}
+          {parsing && <LoadingSpinner label="Extracting job details…" />}
+        </section>
 
-        <div className="ui-form-actions">
-          <button type="submit" data-role="primary" className="ui-button ui-primary">
-            Save application
-          </button>
-        </div>
-      </form>
+        <form onSubmit={handleSubmit} className="ui-panel add-job-details space-y-4">
+          {error && (
+            <p className="ui-helper !text-red-700 legacy-size-text_sm" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="add-job-details-fields">
+            <label className="ui-label block">
+              <span className={fieldLabel}>
+                Company <span className="text-red-700">*</span>
+              </span>
+              <input
+                value={form.company}
+                onChange={(e) => update('company', e.target.value)}
+                className={fieldControl}
+                required
+              />
+            </label>
+            <label className="ui-label block">
+              <span className={fieldLabel}>
+                Role <span className="text-red-700">*</span>
+              </span>
+              <input
+                value={form.role}
+                onChange={(e) => update('role', e.target.value)}
+                className={fieldControl}
+                required
+              />
+            </label>
+            <label className="ui-label block">
+              <span className={fieldLabel}>Location</span>
+              <input
+                value={form.location}
+                onChange={(e) => update('location', e.target.value)}
+                className={fieldControl}
+              />
+            </label>
+            <label className="ui-label block">
+              <span className={fieldLabel}>Salary</span>
+              <input
+                value={form.salary}
+                onChange={(e) => update('salary', e.target.value)}
+                className={fieldControl}
+              />
+            </label>
+            <label className="add-job-full-row ui-label block">
+              <span className={fieldLabel}>Job URL</span>
+              <input
+                type="url"
+                value={form.jobUrl}
+                onChange={(e) => setJobUrl(e.target.value)}
+                className={fieldControl}
+              />
+            </label>
+            <label className="ui-label block">
+              <span className={fieldLabel}>Portal</span>
+              <select
+                value={sourceValue}
+                onChange={(e) => {
+                  setSourceLocked(true)
+                  update('source', e.target.value)
+                }}
+                className={`${fieldControl} form-select`}
+              >
+                {PORTAL_JOB_SOURCE_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {JOB_SOURCE_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ui-label block">
+              <span className={fieldLabel}>
+                Master CV <span className="text-red-700">*</span>
+              </span>
+              <select
+                value={form.cvTrack ?? activeTrack}
+                onChange={(e) => update('cvTrack', e.target.value as CvTrack)}
+                className={`${fieldControl} form-select`}
+              >
+                {Object.keys(library.cvs).map((track) => (
+                  <option key={track} value={track}>
+                    {getLabel(track)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {form.jdSummary && (
+            <div className="rounded-lg border border-[#e6eeeb] bg-[#f7fbf9] p-3">
+              <span className={fieldLabel}>AI summary</span>
+              <p className="mt-1 ui-body leading-relaxed text-brand-ink legacy-size-text_sm">{form.jdSummary}</p>
+            </div>
+          )}
+
+          <label className="ui-label block">
+            <span className={fieldLabel}>Full job description</span>
+            <textarea
+              value={form.jobDescription}
+              onChange={(e) => {
+                update('jobDescription', e.target.value)
+                setPasteText(e.target.value)
+              }}
+              rows={8}
+              className={fieldControl}
+            />
+          </label>
+
+          <label className="ui-label block">
+            <span className={fieldLabel}>Personal notes</span>
+            <textarea
+              value={form.notes}
+              onChange={(e) => update('notes', e.target.value)}
+              rows={2}
+              className={fieldControl}
+            />
+          </label>
+
+          {form.extractedSkills.length > 0 && (
+            <div>
+              <span className={fieldLabel}>Extracted skills</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {form.extractedSkills.map((skill) => (
+                  <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink legacy-size-text_sm">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="ui-form-actions">
+            <button type="submit" data-role="primary" className="ui-button ui-primary">
+              Save application
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

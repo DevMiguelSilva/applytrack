@@ -180,3 +180,37 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 
 /* Historical inherited text sizes missed by the initial JSX match. */
 .ui-cv-page > .ui-section-header .ui-description { font-size: 14px; }
+
+/* Add job and CV forms use the shared page width and adapt to their own space. */
+.add-job-page { container-name: add-job-page; container-type: inline-size; }
+.add-job-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 24px; min-width: 0; }
+.add-job-layout > * { min-width: 0; }
+.add-job-details { container-name: add-job-details; container-type: inline-size; }
+.add-job-details-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.add-job-full-row { min-width: 0; }
+.cv-contact, .cv-entry { min-width: 0; container-type: inline-size; }
+.cv-contact { container-name: cv-contact; }
+.cv-entry { container-name: cv-entry; }
+.cv-contact-pairs, .cv-experience-fields, .cv-experience-dates, .cv-project-fields, .cv-education-fields, .cv-certification-fields {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0;
+}
+.cv-full-row { min-width: 0; }
+@container add-job-page (min-width: 960px) {
+  .add-job-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+}
+@container add-job-details (min-width: 480px) {
+  .add-job-details-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .add-job-full-row { grid-column: 1 / -1; }
+}
+@container cv-contact (min-width: 480px) {
+  .cv-contact-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container cv-entry (min-width: 480px) {
+  .cv-experience-fields, .cv-experience-dates, .cv-project-fields, .cv-education-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cv-full-row { grid-column: 1 / -1; }
+}
+@container cv-entry (min-width: 760px) {
+  .cv-certification-fields { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, .7fr); }
+}

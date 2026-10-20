@@ -174,7 +174,7 @@ export function MasterCvPage() {
   const refs = deleting ? templateReferences(library, deleting, jobs, searches) : { jobs: [], searches: [] }
 
   return (
-    <div className="ui-page ui-cv-page mx-auto min-w-0 max-w-3xl" aria-busy={locked}>
+    <div className="ui-page ui-cv-page mx-auto min-w-0 w-full" aria-busy={locked}>
       <SectionHeader title="CV library" description="Create and manage master CVs for the roles you apply to." actions={<button type="button" className="ui-button ui-primary" disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>} />
       {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 legacy-size-text_sm"><p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
       {showAdd && <form className={card} onSubmit={(e) => { e.preventDefault(); void run(async () => { await saveDraft(); await addTemplate(newName, copyFrom || undefined); setNewName(''); setShowAdd(false) }) }}>
@@ -224,9 +224,9 @@ export function MasterCvPage() {
       </section>
 
       <form onSubmit={handleSave} className="space-y-6">
-        <section className="ui-panel min-w-0 space-y-4">
+        <section className="ui-panel min-w-0 space-y-4 cv-contact">
           <h2 className="break-words ui-section-title legacy-size-text_lg">Contact · {getLabel(editingTrack)}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="cv-contact-pairs">
             {(
               [
                 ['name', 'Full name'],
@@ -428,7 +428,7 @@ function ExperienceEditor({
         </button>
       </div>
       {experience.map((exp, index) => (
-        <div key={exp.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
+        <div key={exp.id} className="cv-entry cv-experience-entry space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Role {index + 1}
@@ -438,7 +438,7 @@ function ExperienceEditor({
               onClick={() => onChange(experience.filter((e) => e.id !== exp.id))}
             />
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="cv-experience-fields">
             <input
               value={exp.title}
               placeholder="Title"
@@ -467,9 +467,9 @@ function ExperienceEditor({
                 next[index] = { ...exp, location: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 ui-field"
+              className="min-w-0 ui-field cv-full-row"
             />
-            <div className="flex min-w-0 gap-2">
+            <div className="cv-experience-dates cv-full-row">
               <input
                 value={exp.start}
                 placeholder="Start"
@@ -562,7 +562,7 @@ function ProjectsEditor({
         </button>
       </div>
       {projects.map((project, index) => (
-        <div key={project.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
+        <div key={project.id} className="cv-entry cv-project-entry space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Project {index + 1}
@@ -572,26 +572,28 @@ function ProjectsEditor({
               onClick={() => onChange(projects.filter((p) => p.id !== project.id))}
             />
           </div>
-          <input
-            value={project.name}
-            placeholder="Project name"
-            onChange={(e) => {
-              const next = [...projects]
-              next[index] = { ...project, name: e.target.value }
-              onChange(next)
-            }}
-            className="min-w-0 w-full ui-field"
-          />
-          <input
-            value={project.url}
-            placeholder="URL"
-            onChange={(e) => {
-              const next = [...projects]
-              next[index] = { ...project, url: e.target.value }
-              onChange(next)
-            }}
-            className="min-w-0 w-full ui-field"
-          />
+          <div className="cv-project-fields">
+            <input
+              value={project.name}
+              placeholder="Project name"
+              onChange={(e) => {
+                const next = [...projects]
+                next[index] = { ...project, name: e.target.value }
+                onChange(next)
+              }}
+              className="min-w-0 w-full ui-field"
+            />
+            <input
+              value={project.url}
+              placeholder="URL"
+              onChange={(e) => {
+                const next = [...projects]
+                next[index] = { ...project, url: e.target.value }
+                onChange(next)
+              }}
+              className="min-w-0 w-full ui-field"
+            />
+          </div>
           <textarea
             value={project.bullets.map((b) => b.text).join('\n')}
             onChange={(e) => {
@@ -663,7 +665,7 @@ function EducationEditor({
         </div>
       </div>
       {education.map((edu, index) => (
-        <div key={edu.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
+        <div key={edu.id} className="cv-entry cv-education-entry space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Education {index + 1}
@@ -673,7 +675,7 @@ function EducationEditor({
               onClick={() => onChange(education.filter((e) => e.id !== edu.id))}
             />
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="cv-education-fields">
             <input
               value={edu.degree}
               placeholder="Degree / Diploma"
@@ -748,7 +750,7 @@ function CertificationsEditor({
         </button>
       </div>
       {certifications.map((cert, index) => (
-        <div key={cert.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
+        <div key={cert.id} className="cv-entry cv-certification-entry space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="pt-1.5 ui-meta font-medium uppercase tracking-wide text-brand-muted legacy-size-text_xs">
               Certification {index + 1}
@@ -758,7 +760,7 @@ function CertificationsEditor({
               onClick={() => onChange(certifications.filter((c) => c.id !== cert.id))}
             />
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="cv-certification-fields">
             <input
               value={cert.name}
               placeholder="Name (e.g. Power Platform Fundamentals)"
@@ -767,7 +769,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, name: e.target.value }
                 onChange(next)
               }}
-              className="min-w-0 sm:col-span-1 ui-field"
+              className="min-w-0 ui-field"
             />
             <input
               value={cert.issuer}
