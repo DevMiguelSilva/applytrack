@@ -11,7 +11,7 @@ function moduleUrl(path, replacements = {}) {
 }
 const typesUrl = moduleUrl('../src/types/cv.ts')
 const mutationUrl = moduleUrl('../src/lib/localMutation.ts')
-const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary } = await import(typesUrl)
+const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary, cleanMasterCvEntries } = await import(typesUrl)
 const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
 const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
 
@@ -30,6 +30,29 @@ test('legacy and dynamic libraries retain CV content, IDs, names and attachments
   assert.notEqual(copied.cvs.frontend.contact.name, 'Different')
   assert.deepEqual(normalizeLibrary(copied), copied)
   assert.equal(normalizeLibrary(migrated.cvs.frontend).cvs.frontend.contact.name, migrated.cvs.frontend.contact.name)
+})
+
+test('CV save cleanup drops untouched rows and blank bullets while retaining partial entries and IDs', () => {
+  const cv = createEmptyMasterCv({
+    skills: [{ id: 'empty-skill', group: 'Group', items: [] }, { id: 'skill', group: 'Tools', items: [' Excel '] }],
+    experience: [
+      { id: 'empty-exp', company: '', title: '', location: '', start: '', end: '', current: false, bullets: [{ id: 'blank-bullet', text: '', tags: [] }] },
+      { id: 'partial-exp', company: ' Acme ', title: '', location: '', start: '', end: '', current: false, bullets: [{ id: 'blank-2', text: '  ', tags: [] }, { id: 'bullet', text: 'Built a tool\nImproved workflow', tags: [] }] },
+    ],
+    projects: [{ id: 'empty-project', name: '', url: '', bullets: [] }, { id: 'partial-project', name: 'Portfolio', url: '', bullets: [] }],
+    education: [{ id: 'empty-education', school: '', degree: '', start: '', end: '' }, { id: 'partial-education', school: 'College', degree: '', start: '', end: '' }],
+    certifications: [{ id: 'empty-cert', name: '', issuer: '', year: '' }, { id: 'partial-cert', name: 'PL-900', issuer: '', year: '' }],
+  })
+  const saved = cleanMasterCvEntries(cv)
+  assert.deepEqual(saved.skills.map((entry) => entry.id), ['skill'])
+  assert.deepEqual(saved.experience.map((entry) => entry.id), ['partial-exp'])
+  assert.equal(saved.experience[0].bullets[0].id, 'bullet')
+  assert.deepEqual(saved.experience[0].bullets.map((bullet) => bullet.text), ['Built a tool', 'Improved workflow'])
+  assert.equal(saved.experience[0].bullets[1].id.length > 0, true)
+  assert.deepEqual(saved.projects.map((entry) => entry.id), ['partial-project'])
+  assert.deepEqual(saved.education.map((entry) => entry.id), ['partial-education'])
+  assert.deepEqual(saved.certifications.map((entry) => entry.id), ['partial-cert'])
+  assert.equal(saved.experience[0].company, ' Acme ')
 })
 
 test('deletion archives Saved references, pauses explicit searches and preserves history', () => {
