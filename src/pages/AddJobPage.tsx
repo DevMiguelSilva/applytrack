@@ -113,8 +113,8 @@ export function AddJobPage() {
       <SectionHeader title="Add application" description="Paste a job posting or enter its details to add it to your board." />
 
       <div className="add-job-layout">
-        <section className="ui-panel add-job-posting space-y-3">
-          <h2 className=" ui-section-title legacy-size-text_base">Quick add with AI</h2>
+        <section className="ui-panel add-job-posting">
+          <h2 className="ui-section-title legacy-size-text_base">Quick add with AI</h2>
           <textarea
             value={pasteText}
             onChange={(e) => {
@@ -126,19 +126,21 @@ export function AddJobPage() {
             placeholder="Paste the complete job posting here…"
             className={fieldControl}
           />
-          <div className="m-actions">
-            <button
-              type="button"
-              data-role="primary"
-              onClick={handleParseAndFill}
-              disabled={parsing || !pasteText.trim()}
-              aria-busy={parsing}
-              className="ui-button ui-primary"
-            >
-              {parsing ? 'Parsing…' : 'Parse with AI'}
-            </button>
+          <div className="add-job-posting-actions">
+            <div className="m-actions">
+              <button
+                type="button"
+                data-role="primary"
+                onClick={handleParseAndFill}
+                disabled={parsing || !pasteText.trim()}
+                aria-busy={parsing}
+                className="ui-button ui-primary"
+              >
+                {parsing ? 'Parsing…' : 'Parse with AI'}
+              </button>
+            </div>
+            {parsing && <LoadingSpinner label="Extracting job details…" />}
           </div>
-          {parsing && <LoadingSpinner label="Extracting job details…" />}
         </section>
 
         <form onSubmit={handleSubmit} className="ui-panel add-job-details space-y-4">

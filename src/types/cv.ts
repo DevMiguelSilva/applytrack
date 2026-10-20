@@ -185,6 +185,25 @@ export function createEmptyMasterCv(overrides: Partial<MasterCv> = {}): MasterCv
   }
 }
 
+/** Drop untouched/blank editor rows while preserving every partially completed entry. */
+export function cleanMasterCvEntries(cv: MasterCv): MasterCv {
+  const hasText = (...values: (string | null | undefined)[]) => values.some((value) => Boolean(value?.trim()))
+  const cleanBullets = (bullets: CvBullet[]) => bullets.flatMap((bullet) => bullet.text
+    .split(/\r?\n/)
+    .map((text, index) => ({ ...bullet, id: index === 0 ? bullet.id : id(), text }))
+    .filter((line) => hasText(line.text)))
+  return {
+    ...cv,
+    skills: cv.skills.filter((group) => hasText(group.group === 'Group' ? '' : group.group, ...group.items)),
+    experience: cv.experience.map((entry) => ({ ...entry, bullets: cleanBullets(entry.bullets) }))
+      .filter((entry) => hasText(entry.company, entry.title, entry.location, entry.start, entry.end, ...entry.bullets.map((bullet) => bullet.text))),
+    projects: cv.projects.map((entry) => ({ ...entry, bullets: cleanBullets(entry.bullets) }))
+      .filter((entry) => hasText(entry.name, entry.url, ...entry.bullets.map((bullet) => bullet.text))),
+    education: cv.education.filter((entry) => hasText(entry.school, entry.degree, entry.start, entry.end, entry.year)),
+    certifications: cv.certifications.filter((entry) => hasText(entry.name, entry.issuer, entry.year)),
+  }
+}
+
 /** Ensure older saved CVs without certifications still load cleanly. */
 export function normalizeMasterCv(cv: Partial<MasterCv> | null | undefined, fallback?: MasterCv): MasterCv {
   const base = fallback ?? createEmptyMasterCv()

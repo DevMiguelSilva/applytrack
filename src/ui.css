@@ -63,9 +63,9 @@ select.ui-field { padding-right: 36px; }
 textarea.ui-field { height: auto; resize: vertical; }
 .ui-field::placeholder { color: var(--ui-muted); opacity: 1; }
 .ui-field:disabled { background-color: #f1f5f3; }
-.ui-file { max-width: 100%; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--ui-muted); }
+.ui-file { max-width: 100%; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--ui-muted); cursor: pointer; }
 .ui-file::file-selector-button { min-height: 44px; margin-right: 12px; padding: 10px 16px; border: 1px solid var(--ui-line); border-radius: 12px; background: white; color: var(--ui-ink); font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 20px; font-weight: 600; cursor: pointer; }
-.ui-file:disabled { opacity: .6; }
+.ui-file:disabled { opacity: .6; cursor: not-allowed; }
 .ui-icon-button { display: inline-flex; min-height: 44px; min-width: 44px; width: 44px; padding: 0; flex-shrink: 0; }
 .ui-icon-action { display: inline-flex; min-width: 44px; flex-direction: column; align-items: center; gap: 4px; padding: 0; border-radius: 8px; font: 600 12px/16px Inter, system-ui, sans-serif; }
 .ui-icon-action-box { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--ui-line); border-radius: 8px; background-color: white; color: var(--ui-ink); }
@@ -183,18 +183,84 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 
 /* Add job and CV forms use the shared page width and adapt to their own space. */
 .add-job-page { container-name: add-job-page; container-type: inline-size; }
-.add-job-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 24px; min-width: 0; }
+.add-job-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 24px; min-width: 0; }
 .add-job-layout > * { min-width: 0; }
 .add-job-details { container-name: add-job-details; container-type: inline-size; }
 .add-job-details-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .add-job-full-row { min-width: 0; }
-.cv-contact, .cv-entry { min-width: 0; container-type: inline-size; }
+.add-job-posting { display: grid; grid-template-rows: auto minmax(220px, 1fr) auto; gap: 12px; min-width: 0; }
+.add-job-posting > textarea { width: 100%; height: 100%; min-height: 0; resize: none; }
+.add-job-posting-actions { display: grid; gap: 8px; align-content: end; }
+.ui-cv-page { container-name: cv-page; container-type: inline-size; }
+.cv-template-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 12px 20px; min-width: 0; padding: 16px 20px; border: 1px solid var(--ui-line); border-radius: 18px; background: linear-gradient(110deg, #f2f8f5 0%, #fff 72%); }
+.cv-template-select > span { display: block; color: var(--ui-ink); font-weight: 600; }
+.cv-template-meta, .cv-template-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cv-template-meta { min-height: 36px; color: var(--ui-muted); font: 500 12px/16px Inter, system-ui, sans-serif; white-space: nowrap; }
+.cv-default-mark { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: #e2f3e9; color: #1d6b45; font-size: 12px; font-weight: 700; }
+.cv-rename-form { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; padding-top: 12px; border-top: 1px solid var(--ui-line); }
+.cv-import-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; min-width: 0; padding: 16px 20px; border: 1px dashed #b8d4c7; border-radius: 18px; background: #f5faf7; }
+.cv-import-copy { display: flex; align-items: center; gap: 12px; min-width: min(100%, 280px); }
+.cv-import-copy p { margin-top: 2px; }
+.cv-import-copy .ui-section-title { font-size: 14px; line-height: 20px; }
+.cv-import-icon { display: inline-flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; padding: 0; border: 1px solid #d3e7db; border-radius: 12px; background: white; color: var(--ui-focus); cursor: pointer; transition: background-color 150ms, border-color 150ms; }
+.cv-import-icon:hover:not(:disabled) { background: #e8f4ed; border-color: #b8d4c7; }
+.cv-import-icon:disabled { cursor: not-allowed; opacity: .6; }
+.cv-import-icon:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.cv-import-icon > svg { width: 20px; height: 20px; }
+.cv-file-input-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.cv-editor-form { display: grid; gap: 18px; min-width: 0; }
+.cv-editor-sections { display: grid; gap: 18px; min-width: 0; }
+.cv-editor-section { position: relative; min-width: 0; padding: 20px; }
+.cv-editor-section::before { content: none; }
+.cv-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; }
+.cv-section-heading-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cv-section-step { display: inline-flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border-radius: 12px; background: #e8f4ed; color: #27644a; font: 700 12px/16px Inter, system-ui, sans-serif; }
+.cv-section-title { font-size: 18px; line-height: 24px; }
+.cv-section-description { margin-top: 2px; }
+.cv-section-action { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.cv-add-button { color: #204b36 !important; }
+.cv-profile-section { container-name: cv-profile; container-type: inline-size; }
+.cv-profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
+.cv-contact, .cv-entry, .cv-skill-entry { min-width: 0; container-type: inline-size; }
 .cv-contact { container-name: cv-contact; }
 .cv-entry { container-name: cv-entry; }
-.cv-contact-pairs, .cv-experience-fields, .cv-experience-dates, .cv-project-fields, .cv-education-fields, .cv-certification-fields {
+.cv-skill-entry { container-name: cv-skill-entry; }
+.cv-profile-group { min-width: 0; }
+.cv-subsection-title { margin-bottom: 12px; color: var(--ui-ink); font: 600 14px/20px Inter, system-ui, sans-serif; }
+.cv-contact-pairs, .cv-skill-fields, .cv-experience-fields, .cv-experience-dates, .cv-project-fields, .cv-education-fields, .cv-certification-fields {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0;
 }
-.cv-full-row { min-width: 0; }
+.cv-full-row, .cv-experience-location { min-width: 0; }
+.cv-links-field { margin-top: 10px; }
+.cv-entry-card { min-width: 0; padding: 14px; border: 1px solid #e2ebe7; border-radius: 14px; background: linear-gradient(115deg, #f7fbf9 0%, #fff 76%); }
+.cv-entry-label { padding-top: 2px; color: #547066; font: 700 11px/16px Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.cv-entry-field { display: block; min-width: 0; color: var(--ui-muted); font: 500 14px/20px Inter, system-ui, sans-serif; }
+.cv-entry-field > span { display: block; margin-bottom: 4px; }
+.cv-entry-field em { font-style: normal; font-weight: 400; }
+.cv-entry-field textarea { width: 100%; }
+.cv-legacy-date { display: block; margin-top: 4px; color: var(--ui-muted); font: 400 11px/16px Inter, system-ui, sans-serif; }
+.ui-cv-page textarea.ui-field { box-sizing: border-box; height: 112px; min-height: 112px; resize: none; overflow-y: auto; }
+.ui-cv-page .cv-profile-summary textarea.ui-field { height: 132px; min-height: 132px; }
+.cv-section-action > .ui-button { min-height: 38px; }
+.cv-section-action > .ui-button.ui-primary { white-space: nowrap; }
+.cv-read-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
+.cv-read-grid > div, .cv-read-profile > p { min-width: 0; margin: 0; }
+.cv-read-grid dt, .cv-read-profile > p > span { display: block; margin-bottom: 3px; color: var(--ui-muted); font: 500 12px/17px Inter, system-ui, sans-serif; }
+.cv-read-grid dd, .cv-read-profile > p { color: var(--ui-ink); font: 400 14px/21px Inter, system-ui, sans-serif; overflow-wrap: anywhere; }
+.cv-read-profile { display: grid; gap: 14px; }
+.cv-read-items { display: grid; gap: 10px; }
+.cv-read-item { min-width: 0; padding: 14px 16px; border: 1px solid #e2ebe7; border-radius: 14px; background: linear-gradient(115deg, #f7fbf9 0%, #fff 76%); }
+.cv-read-item h3 { margin: 0; color: var(--ui-ink); font: 600 15px/21px Inter, system-ui, sans-serif; overflow-wrap: anywhere; }
+.cv-read-item p { margin: 5px 0 0; color: var(--ui-muted); font: 400 13px/20px Inter, system-ui, sans-serif; white-space: pre-line; overflow-wrap: anywhere; }
+.cv-read-bullets { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 20px; color: var(--ui-ink); font: 400 13px/19px Inter, system-ui, sans-serif; }
+.cv-experience-dates > .ui-check-label { align-self: start; margin: 0; }
+.cv-empty-state { margin-top: 4px; padding: 13px 16px; border: 1px dashed #d8e6df; border-radius: 12px; background: #fbfdfc; color: var(--ui-muted); font: 400 14px/20px Inter, system-ui, sans-serif; }
+.cv-save-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 16px 20px; border: 1px solid #d8e8df; border-radius: 16px; background: #f1f8f4; }
+.cv-save-row > .ui-meta { min-width: 0; }
+@container cv-profile (min-width: 780px) {
+  .cv-profile-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+  .cv-profile-summary { padding-left: 20px; border-left: 1px solid var(--ui-line); }
+}
 @container add-job-page (min-width: 960px) {
   .add-job-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 }
@@ -206,11 +272,38 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
   .cv-contact-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container cv-entry (min-width: 480px) {
-  .cv-experience-fields, .cv-experience-dates, .cv-project-fields, .cv-education-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .cv-full-row { grid-column: 1 / -1; }
+  .cv-experience-fields, .cv-project-fields, .cv-education-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cv-experience-location, .cv-experience-dates, .cv-full-row { grid-column: 1 / -1; }
+  .cv-experience-dates { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; }
+  .cv-experience-dates > .ui-check-label { align-self: end; transform: translateY(5px); }
 }
 @container cv-entry (min-width: 760px) {
   .cv-certification-fields { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, .7fr); }
+}
+@container cv-entry (min-width: 840px) {
+  .cv-experience-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cv-experience-location { grid-column: auto; }
+  .cv-education-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container cv-skill-entry (min-width: 480px) {
+  .cv-skill-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container cv-page (min-width: 900px) {
+  .cv-template-toolbar { grid-template-columns: minmax(220px, 1fr) auto auto; }
+}
+@media (max-width: 639px) {
+  .cv-read-grid { grid-template-columns: minmax(0, 1fr); }
+  .cv-template-toolbar { grid-template-columns: minmax(0, 1fr); align-items: stretch; padding: 14px; }
+  .cv-template-meta { min-height: 24px; }
+  .cv-template-actions { justify-content: flex-start; }
+  .cv-rename-form { grid-template-columns: minmax(0, 1fr); }
+  .cv-import-panel { align-items: stretch; padding: 14px; }
+  .cv-editor-section { padding: 16px; }
+  .cv-section-heading { align-items: flex-start; }
+  .cv-section-action, .cv-section-action > .ui-button { width: 100%; }
+  .cv-save-row { align-items: stretch; padding: 14px; }
+  .cv-save-row > .ui-button { width: 100%; }
+}
+@container cv-profile (max-width: 779px) {
+  .cv-profile-summary { padding-top: 18px; border-top: 1px solid var(--ui-line); }
 }
