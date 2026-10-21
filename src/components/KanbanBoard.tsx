@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
 import { STATUS_CONFIG } from '../types/job'
 import { filterJobsBySearch } from '../lib/jobSearch'
+import type { SavedJobIndicators } from '../lib/savedJobIndicators'
 import { boardLook } from './BoardLook'
 import { attachCardDragGhost, JobCard } from './JobCard'
 
@@ -34,6 +35,7 @@ interface KanbanBoardProps {
   columns?: BoardColumn[]
   trashedJobs?: JobApplication[]
   onRestoreJob?: (id: string) => void
+  savedIndicators?: Readonly<Record<string, SavedJobIndicators>>
 }
 
 export function KanbanBoard({
@@ -43,6 +45,7 @@ export function KanbanBoard({
   columns = ['saved', 'applied', 'interview', 'offer'],
   trashedJobs = [],
   onRestoreJob,
+  savedIndicators = {},
 }: KanbanBoardProps) {
   const openPurge = usePermanentDelete()
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -139,6 +142,7 @@ export function KanbanBoard({
                     <JobCard
                       key={job.id}
                       job={job}
+                      savedIndicators={status === 'saved' ? savedIndicators[job.id] : undefined}
                       isDragging={draggedId === job.id}
                       onDragStart={(id, event) => {
                         setDraggedId(id)
