@@ -11,11 +11,6 @@ function nextRevision(previous: string | null): string {
   const last = previous ? Date.parse(previous) : 0
   return new Date(Math.max(Date.now(), Number.isFinite(last) ? last + 1 : 0)).toISOString()
 }
-interface PendingCv {
-  track: CvTrack
-  cv: MasterCv
-  attachment?: ResumeAttachment
-}
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}`
@@ -28,7 +23,7 @@ interface MasterCvContextValue {
   loading: boolean
   loadError: string | null
   reload: () => Promise<void>
-  setActiveTrack: (track: CvTrack, pending?: PendingCv) => Promise<void>
+  setDefaultTrack: (track: CvTrack) => Promise<void>
   getCv: (track: CvTrack) => MasterCv | undefined
   getLabel: (track: CvTrack) => string
   saveTrackCv: (track: CvTrack, cv: MasterCv) => Promise<void>
@@ -137,12 +132,9 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     return next
   }), [cloud, user, runMutation])
 
-  const setActiveTrack = useCallback((id: string, pending?: PendingCv) => persist((value) => {
+  const setDefaultTrack = useCallback((id: string) => persist((value) => {
     if (!value.cvs[id]) throw new Error('This CV template no longer exists.')
-    if (pending && !value.cvs[pending.track]) throw new Error('The edited CV template no longer exists. Your draft is preserved.')
-    return {...value, activeTrack:id,
-      cvs:pending ? {...value.cvs, [pending.track]:{...pending.cv, updatedAt:new Date().toISOString()}} : value.cvs,
-      attachments:pending?.attachment ? {...value.attachments, [pending.track]:pending.attachment} : value.attachments}
+    return {...value, activeTrack:id}
   }), [persist])
   const saveTemplate = useCallback((id: string, cv: MasterCv, attachment?: ResumeAttachment | null) => persist((value) => {
     if (!value.cvs[id]) throw new Error('This CV template no longer exists.')
@@ -185,9 +177,9 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
   const updateMasterCv = useCallback((updates: Partial<MasterCv>) => persist((value) => ({...value,
     cvs:{...value.cvs, [value.activeTrack]:{...value.cvs[value.activeTrack], ...updates}}})), [persist])
   const value = useMemo(() => ({library, masterCv:library.cvs[library.activeTrack], activeTrack:library.activeTrack,
-    loading, loadError, reload, setActiveTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
+    loading, loadError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
     saveLibrary, saveMasterCv, updateMasterCv, addTemplate, renameTemplate, deleteTemplate}),
-  [library, loading, loadError, reload, setActiveTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
+  [library, loading, loadError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
     saveLibrary, saveMasterCv, updateMasterCv, addTemplate, renameTemplate, deleteTemplate])
   return <MasterCvContext.Provider value={value}>{children}</MasterCvContext.Provider>
 }

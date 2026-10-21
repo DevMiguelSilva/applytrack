@@ -32,6 +32,19 @@ test('legacy and dynamic libraries retain CV content, IDs, names and attachments
   assert.equal(normalizeLibrary(migrated.cvs.frontend).cvs.frontend.contact.name, migrated.cvs.frontend.contact.name)
 })
 
+test('removing a non-default CV preserves the default; removing the default picks a valid fallback', () => {
+  const library = createDefaultLibrary()
+  library.activeTrack = 'frontend'
+
+  const nonDefaultRemoved = removeCvTemplate(library, 'powerPlatform', [], [], [])
+  assert.equal(nonDefaultRemoved.library.activeTrack, 'frontend')
+  assert.ok(nonDefaultRemoved.library.cvs[nonDefaultRemoved.library.activeTrack])
+
+  const defaultRemoved = removeCvTemplate(library, 'frontend', [], [], [])
+  assert.equal(defaultRemoved.library.activeTrack, 'powerPlatform')
+  assert.ok(defaultRemoved.library.cvs[defaultRemoved.library.activeTrack])
+})
+
 test('CV save cleanup drops untouched rows and blank bullets while retaining partial entries and IDs', () => {
   const cv = createEmptyMasterCv({
     skills: [{ id: 'empty-skill', group: 'Group', items: [] }, { id: 'skill', group: 'Tools', items: [' Excel '] }],
