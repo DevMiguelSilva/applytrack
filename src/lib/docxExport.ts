@@ -15,7 +15,7 @@ import {
   type ParagraphChild,
 } from 'docx'
 import type { MasterCv } from '../types/cv'
-import { formatEducationDates } from '../types/cv'
+import { formatCvDate, formatEducationDisplayDates } from '../types/cv'
 
 /**
  * ATS-oriented export:
@@ -336,7 +336,7 @@ export async function buildCvDocxBlob(cv: MasterCv): Promise<Blob> {
   if (cv.experience.length > 0) {
     children.push(sectionHeading('Experience'))
     for (const exp of cv.experience) {
-      const dates = [exp.start, exp.current ? 'Present' : exp.end].filter(Boolean).join(' - ')
+      const dates = [exp.start, exp.current ? 'Present' : exp.end].map(formatCvDate).filter(Boolean).join(' - ')
       const bullets = exp.bullets.filter((b) => b.text.trim()).slice(0, 6)
       children.push(
         experienceHeader(exp.company, exp.title, exp.location, dates),
@@ -373,7 +373,7 @@ export async function buildCvDocxBlob(cv: MasterCv): Promise<Blob> {
     children.push(sectionHeading('Education'))
     for (const edu of cv.education) {
       const label = [edu.degree, edu.school].filter(Boolean).join(', ')
-      children.push(educationOrCertHeader(label, formatEducationDates(edu)))
+      children.push(educationOrCertHeader(label, formatEducationDisplayDates(edu)))
     }
   }
 
@@ -382,7 +382,7 @@ export async function buildCvDocxBlob(cv: MasterCv): Promise<Blob> {
     children.push(sectionHeading('Certifications'))
     for (const cert of certifications) {
       const label = [cert.name, cert.issuer].filter(Boolean).join(', ')
-      children.push(educationOrCertHeader(label, cert.year || ''))
+      children.push(educationOrCertHeader(label, formatCvDate(cert.year || '')))
     }
   }
 
@@ -560,6 +560,7 @@ export function openCvPrintWindow(cv: MasterCv, title: string): void {
     .map((exp) => {
       const dates = [exp.start, exp.current ? 'Present' : exp.end]
         .filter(Boolean)
+        .map(formatCvDate)
         .map(atsSafe)
         .join(' - ')
       const company = atsSafe(exp.company)
@@ -601,14 +602,14 @@ export function openCvPrintWindow(cv: MasterCv, title: string): void {
   const eduHtml = cv.education
     .map((edu) => {
       const label = [edu.degree, edu.school].filter(Boolean).map(atsSafe).join(', ')
-      return `<div class="job-head"><span>${formatEduCertLabel(label)}</span><span class="dates">${escapeHtml(atsSafe(formatEducationDates(edu)))}</span></div>`
+      return `<div class="job-head"><span>${formatEduCertLabel(label)}</span><span class="dates">${escapeHtml(atsSafe(formatEducationDisplayDates(edu)))}</span></div>`
     })
     .join('')
 
   const certHtml = (cv.certifications ?? [])
     .map((cert) => {
       const label = [cert.name, cert.issuer].filter(Boolean).map(atsSafe).join(', ')
-      return `<div class="job-head"><span>${formatEduCertLabel(label)}</span><span class="dates">${escapeHtml(atsSafe(cert.year || ''))}</span></div>`
+      return `<div class="job-head"><span>${formatEduCertLabel(label)}</span><span class="dates">${escapeHtml(atsSafe(formatCvDate(cert.year || '')))}</span></div>`
     })
     .join('')
 

@@ -27,6 +27,8 @@ import {
   type CvTrack,
   type MasterCv,
   cleanMasterCvEntries,
+  formatCvDate,
+  formatEducationDisplayDates,
 } from '../types/cv'
 
 const card = "ui-panel min-w-0 space-y-4"
@@ -719,7 +721,7 @@ function ExperienceEditor({
         >
           + Add role
         </button>}{action}</>} />
-      {!editing && <CvReadItems empty="No experience added yet." items={experience.map((exp) => ({ title: [exp.title, exp.company].filter(Boolean).join(' · '), detail: [[exp.location, [exp.start, exp.current ? 'Present' : exp.end].filter(Boolean).join(' – ')].filter(Boolean).join(' · '), exp.current ? 'Current role' : ''].filter(Boolean).join(' · '), bullets: exp.bullets.map((bullet) => bullet.text).filter((text) => text.trim()) }))} />}
+      {!editing && <CvReadItems empty="No experience added yet." items={experience.map((exp) => ({ title: [exp.title, exp.company].filter(Boolean).join(' · '), detail: [[exp.location, [formatCvDate(exp.start), formatCvDate(exp.current ? 'Present' : exp.end)].filter(Boolean).join(' – ')].filter(Boolean).join(' · '), exp.current ? 'Current role' : ''].filter(Boolean).join(' · '), bullets: exp.bullets.map((bullet) => bullet.text).filter((text) => text.trim()) }))} />}
       {editing && <>
       {experience.length === 0 && <p className="cv-empty-state">Your experience will appear here. Add your most relevant role first.</p>}
       {experience.map((exp, index) => (
@@ -957,7 +959,7 @@ function EducationEditor({
             + Add education
           </button>
         </div>}{action}</>} />
-      {!editing && <CvReadItems empty="No education added yet." items={education.map((edu) => ({ title: [edu.degree, edu.school].filter(Boolean).join(' · '), detail: [edu.start, edu.end].filter(Boolean).join(' – ') }))} />}
+      {!editing && <CvReadItems empty="No education added yet." items={education.map((edu) => ({ title: [edu.degree, edu.school].filter(Boolean).join(' · '), detail: formatEducationDisplayDates(edu, ' – ') }))} />}
       {editing && <>
       {education.length === 0 && <p className="cv-empty-state">No education added yet. Include the most relevant qualification first.</p>}
       {education.map((edu, index) => (
@@ -1036,7 +1038,7 @@ function CertificationsEditor({
         >
           + Add certification
         </button>}{action}</>} />
-      {!editing && <CvReadItems empty="No certifications added yet." items={certifications.map((cert) => ({ title: cert.name, detail: [cert.issuer, cert.year].filter(Boolean).join(' · ') }))} />}
+      {!editing && <CvReadItems empty="No certifications added yet." items={certifications.map((cert) => ({ title: cert.name, detail: [cert.issuer, formatCvDate(cert.year)].filter(Boolean).join(' · ') }))} />}
       {editing && <>
       {certifications.length === 0 && <p className="cv-empty-state">No certifications yet. Add credentials that are relevant to your applications.</p>}
       {certifications.map((cert, index) => (

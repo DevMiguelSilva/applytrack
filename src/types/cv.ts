@@ -56,6 +56,44 @@ export interface CvEducation {
   year?: string
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function formatMonthYearToken(value: string): string | null {
+  const match = /^(\d{4})-(\d{1,2})$/.exec(value)
+  if (!match) return /^\d{4}$/.test(value) || /^present$/i.test(value) ? value : null
+
+  const month = Number(match[2])
+  if (Number(match[1]) === 0 || month < 1 || month > 12) return null
+  return `${MONTH_NAMES[month - 1]} ${match[1]}`
+}
+
+/** Format a month/year value or a recognized legacy date range for display only. */
+export function formatCvDate(value: string): string {
+  const single = formatMonthYearToken(value)
+  if (single !== null) return single
+
+  const range = /^(\d{4}(?:-\d{1,2})?|present)(\s+[-–—]\s+)(\d{4}(?:-\d{1,2})?|present)$/i.exec(value)
+  if (!range) return value
+
+  const start = formatMonthYearToken(range[1])
+  const end = formatMonthYearToken(range[3])
+  if (start === null || end === null) return value
+  return `${start}${range[2]}${end}`
+}
+
+/** Display education dates without changing the stored/native-input values. */
+export function formatEducationDisplayDates(edu: CvEducation, separator = ' - '): string {
+  const start = (edu.start || '').trim()
+  const end = (edu.end || '').trim()
+  if (start && end) return `${formatCvDate(start)}${separator}${formatCvDate(end)}`
+  if (start) return formatCvDate(start)
+  if (end) return formatCvDate(end)
+  return formatCvDate((edu.year || '').trim())
+}
+
 /** Display range for education (and migrate legacy `year` when needed). */
 export function formatEducationDates(edu: CvEducation): string {
   const start = (edu.start || '').trim()
