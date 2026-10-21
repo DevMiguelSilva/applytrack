@@ -2,10 +2,12 @@ import { DeleteDialog } from '../components/DeleteDialog'
 import { useAuth } from '../hooks/useAuth'
 import { TrashIcon } from '../components/TrashIcon'
 import { SectionHeader } from '../components/SectionHeader'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type SetStateAction } from 'react'
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { templateReferences } from '../lib/cvLibrary'
+import { cvItemRevisionMatches, cvItemSignature, cvItems, isUntouchedEmptyCvItem, removeCvItemById, type CvItem, type CvItemKind, type CvItemProvenance, type CvItemRemoval } from '../lib/cvItemDeletion'
 import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
 import { useMasterCv } from '../hooks/useMasterCv'
@@ -42,6 +44,35 @@ function joinContactLinks(links: ReturnType<typeof splitContactLinks>) {
   return [links.linkedin, links.portfolio, ...links.other].map((link) => link.trim()).filter(Boolean)
 }
 
+function cvItemRemovalCopy(kind: CvItemKind, item: CvItem) {
+  switch (kind) {
+    case 'skillGroup': {
+      const entry = item as CvSkillGroup
+      const label = entry.group.trim() && entry.group.trim() !== 'Group' ? entry.group.trim() : 'Untitled skill group'
+      return { type: 'skill group', label, hasChildren: entry.items.some((skill) => skill.trim()) }
+    }
+    case 'experience': {
+      const entry = item as CvExperience
+      const label = [entry.title.trim(), entry.company.trim() ? `at ${entry.company.trim()}` : ''].filter(Boolean).join(' ') || 'Untitled experience role'
+      return { type: 'experience role', label, hasChildren: entry.bullets.some((bullet) => bullet.text.trim() || bullet.tags.some((tag) => tag.trim())) }
+    }
+    case 'project': {
+      const entry = item as CvProject
+      return { type: 'project', label: entry.name.trim() || 'Untitled project', hasChildren: entry.bullets.some((bullet) => bullet.text.trim() || bullet.tags.some((tag) => tag.trim())) }
+    }
+    case 'education': {
+      const entry = item as CvEducation
+      const label = [entry.degree.trim(), entry.school.trim() ? `at ${entry.school.trim()}` : ''].filter(Boolean).join(' ') || 'Untitled education entry'
+      return { type: 'education entry', label, hasChildren: false }
+    }
+    case 'certification': {
+      const entry = item as CvCertification
+      const label = [entry.name.trim(), entry.issuer.trim() ? `(${entry.issuer.trim()})` : ''].filter(Boolean).join(' ') || 'Untitled certification'
+      return { type: 'certification', label, hasChildren: false }
+    }
+  }
+}
+
 function MonthField({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) {
   const monthValue = /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : ''
   return <label className="cv-entry-field"><span>{label}</span><input
@@ -55,6 +86,7 @@ function MonthField({ label, value, onChange, disabled = false }: { label: strin
 }
 
 export function MasterCvPage() {
+  const location = useLocation()
   const {
     library,
     activeTrack,
@@ -64,7 +96,13 @@ export function MasterCvPage() {
     saveTemplate, getLabel, addTemplate, renameTemplate, deleteTemplate, loadError, reload,
   } = useMasterCv()
   const [editingTrack, setEditingTrack] = useState<CvTrack>(activeTrack)
-  const [draft, setDraft] = useState<MasterCv | null>(null)
+  const [draft, setDraftState] = useState<MasterCv | null>(null)
+  const draftRef = useRef<MasterCv | null>(null)
+  const setDraft = (value: SetStateAction<MasterCv | null>) => {
+    const next = typeof value === 'function' ? value(draftRef.current) : value
+    draftRef.current = next
+    setDraftState(() => next)
+  }
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const sectionSnapshot = useRef<MasterCv | null>(null)
   const editorForm = useRef<HTMLFormElement>(null)
@@ -89,6 +127,22 @@ export function MasterCvPage() {
   const deleteVersion = useRef(0)
   const [deletePending, setDeletePending] = useState(false)
   const [deleteError, setDeleteError] = useState<string|null>(null)
+  const itemProvenance = useRef(new Map<string, CvItemProvenance>())
+  const itemRevisions = useRef(new Map<string, number>())
+  const itemSession = useRef(0)
+  const [itemRemoval, setItemRemoval] = useState<CvItemRemoval | null>(null)
+  const [itemDeleteNotice, setItemDeleteNotice] = useState<string | null>(null)
+  const itemDeleteBusy = useRef(false)
+  const processedItemRemoval = useRef<CvItemRemoval | null>(null)
+  const resetItemEditorSession = useCallback(() => {
+    itemSession.current++
+    itemProvenance.current.clear()
+    itemRevisions.current.clear()
+    itemDeleteBusy.current = false
+    processedItemRemoval.current = null
+    setItemRemoval(null)
+    setItemDeleteNotice(null)
+  }, [])
   const invalidateDeletion=useCallback(()=>{deleteVersion.current++},[])
   useEffect(() => { deleteVersion.current++; deleteBusy.current=false; setDeleting(null); setDeletePending(false); return invalidateDeletion }, [account,invalidateDeletion])
   const closeDeletion = () => {
@@ -115,16 +169,119 @@ export function MasterCvPage() {
   useEffect(() => {
     setEditingTrack(activeTrack)
     setDraft(null)
+    resetItemEditorSession()
     setEditingSection(null)
     sectionSnapshot.current = null
     setPendingAttachment(undefined)
     setRename(null)
     setImportNote(null)
-  }, [activeTrack])
+  }, [activeTrack, resetItemEditorSession])
+
+  useEffect(() => {
+    resetItemEditorSession()
+  }, [account, resetItemEditorSession])
+
+  useEffect(() => {
+    resetItemEditorSession()
+  }, [location.pathname, library.updatedAt, resetItemEditorSession])
 
   const cv = draft ?? getCv(editingTrack)
   const attachment = library.attachments[editingTrack]
   const setCv = (next: MasterCv) => setDraft(next)
+
+  const itemKey = (kind: CvItemKind, id: string) => `${kind}:${id}`
+  const registerNewItem = (kind: CvItemKind, item: CvItem) => {
+    const key = itemKey(kind, item.id)
+    itemProvenance.current.set(key, {
+      account, track: editingTrack, session: itemSession.current,
+      initial: cvItemSignature(item), touched: false, revision: 0,
+    })
+    itemRevisions.current.set(key, 0)
+  }
+  const updateItems = <T extends CvItem>(kind: CvItemKind, nextItems: T[]) => {
+    const current = draftRef.current ?? getCv(editingTrack)!
+    const previousItems = cvItems(current, kind)
+    for (const previous of previousItems) {
+      const key = itemKey(kind, previous.id)
+      const next = nextItems.find((item) => item.id === previous.id)
+      if (next && cvItemSignature(previous) !== cvItemSignature(next)) {
+        const revision = (itemRevisions.current.get(key) ?? 0) + 1
+        itemRevisions.current.set(key, revision)
+        const provenance = itemProvenance.current.get(key)
+        if (provenance) { provenance.touched = true; provenance.revision = revision }
+      }
+    }
+    setDraft({ ...current, [kind === 'skillGroup' ? 'skills' : kind === 'experience' ? 'experience' : kind === 'project' ? 'projects' : kind === 'education' ? 'education' : 'certifications']: nextItems } as MasterCv)
+  }
+  const requestItemRemoval = (kind: CvItemKind, type: string, item: CvItem, label: string, hasChildren: boolean, trigger: HTMLElement | null) => {
+    if (locked || deleting) return
+    const current = draftRef.current ?? cv!
+    const key = itemKey(kind, item.id)
+    const provenance = itemProvenance.current.get(key)
+    const scope = { account, track: editingTrack, session: itemSession.current }
+    if (isUntouchedEmptyCvItem(item, provenance, scope)) {
+      const order = cvItems(current, kind).map((entry) => entry.id)
+      setDraft(removeCvItemById(current, kind, item.id))
+      itemProvenance.current.delete(key)
+      itemRevisions.current.delete(key)
+      setItemDeleteNotice(null)
+      focusAfterItemRemoval(kind, item.id, order)
+      return
+    }
+    setItemDeleteNotice(null)
+    processedItemRemoval.current = null
+    setItemRemoval({
+      account, track: editingTrack, libraryRevision: library.updatedAt, routePath: location.pathname,
+      section: editingSection ?? '', session: itemSession.current,
+      kind, type, id: item.id, revision: itemRevisions.current.get(key) ?? 0,
+      orderSignature: cvItems(current, kind).map((entry) => entry.id).join('\u0000'),
+      label, hasChildren, trigger,
+    })
+  }
+  const focusAfterItemRemoval = (kind: CvItemKind, removedId: string, oldOrder: string[]) => {
+    const oldIndex = oldOrder.indexOf(removedId)
+    const targetId = oldOrder[oldIndex + 1] ?? oldOrder[oldIndex - 1]
+    requestAnimationFrame(() => {
+      if (targetId) document.querySelector<HTMLElement>(`[data-cv-item-remove="${kind}:${CSS.escape(targetId)}"]`)?.focus()
+      else document.querySelector<HTMLElement>(`[data-cv-section-add="${kind}"]`)?.focus()
+    })
+  }
+  const closeItemRemoval = () => {
+    if (itemDeleteBusy.current) return
+    const trigger = itemRemoval?.trigger
+    setItemRemoval(null)
+    setItemDeleteNotice(null)
+    requestAnimationFrame(() => trigger?.isConnected && trigger.focus())
+  }
+  const confirmItemRemoval = () => {
+    const captured = itemRemoval
+    if (!captured || locked || itemDeleteBusy.current || processedItemRemoval.current === captured) return
+    const scopeMatches = captured.account === account && captured.track === editingTrack
+      && captured.section === editingSection && captured.session === itemSession.current
+      && captured.libraryRevision === library.updatedAt && captured.routePath === location.pathname
+    const current = draftRef.current ?? getCv(captured.track)!
+    const key = itemKey(captured.kind, captured.id)
+    if (!scopeMatches || !cvItemRevisionMatches(current, captured, itemRevisions.current.get(key) ?? 0)) {
+      setItemRemoval(null)
+      setItemDeleteNotice('This entry changed while confirmation was open. Reopen Remove to confirm its current contents.')
+      requestAnimationFrame(() => captured.trigger?.isConnected && captured.trigger.focus())
+      return
+    }
+    processedItemRemoval.current = captured
+    itemDeleteBusy.current = true
+    const order = cvItems(current, captured.kind).map((entry) => entry.id)
+    // Apply against the latest section draft inside the state update; this removes only
+    // the captured stable ID and keeps unrelated edits made since the modal opened.
+    const removeFromLatest = (latest: MasterCv | null) => removeCvItemById(latest ?? current, captured.kind, captured.id)
+    draftRef.current = removeFromLatest(draftRef.current)
+    setDraftState((latest) => removeFromLatest(latest))
+    itemProvenance.current.delete(key)
+    itemRevisions.current.delete(key)
+    itemDeleteBusy.current = false
+    setItemRemoval(null)
+    setItemDeleteNotice(null)
+    focusAfterItemRemoval(captured.kind, captured.id, order)
+  }
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -138,6 +295,7 @@ export function MasterCvPage() {
     await setActiveTrack(track, draft ? {track:editingTrack, cv:cleanMasterCvEntries(draft), attachment:pendingAttachment} : undefined)
     setDraft(null)
     setPendingAttachment(undefined)
+    resetItemEditorSession()
   })
 
   const handleSave = async (e: React.FormEvent) => {
@@ -149,11 +307,13 @@ export function MasterCvPage() {
       setPendingAttachment(undefined)
       setEditingSection(null)
       sectionSnapshot.current = null
+      resetItemEditorSession()
     })
   }
 
   const handleUpload = async (file: File | null) => {
     if (!file || !cv || busy || importing) return
+    resetItemEditorSession()
     const target = editingTrack
     const base = cv
     setImporting(true)
@@ -186,6 +346,7 @@ export function MasterCvPage() {
       await saveTemplate(target, cleanMasterCvEntries(next), importedAttachment)
       setDraft(null)
       setPendingAttachment(undefined)
+      resetItemEditorSession()
     } catch (err) {
       setImportError(getErrorMessage(err, 'Import failed. Your draft is still here.'))
     } finally {
@@ -206,6 +367,7 @@ export function MasterCvPage() {
     contact: { ...cv.contact, links: joinContactLinks({ ...splitContactLinks(cv.contact.links), ...patch }) },
   })
   const beginSectionEdit = (section: string) => {
+    resetItemEditorSession()
     sectionSnapshot.current = structuredClone(cv)
     setDraft(structuredClone(cv))
     setEditingSection(section)
@@ -225,6 +387,7 @@ export function MasterCvPage() {
     }
     sectionSnapshot.current = null
     setEditingSection(null)
+    resetItemEditorSession()
   }
   const sectionActions = (section: string) => editingSection === section
     ? <><button type="button" className={button} onClick={() => cancelSectionEdit(section)}>Cancel</button><button type="button" className="ui-button ui-primary" onClick={() => editorForm.current?.requestSubmit()}>Save section</button></>
@@ -257,6 +420,18 @@ export function MasterCvPage() {
         <p className="mt-3">{refs.jobs.length} linked Saved jobs; {refs.searches.length} linked searches.</p>
         {deleting === library.activeTrack && <p className="mt-3">Default for future new items: {getLabel(Object.keys(library.cvs).filter(id=>id!==deleting).sort()[0])}. Existing linked jobs and searches will not be reassigned.</p>}
       </DeleteDialog>
+      <DeleteDialog
+        open={Boolean(itemRemoval)}
+        title={`Remove ${itemRemoval?.type ?? 'entry'}?`}
+        pending={false}
+        confirmLabel="Remove"
+        pendingLabel="Remove"
+        onCancel={closeItemRemoval}
+        onConfirm={confirmItemRemoval}
+      >
+        {itemRemoval && <p>Remove ‘{itemRemoval.label}’ from this CV draft?{itemRemoval.hasChildren && <> This also removes its {itemRemoval.kind === 'skillGroup' ? 'skills' : 'highlights'}.</>} Save CV to keep this change.</p>}
+      </DeleteDialog>
+      {itemDeleteNotice && <p role="status" className="ui-helper legacy-size-text_sm">{itemDeleteNotice}</p>}
       <fieldset disabled={locked} className="cv-editor-form min-w-0">
       <section className="cv-import-panel">
         <div className="cv-import-copy"><button type="button" className="cv-import-icon" aria-label="Choose a resume file" disabled={locked} onClick={() => resumeFileInput.current?.click()}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button><div><h2 className="ui-section-title">Start with your resume</h2><p className="ui-body text-brand-muted">Import a DOCX or text file to prefill this CV.</p></div></div>
@@ -352,25 +527,32 @@ export function MasterCvPage() {
 
         <ExperienceEditor
           experience={cv.experience}
-          onChange={(experience) => setCv({ ...cv, experience })}
+          onChange={(experience) => updateItems('experience', experience)}
+          onAdd={(item) => registerNewItem('experience', item)}
+          onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('experience', item); requestItemRemoval('experience', copy.type, item, copy.label, copy.hasChildren, trigger) }}
           editing={editingSection === 'experience'} action={sectionActions('experience')}
         />
-        <SkillGroupsEditor skills={cv.skills} onChange={(skills) => setCv({ ...cv, skills })} editing={editingSection === 'skills'} action={sectionActions('skills')} />
+        <SkillGroupsEditor skills={cv.skills} onChange={(skills) => updateItems('skillGroup', skills)} onAdd={(item) => registerNewItem('skillGroup', item)} onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('skillGroup', item); requestItemRemoval('skillGroup', copy.type, item, copy.label, copy.hasChildren, trigger) }} editing={editingSection === 'skills'} action={sectionActions('skills')} />
         <EducationEditor
           education={cv.education}
           certifications={cv.certifications ?? []}
           editing={editingSection === 'education'} action={sectionActions('education')}
-          onChange={(education) => setCv({ ...cv, education })}
+          onChange={(education) => updateItems('education', education)}
+          onAdd={(item) => registerNewItem('education', item)}
+          onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('education', item); requestItemRemoval('education', copy.type, item, copy.label, copy.hasChildren, trigger) }}
           onSplitCerts={() => {
             const split = splitEducationAndCerts(cv.education, cv.certifications ?? [])
-            setCv({ ...cv, education: split.education, certifications: split.certifications })
+            updateItems('education', split.education)
+            updateItems('certification', split.certifications)
           }}
         />
-        <ProjectsEditor projects={cv.projects} onChange={(projects) => setCv({ ...cv, projects })} editing={editingSection === 'projects'} action={sectionActions('projects')} />
+        <ProjectsEditor projects={cv.projects} onChange={(projects) => updateItems('project', projects)} onAdd={(item) => registerNewItem('project', item)} onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('project', item); requestItemRemoval('project', copy.type, item, copy.label, copy.hasChildren, trigger) }} editing={editingSection === 'projects'} action={sectionActions('projects')} />
         <CertificationsEditor
           certifications={cv.certifications ?? []}
           editing={editingSection === 'certifications'} action={sectionActions('certifications')}
-          onChange={(certifications) => setCv({ ...cv, certifications })}
+          onChange={(certifications) => updateItems('certification', certifications)}
+          onAdd={(item) => registerNewItem('certification', item)}
+          onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('certification', item); requestItemRemoval('certification', copy.type, item, copy.label, copy.hasChildren, trigger) }}
         />
 
       </form>
@@ -407,11 +589,15 @@ function CvSectionHeading({
 function SkillGroupsEditor({
   skills,
   onChange,
+  onAdd,
+  onRemove,
   editing,
   action,
 }: {
   skills: CvSkillGroup[]
   onChange: (skills: CvSkillGroup[]) => void
+  onAdd: (item: CvSkillGroup) => void
+  onRemove: (item: CvSkillGroup, trigger: HTMLElement | null) => void
   editing: boolean
   action: ReactNode
 }) {
@@ -420,8 +606,9 @@ function SkillGroupsEditor({
       <CvSectionHeading step="03" title="Skills" description="Organize the skills you want to highlight." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
+          data-cv-section-add="skillGroup"
           onClick={() =>
-            onChange([...skills, { id: crypto.randomUUID(), group: 'Group', items: [] }])
+            { const item = { id: crypto.randomUUID(), group: 'Group', items: [] }; onAdd(item); onChange([...skills, item]) }
           }
         >
           + Add group
@@ -437,7 +624,8 @@ function SkillGroupsEditor({
             </p>
             <CvDeleteButton
               label={`Remove ${group.group || 'skill'} group`}
-              onClick={() => onChange(skills.filter((g) => g.id !== group.id))}
+              itemKey={`skillGroup:${group.id}`}
+              onClick={(trigger) => onRemove(group, trigger)}
             />
           </div>
           <div className="cv-skill-fields">
@@ -477,14 +665,15 @@ function SkillGroupsEditor({
   )
 }
 
-function CvDeleteButton({ onClick, label, disabled, confirm = false }: { onClick: () => void; label: string; disabled?: boolean; confirm?: boolean }) {
+function CvDeleteButton({ onClick, label, disabled, confirm = false, itemKey }: { onClick: (trigger: HTMLButtonElement) => void; label: string; disabled?: boolean; confirm?: boolean; itemKey?: string }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => onClick(event.currentTarget)}
       disabled={disabled}
       aria-label={label}
       title={label}
+      data-cv-item-remove={itemKey}
       className={confirm ? "ui-button ui-danger" : "ui-button ui-danger-quiet ui-icon-button ui-compact"}
     >
       <TrashIcon />{confirm && <span>{label}</span>}
@@ -495,11 +684,15 @@ function CvDeleteButton({ onClick, label, disabled, confirm = false }: { onClick
 function ExperienceEditor({
   experience,
   onChange,
+  onAdd,
+  onRemove,
   editing,
   action,
 }: {
   experience: CvExperience[]
   onChange: (experience: CvExperience[]) => void
+  onAdd: (item: CvExperience) => void
+  onRemove: (item: CvExperience, trigger: HTMLElement | null) => void
   editing: boolean
   action: ReactNode
 }) {
@@ -508,10 +701,9 @@ function ExperienceEditor({
       <CvSectionHeading step="02" title="Experience" description="Add roles and the results you delivered." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
-          onClick={() =>
-            onChange([
-              ...experience,
-              {
+          data-cv-section-add="experience"
+          onClick={() => {
+            const item: CvExperience = {
                 id: crypto.randomUUID(),
                 company: '',
                 title: '',
@@ -520,9 +712,10 @@ function ExperienceEditor({
                 end: '',
                 current: false,
                 bullets: [{ id: crypto.randomUUID(), text: '', tags: [] }],
-              },
-            ])
-          }
+              }
+            onAdd(item)
+            onChange([...experience, item])
+          }}
         >
           + Add role
         </button>}{action}</>} />
@@ -537,7 +730,8 @@ function ExperienceEditor({
             </p>
             <CvDeleteButton
               label="Remove role"
-              onClick={() => onChange(experience.filter((e) => e.id !== exp.id))}
+              itemKey={`experience:${exp.id}`}
+              onClick={(trigger) => onRemove(exp, trigger)}
             />
           </div>
           <div className="cv-experience-fields">
@@ -626,11 +820,15 @@ function ExperienceEditor({
 function ProjectsEditor({
   projects,
   onChange,
+  onAdd,
+  onRemove,
   editing,
   action,
 }: {
   projects: CvProject[]
   onChange: (projects: CvProject[]) => void
+  onAdd: (item: CvProject) => void
+  onRemove: (item: CvProject, trigger: HTMLElement | null) => void
   editing: boolean
   action: ReactNode
 }) {
@@ -639,17 +837,17 @@ function ProjectsEditor({
       <CvSectionHeading step="05" title="Projects" description="Showcase selected work, links, and outcomes." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
-          onClick={() =>
-            onChange([
-              ...projects,
-              {
+          data-cv-section-add="project"
+          onClick={() => {
+            const item: CvProject = {
                 id: crypto.randomUUID(),
                 name: '',
                 url: '',
                 bullets: [{ id: crypto.randomUUID(), text: '', tags: [] }],
-              },
-            ])
-          }
+              }
+            onAdd(item)
+            onChange([...projects, item])
+          }}
         >
           + Add project
         </button>}{action}</>} />
@@ -664,7 +862,8 @@ function ProjectsEditor({
             </p>
             <CvDeleteButton
               label="Remove project"
-              onClick={() => onChange(projects.filter((p) => p.id !== project.id))}
+              itemKey={`project:${project.id}`}
+              onClick={(trigger) => onRemove(project, trigger)}
             />
           </div>
           <div className="cv-project-fields">
@@ -719,6 +918,8 @@ function EducationEditor({
   education,
   certifications,
   onChange,
+  onAdd,
+  onRemove,
   onSplitCerts,
   editing,
   action,
@@ -726,6 +927,8 @@ function EducationEditor({
   education: CvEducation[]
   certifications: CvCertification[]
   onChange: (education: CvEducation[]) => void
+  onAdd: (item: CvEducation) => void
+  onRemove: (item: CvEducation, trigger: HTMLElement | null) => void
   onSplitCerts: () => void
   editing: boolean
   action: ReactNode
@@ -748,12 +951,8 @@ function EducationEditor({
           <button
             type="button"
             className="ui-button ui-secondary cv-add-button"
-            onClick={() =>
-              onChange([
-                ...education,
-                { id: crypto.randomUUID(), school: '', degree: '', start: '', end: '' },
-              ])
-            }
+            data-cv-section-add="education"
+            onClick={() => { const item: CvEducation = { id: crypto.randomUUID(), school: '', degree: '', start: '', end: '' }; onAdd(item); onChange([...education, item]) }}
           >
             + Add education
           </button>
@@ -769,7 +968,8 @@ function EducationEditor({
             </p>
             <CvDeleteButton
               label="Remove education"
-              onClick={() => onChange(education.filter((e) => e.id !== edu.id))}
+              itemKey={`education:${edu.id}`}
+              onClick={(trigger) => onRemove(edu, trigger)}
             />
           </div>
           <div className="cv-education-fields">
@@ -814,11 +1014,15 @@ function EducationEditor({
 function CertificationsEditor({
   certifications,
   onChange,
+  onAdd,
+  onRemove,
   editing,
   action,
 }: {
   certifications: CvCertification[]
   onChange: (certifications: CvCertification[]) => void
+  onAdd: (item: CvCertification) => void
+  onRemove: (item: CvCertification, trigger: HTMLElement | null) => void
   editing: boolean
   action: ReactNode
 }) {
@@ -827,12 +1031,8 @@ function CertificationsEditor({
       <CvSectionHeading step="06" title="Certifications" description="Track licenses and professional credentials." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
-          onClick={() =>
-            onChange([
-              ...certifications,
-              { id: crypto.randomUUID(), name: '', issuer: '', year: '' },
-            ])
-          }
+          data-cv-section-add="certification"
+          onClick={() => { const item: CvCertification = { id: crypto.randomUUID(), name: '', issuer: '', year: '' }; onAdd(item); onChange([...certifications, item]) }}
         >
           + Add certification
         </button>}{action}</>} />
@@ -847,7 +1047,8 @@ function CertificationsEditor({
             </p>
             <CvDeleteButton
               label="Remove certification"
-              onClick={() => onChange(certifications.filter((c) => c.id !== cert.id))}
+              itemKey={`certification:${cert.id}`}
+              onClick={(trigger) => onRemove(cert, trigger)}
             />
           </div>
           <div className="cv-certification-fields">
