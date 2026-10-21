@@ -2,9 +2,10 @@ import { CopyFeedback } from '../lib/copyFeedback'
 import { resolveJobCv } from '../lib/cvLibrary'
 import { jobHasLiveSource } from '../lib/cvSources'
 import { emptyStoredCv, storedCvContent } from '../lib/storedCv'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
+import { gapCvSelectionKey, GapCvRefreshTracker, refreshGapReportForCvChange } from '../lib/gapCheckRefresh'
 import { getGapCheckMode, hasGapContent } from '../lib/gapCheckAvailability'
 import { getErrorMessage } from '../lib/errorMessage'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
@@ -145,11 +146,14 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
   useEffect(() => () => feedback.dispose(), [feedback])
   const copyLetter = () => feedback.copy(coverLetter, text => navigator.clipboard.writeText(text))
 
-  const claimedSkills = job.claimedSkills ?? []
+  const claimedSkills = useMemo(() => job.claimedSkills ?? [], [job.claimedSkills])
   const skillsLocked = !canGenerate || job.status !== 'saved' || Boolean(job.deletedAt)
   const gapCheckMode = getGapCheckMode(job.status, canGenerate, Boolean(job.deletedAt), existing?.gapReport)
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
+  const cvSelectionKey = gapCvSelectionKey(job.cvTrack, masterCvSearchText(masterCv))
+  const gapRefreshTracker = useRef<GapCvRefreshTracker | null>(null)
+  if (!gapRefreshTracker.current) gapRefreshTracker.current = new GapCvRefreshTracker(cvSelectionKey)
 
   const setPanelOpen = (id: PanelId, open: boolean) => {
     setOpenPanels((prev) => {
@@ -160,13 +164,33 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
     })
   }
 
-  const computeGap = (claimed: string[]) =>
+  const computeGap = useCallback((claimed: string[]) =>
     buildGapReport(
       `${job.role}\n${job.jobDescription}`,
       job.extractedSkills,
       masterCvSearchText(masterCv),
       claimed
+    ), [job.role, job.jobDescription, job.extractedSkills, masterCv])
+
+  useEffect(() => {
+    const refresh = refreshGapReportForCvChange(
+      gapRefreshTracker.current!,
+      cvSelectionKey,
+      showGap && !skillsLocked,
+      claimedSkills,
+      computeGap,
     )
+    if (!refresh) return
+
+    const { version, report: gap } = refresh
+    setGapReport(gap)
+    setError(null)
+    void updateJob(job.id, { matchScore: gap.coveragePercent }).catch((err) => {
+      if (gapRefreshTracker.current?.isLatest(version)) {
+        setError(getErrorMessage(err, 'Could not update the CV match score'))
+      }
+    })
+  }, [cvSelectionKey, showGap, skillsLocked, job.id, claimedSkills, computeGap, updateJob])
 
   const run = async (action: string, fn: () => Promise<void>) => {
     setLoading(action)
