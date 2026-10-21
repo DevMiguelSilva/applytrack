@@ -80,7 +80,9 @@ test('deletion archives Saved references, pauses explicit searches and preserves
   assert.deepEqual(next.searches[1],searches[1]);assert.equal(next.inbox[0].matchedTrack,null);assert.equal(next.inbox[0].needsCvSelection,true);assert.deepEqual(next.inbox[1],inbox[1])
   assert.throws(()=>removeCvTemplate(next.library,'frontend',[],[],[]),/at least one/)
   const snapshot=createEmptyMasterCv({summary:'Submitted original'})
-  assert.equal(resolveJobCv(next.library,jobs[1],{masterCvSnapshot:snapshot}),snapshot)
+  for (const status of ['applied', 'interview', 'offer', 'rejected']) {
+    assert.equal(resolveJobCv(next.library,{...jobs[1],status},{masterCvSnapshot:snapshot}),snapshot)
+  }
   assert.equal(resolveJobCv(next.library,jobs[1]),null);assert.equal(resolveJobCv(next.library,next.jobs[0]),null)
 })
 test('Auto scores every current template and keeps legacy tie preference', () => {

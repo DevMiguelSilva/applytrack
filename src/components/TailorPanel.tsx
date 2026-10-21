@@ -5,6 +5,7 @@ import { emptyStoredCv, storedCvContent } from '../lib/storedCv'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
+import { getGapCheckMode, hasGapContent } from '../lib/gapCheckAvailability'
 import { getErrorMessage } from '../lib/errorMessage'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
 import type { GapReport, GapSkill, MasterCv } from '../types/cv'
@@ -25,14 +26,6 @@ type PanelId = 'gap' | 'tailor' | 'cover'
 
 interface TailorPanelProps {
   job: JobApplication
-}
-
-function hasGapContent(gap: GapReport): boolean {
-  return (
-    gap.matchedKeywords.length > 0 ||
-    (gap.claimedKeywords?.length ?? 0) > 0 ||
-    gap.missingKeywords.length > 0
-  )
 }
 
 const quietBtn =
@@ -154,6 +147,7 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
 
   const claimedSkills = job.claimedSkills ?? []
   const skillsLocked = !canGenerate || job.status !== 'saved' || Boolean(job.deletedAt)
+  const gapCheckMode = getGapCheckMode(job.status, canGenerate, Boolean(job.deletedAt), existing?.gapReport)
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
 
@@ -229,7 +223,11 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
       setPanelOpen('gap', false)
       return
     }
-    void runGap()
+    if (gapCheckMode === 'view') {
+      setPanelOpen('gap', true)
+      return
+    }
+    if (gapCheckMode === 'run') void runGap()
   }
 
   const skillExplanation = skillExplanations.get(job.id)
@@ -378,15 +376,17 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
       </div>
 
       <div className="m-actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <button
-          type="button"
-          data-role="quiet"
-          disabled={!!loading || skillsLocked}
-          onClick={onGapClick}
-          className="ui-button ui-primary m-action"
-        >
-          {loading === 'gap' ? 'Checking…' : 'Gap check'}
-        </button>
+        {gapCheckMode !== 'hidden' && (
+          <button
+            type="button"
+            data-role="quiet"
+            disabled={!!loading || gapCheckMode === 'disabled'}
+            onClick={onGapClick}
+            className="ui-button ui-primary m-action"
+          >
+            {loading === 'gap' ? 'Checking…' : gapCheckMode === 'view' ? (showGap ? 'Hide gap check' : 'View gap check') : 'Gap check'}
+          </button>
+        )}
         <button
           type="button"
           data-role="primary"
@@ -410,7 +410,7 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
       </div>}
       {copied > 0 && <div key={copied} role="status" aria-live="polite" className="copy-confirmation fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 max-w-[calc(100%-2rem)] text-center rounded-lg border border-brand-line bg-white px-4 py-3 ui-helper font-medium !text-brand-ink shadow-sm lg:bottom-6 legacy-size-text_sm">Cover letter copied</div>}
 
-      {showGap && hasGapContent(gapReport) && (
+      {showGap && hasGapContent(gapReport) && gapCheckMode !== 'hidden' && gapCheckMode !== 'disabled' && (
         <div className={nested}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className=" ui-label legacy-size-text_sm">
