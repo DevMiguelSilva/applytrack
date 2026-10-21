@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import type { JobApplication } from '../types/job'
 import { jobSourceLabel, latestInterviewFollowUp } from '../types/job'
 import { BOARD_TONE } from '../lib/boardTone'
+import type { SavedJobIndicators } from '../lib/savedJobIndicators'
 import { boardLook } from './BoardLook'
 
 interface JobCardProps {
@@ -13,6 +14,7 @@ interface JobCardProps {
   onDragEnd?: () => void
   trashMode?: boolean
   onRestore?: (id: string) => void
+  savedIndicators?: SavedJobIndicators
 }
 
 export function JobCard({
@@ -22,6 +24,7 @@ export function JobCard({
   onDragEnd,
   trashMode,
   onRestore,
+  savedIndicators,
 }: JobCardProps) {
   const openPurge = usePermanentDelete()
   const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
@@ -68,6 +71,20 @@ export function JobCard({
           )}
           {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
             <p className="truncate pt-1 ui-meta font-semibold text-emerald-700 legacy-size-text__11px_">Interview booked</p>
+          )}
+          {job.status === 'saved' && (savedIndicators?.resumeReady || savedIndicators?.matchPercent != null) && (
+            <div role="group" aria-label="Resume readiness and match" className="flex flex-wrap gap-1.5 pt-1">
+              {savedIndicators.resumeReady && (
+                <span className="inline-flex items-center rounded-full bg-[#e7f4ef] px-2 py-0.5 ui-meta font-medium text-[#1f4d38]">
+                  Resume ready
+                </span>
+              )}
+              {savedIndicators.matchPercent != null && (
+                <span className="inline-flex items-center rounded-full border border-[#dce8e4] bg-white px-2 py-0.5 ui-meta font-medium text-[#4d635c]">
+                  {savedIndicators.matchPercent}% match
+                </span>
+              )}
+            </div>
           )}
           {!job.jdComplete && !job.needsRescore && (
             <p className="pt-1 ui-meta font-semibold text-[#8a6230] legacy-size-text__11px_">Description incomplete</p>
