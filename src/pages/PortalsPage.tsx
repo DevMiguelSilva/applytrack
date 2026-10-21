@@ -1,7 +1,7 @@
 import { SectionHeader } from '../components/SectionHeader'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { IconAction } from '../components/IconAction'
-import { attachCardDragGhost } from '../components/JobCard'
+import { attachCardDragGhost } from '../components/attachCardDragGhost'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { usePortalFeeds } from '../hooks/usePortalFeeds'
 import {

@@ -401,9 +401,10 @@ export function parseDualTrackReason(reasons: string[]): { frontend: number; pow
 export function scoreJobMatch(
   jobText: string,
   candidateSkills: string[],
-  _roleHint = '',
+  roleHint = '',
   cvText = ''
 ): MatchResult {
+  void roleHint // Retained for compatibility with existing callers.
   // If cvText provided: honest JD→CV coverage using skills found in JD
   if (cvText.trim()) {
     return scoreJdCoverage(jobText, cvText, [], candidateSkills)

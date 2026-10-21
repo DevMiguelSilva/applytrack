@@ -47,8 +47,12 @@ const sectionBorder: IBorderOptions = {
 
 /** Remove illegal path characters; keep spaces. */
 function safeNameKeepSpaces(value: string): string {
-  return value
-    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '')
+  return Array.from(value)
+    .filter((character) => {
+      const code = character.charCodeAt(0)
+      return !/[<>:"/\\|?*]/.test(character) && code >= 0x20
+    })
+    .join('')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80)

@@ -47,7 +47,7 @@ export function computeStreak(
 ): number {
   if (feeds.length === 0) return 0
 
-  let cursor = new Date(`${today}T12:00:00`)
+  const cursor = new Date(`${today}T12:00:00`)
   // If today isn't complete yet, streak can still count through yesterday
   if (!isDayComplete(daysByDate.get(today), feeds, today)) {
     cursor.setDate(cursor.getDate() - 1)
