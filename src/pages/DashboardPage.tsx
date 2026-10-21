@@ -22,8 +22,6 @@ import {
 } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
-import { useMasterCv } from '../hooks/useMasterCv'
-import { getSavedJobIndicators } from '../lib/savedJobIndicators'
 
 type EndColumn = 'offer' | 'rejected' | 'trash'
 
@@ -56,8 +54,7 @@ function hitColumnLabel(trashed: boolean, job: JobApplication): string {
 export function DashboardPage() {
   const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, loading } =
     useJobs()
-  const { getForJob, docs: tailoredDocs, loading: tailoredDocsLoading } = useTailoredDocs()
-  const { library: cvLibrary, loading: cvLibraryLoading, loadError: cvLibraryError } = useMasterCv()
+  const { getForJob } = useTailoredDocs()
   const narrow = useNarrowBoard()
   const [endColumn, setEndColumn] = useState<EndColumn>('offer')
   const [mobileColumn, setMobileColumn] = useState<BoardColumn>('saved')
@@ -74,24 +71,6 @@ export function DashboardPage() {
     status,
     count: activeJobs.filter((j) => j.status === status).length,
   }))
-
-  const savedJobIndicators = useMemo(() => {
-    const docsByJob = new Map(tailoredDocs.map((doc) => [doc.jobApplicationId, doc]))
-    return Object.fromEntries(
-      activeJobs
-        .filter((job) => job.status === 'saved')
-        .map((job) => [
-          job.id,
-          getSavedJobIndicators(
-            job,
-            cvLibrary,
-            docsByJob.get(job.id),
-            !tailoredDocsLoading,
-            !cvLibraryLoading && !cvLibraryError
-          )!,
-        ])
-    )
-  }, [activeJobs, tailoredDocs, tailoredDocsLoading, cvLibrary, cvLibraryLoading, cvLibraryError])
 
   // Include trashed applies so history on the yearly streak stays intact
   const applyCounts = useMemo(() => buildApplyCountsByDate(jobs), [jobs])
@@ -282,7 +261,6 @@ export function DashboardPage() {
               moveJob(id, status)
             }}
             columns={boardColumns}
-            savedIndicators={savedJobIndicators}
             trashedJobs={trashedJobs}
             onRestoreJob={restoreJob}
           />
