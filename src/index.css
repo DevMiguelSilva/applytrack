@@ -178,6 +178,7 @@ html { scrollbar-gutter: stable; }
 @media (max-width: 639px) {
   .m-action-row {
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 1rem;
   }
