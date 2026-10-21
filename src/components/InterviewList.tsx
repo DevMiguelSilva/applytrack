@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { IconAction } from './IconAction'
+import { TrashIcon } from './TrashIcon'
 import { formControlClass } from '../lib/formUi'
 import { getErrorMessage } from '../lib/errorMessage'
 import {
@@ -159,7 +160,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                     )
                   ) : (
                     <>
-                      <IconAction label={round.done ? 'Done' : 'Mark done'} pressed={round.done} primary disabled={saving}
+                      <IconAction label="Done" pressed={round.done} successToggle disabled={saving}
                         onClick={() => void persist(interviews.map((item) => item.id === round.id ? { ...item, done: !item.done } : item))}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" /></svg>
                       </IconAction>
@@ -167,7 +168,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="m16 3 5 5L8 21H3v-5L16 3Z" /></svg>
                       </IconAction>
                       <IconAction label="Remove" danger disabled={saving} onClick={() => void persist(interviews.filter((item) => item.id !== round.id))}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></svg>
+                        <TrashIcon />
                       </IconAction>
                     </>
                   )}

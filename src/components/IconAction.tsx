@@ -3,6 +3,7 @@ interface IconActionProps {
   pressed?: boolean
   danger?: boolean
   primary?: boolean
+  successToggle?: boolean
   busy?: boolean
   disabled?: boolean
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
@@ -10,7 +11,7 @@ interface IconActionProps {
 }
 
 /** Compact icon action used by editable list rows. */
-export function IconAction({ label, pressed, danger, primary, busy, disabled, onClick, children }: IconActionProps) {
+export function IconAction({ label, pressed, danger, primary, successToggle, busy, disabled, onClick, children }: IconActionProps) {
   return (
     <button
       type="button"
@@ -18,7 +19,7 @@ export function IconAction({ label, pressed, danger, primary, busy, disabled, on
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className={`ui-icon-action ${danger ? 'ui-icon-action-danger' : primary ? 'ui-icon-action-primary' : ''}`}
+      className={`ui-icon-action ${danger ? 'ui-icon-action-danger' : primary ? 'ui-icon-action-primary' : ''} ${successToggle ? 'ui-icon-action-success-toggle' : ''}`}
     >
       <span className="ui-icon-action-box">
         {children}
