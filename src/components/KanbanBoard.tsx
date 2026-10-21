@@ -5,7 +5,8 @@ import { STATUS_CONFIG } from '../types/job'
 import { filterJobsBySearch } from '../lib/jobSearch'
 import type { SavedJobIndicators } from '../lib/savedJobIndicators'
 import { boardLook } from './BoardLook'
-import { attachCardDragGhost, JobCard } from './JobCard'
+import { attachCardDragGhost } from './attachCardDragGhost'
+import { JobCard } from './JobCard'
 
 function ColumnHead({ title, count }: { title: string; count: number }) {
   return (

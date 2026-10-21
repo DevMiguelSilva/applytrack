@@ -55,7 +55,8 @@ function normalizeJob(
 ): JobApplication {
   const status = job.status ?? 'saved'
   const updatedAt = job.updatedAt ?? createEmptyJob().updatedAt
-  const { interviewDate, interviewStage: _interviewStage, ...rest } = job
+  const { interviewDate, ...rest } = job
+  delete rest.interviewStage
   return {
     ...createEmptyJob(),
     ...rest,
@@ -385,5 +386,3 @@ export function useJobs() {
   if (!context) throw new Error('useJobs must be used within JobsProvider')
   return context
 }
-
-export { createEmptyJob }

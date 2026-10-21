@@ -29,7 +29,7 @@ export function computeApplyStreak(
   countsByDate: Map<string, number>,
   today = localDateKey()
 ): number {
-  let cursor = new Date(`${today}T12:00:00`)
+  const cursor = new Date(`${today}T12:00:00`)
   if ((countsByDate.get(today) ?? 0) === 0) {
     cursor.setDate(cursor.getDate() - 1)
   }

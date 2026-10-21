@@ -1,5 +1,4 @@
 import { boardLook } from './BoardLook'
-import { backLinkClass } from '../lib/appUi'
 
 interface PageHeroProps {
   label?: string
@@ -23,5 +22,3 @@ export function PageHero({ label, title, description, actions }: PageHeroProps) 
     </section>
   )
 }
-
-export { backLinkClass }
