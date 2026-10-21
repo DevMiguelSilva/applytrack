@@ -101,6 +101,14 @@ textarea.ui-field { height: auto; resize: vertical; }
 @media (max-width: 639px) { .ui-header-actions { width: 100%; } .ui-header-actions > .m-actions { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .ui-button, .ui-filter, .ui-field, .ui-status-button { transition: none; } }
 
+/* iPhone Safari zooms the page when focused text controls use type below 16px. */
+@media (max-width: 639px) {
+  .ui-app input:not([type='button']):not([type='checkbox']):not([type='color']):not([type='file']):not([type='hidden']):not([type='image']):not([type='radio']):not([type='range']):not([type='reset']):not([type='submit']),
+  .ui-app textarea {
+    font-size: 16px !important;
+  }
+}
+
 .ui-surface { border: 1px solid var(--ui-line); border-radius: 20px; background: white; }
 .ui-empty { border-style: dashed; }
 .ui-app.mobile-app-shell { background: var(--ui-canvas); }
