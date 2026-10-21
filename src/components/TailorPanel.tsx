@@ -2,8 +2,7 @@ import { CopyFeedback } from '../lib/copyFeedback'
 import { resolveJobCv } from '../lib/cvLibrary'
 import { jobHasLiveSource } from '../lib/cvSources'
 import { emptyStoredCv, storedCvContent } from '../lib/storedCv'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { explainSkill } from '../api/gemini'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
 import { getErrorMessage } from '../lib/errorMessage'
@@ -18,6 +17,7 @@ import type { JobApplication } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoring } from '../hooks/useTailoring'
+import { useSkillExplanations } from '../hooks/skillExplanationsContext'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { LoadingSpinner } from './LoadingSpinner'
 
@@ -86,18 +86,21 @@ function SkillAnswer({
   loading,
   error,
   summary,
+  onRetry,
 }: {
   loading: boolean
   error: string | null
   summary: string | null
+  onRetry: () => void
 }) {
   return (
     <div className="mt-2 ui-body text-brand-ink">
       {loading && <p className="text-brand-muted">Looking it up…</p>}
       {error && (
-        <p className="ui-helper !text-red-700" role="alert">
-          {error}
-        </p>
+        <div>
+          <p className="ui-helper !text-red-700" role="alert">{error}</p>
+          <button type="button" className="ui-button ui-secondary mt-2 legacy-size-text_sm" onClick={onRetry}>Try again</button>
+        </div>
       )}
       {summary && !loading && <p>{summary}</p>}
     </div>
@@ -120,6 +123,7 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
   const { updateJob } = useJobs()
   const { getForJob } = useTailoredDocs()
   const { tasks, start, retrySave } = useTailoring()
+  const skillExplanations = useSkillExplanations()
   const task = tasks[job.id]
   const generating = task?.phase === 'running' || task?.phase === 'saving'
   const existing = getForJob(job.id)
@@ -228,50 +232,18 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
     void runGap()
   }
 
-  const explainCache = useRef(new Map<string, string>())
-  const explainRequest = useRef(0)
-  const [explainSkillName, setExplainSkillName] = useState<string | null>(null)
-  const [explainLoading, setExplainLoading] = useState(false)
-  const [explainError, setExplainError] = useState<string | null>(null)
-  const [explanation, setExplanation] = useState<string | null>(null)
-
-  const closeExplanation = () => {
-    explainRequest.current += 1
-    setExplainSkillName(null)
-    setExplainLoading(false)
-    setExplainError(null)
-  }
-
-  const lookupSkill = async (skill: string) => {
-    if (explainSkillName === skill) {
-      closeExplanation()
-      return
-    }
-    const request = ++explainRequest.current
-    setExplainSkillName(skill)
-    setExplainError(null)
-    const cached = explainCache.current.get(skill)
-    if (cached) {
-      setExplanation(cached)
-      setExplainLoading(false)
-      return
-    }
-    setExplanation(null)
-    setExplainLoading(true)
-    try {
-      const result = (await explainSkill(skill)).trim()
-      if (request !== explainRequest.current) return
-      if (!result) throw new Error('No explanation came back')
-      explainCache.current.set(skill, result)
-      setExplanation(result)
-    } catch (err) {
-      if (request !== explainRequest.current) return
-      setExplanation(null)
-      setExplainError(getErrorMessage(err, 'Could not look that up'))
-    } finally {
-      if (request === explainRequest.current) setExplainLoading(false)
-    }
-  }
+  const skillExplanation = skillExplanations.get(job.id)
+  const explainSkillName = skillExplanation?.skill ?? null
+  useEffect(() => {
+    if (!explainSkillName) return
+    setOpenPanels((prev) => {
+      if (prev.has('gap')) return prev
+      const next = new Set(prev)
+      next.add('gap')
+      return next
+    })
+  }, [explainSkillName])
+  const lookupSkill = (skill: string) => skillExplanations.toggle(job.id, skill)
 
   const onTailorClick = () => {
     if (loading) return
@@ -522,9 +494,10 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
                     <p className="mt-0.5 ui-helper text-brand-muted legacy-size-text_sm">{baseFor(row)}</p>
                     {explainSkillName === row.skill && (
                       <SkillAnswer
-                        loading={explainLoading}
-                        error={explainError}
-                        summary={explanation}
+                        loading={skillExplanation?.status === 'loading'}
+                        error={skillExplanation?.error ?? null}
+                        summary={skillExplanation?.summary ?? null}
+                        onRetry={() => skillExplanations.retry(job.id, row.skill)}
                       />
                     )}
                   </li>
@@ -570,9 +543,10 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
                           <tr>
                             <td colSpan={4} className="pb-3">
                               <SkillAnswer
-                                loading={explainLoading}
-                                error={explainError}
-                                summary={explanation}
+                                loading={skillExplanation?.status === 'loading'}
+                                error={skillExplanation?.error ?? null}
+                                summary={skillExplanation?.summary ?? null}
+                                onRetry={() => skillExplanations.retry(job.id, row.skill)}
                               />
                             </td>
                           </tr>
