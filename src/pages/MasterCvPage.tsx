@@ -93,7 +93,7 @@ export function MasterCvPage() {
     library,
     activeTrack,
     loading,
-    setActiveTrack,
+    setDefaultTrack,
     getCv,
     saveTemplate, getLabel, addTemplate, renameTemplate, deleteTemplate, loadError, reload,
   } = useMasterCv()
@@ -129,6 +129,7 @@ export function MasterCvPage() {
   const deleteVersion = useRef(0)
   const [deletePending, setDeletePending] = useState(false)
   const [deleteError, setDeleteError] = useState<string|null>(null)
+  const preserveEditingTrackOnDefaultChange = useRef(false)
   const itemProvenance = useRef(new Map<string, CvItemProvenance>())
   const itemRevisions = useRef(new Map<string, number>())
   const itemSession = useRef(0)
@@ -155,13 +156,19 @@ export function MasterCvPage() {
   const confirmDeletion = async () => {
     const captured = deleteCapture.current
     if (!deleting || !captured || deleteBusy.current) return
+    const deletedTrack = deleting
+    const nextEditingTrack = deletedTrack === activeTrack
+      ? Object.keys(library.cvs).filter((id) => id !== deletedTrack).sort()[0] ?? activeTrack
+      : activeTrack
     const version=++deleteVersion.current
     const sameOwner=()=>liveDelete.current.account===captured.account && deleteVersion.current===version
     deleteBusy.current=true; setDeletePending(true); setDeleteError(null)
     try {
-      await deleteTemplate(deleting,()=>sameOwner() && liveDelete.current.revision===captured.revision)
+      await deleteTemplate(deletedTrack,()=>sameOwner() && liveDelete.current.revision===captured.revision)
       if (!sameOwner()) return
+      setEditingTrack(nextEditingTrack)
       setDeleting(null); setDraft(null); setPendingAttachment(undefined)
+      setEditingSection(null); sectionSnapshot.current = null
       requestAnimationFrame(()=>document.querySelector<HTMLSelectElement>('[aria-label="Selected CV"]')?.focus())
     } catch { if(sameOwner())setDeleteError('Could not delete this CV template. Your draft is preserved. Please try again.') }
     finally {if(sameOwner()){deleteBusy.current=false;setDeletePending(false)}}
@@ -169,6 +176,10 @@ export function MasterCvPage() {
   const [pendingAttachment, setPendingAttachment] = useState<ResumeAttachment | undefined>()
 
   useEffect(() => {
+    if (preserveEditingTrackOnDefaultChange.current) {
+      preserveEditingTrackOnDefaultChange.current = false
+      return
+    }
     setEditingTrack(activeTrack)
     setDraft(null)
     resetItemEditorSession()
@@ -294,9 +305,28 @@ export function MasterCvPage() {
   }
   const saveDraft = async () => { if (draft) await saveTemplate(editingTrack, cleanMasterCvEntries(draft), pendingAttachment) }
   const switchTrack = (track: CvTrack) => run(async () => {
-    await setActiveTrack(track, draft ? {track:editingTrack, cv:cleanMasterCvEntries(draft), attachment:pendingAttachment} : undefined)
+    await saveDraft()
+    setEditingTrack(track)
     setDraft(null)
     setPendingAttachment(undefined)
+    setEditingSection(null)
+    sectionSnapshot.current = null
+    setRename(null)
+    resetItemEditorSession()
+  })
+  const makeDefault = () => run(async () => {
+    preserveEditingTrackOnDefaultChange.current = true
+    try {
+      await saveDraft()
+      await setDefaultTrack(editingTrack)
+    } catch (error) {
+      preserveEditingTrackOnDefaultChange.current = false
+      throw error
+    }
+    setDraft(null)
+    setPendingAttachment(undefined)
+    setEditingSection(null)
+    sectionSnapshot.current = null
     resetItemEditorSession()
   })
 
@@ -410,8 +440,11 @@ export function MasterCvPage() {
           <span>Editing CV</span>
           <select aria-label="Selected CV" disabled={locked} className={`${field} mt-1 form-select`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select>
         </label>
-        <div className="cv-template-meta"><span className="cv-default-mark" aria-hidden="true">✓</span><span>Default for new applications</span></div>
+        <div className="cv-template-meta">
+          {editingTrack === activeTrack && <><span className="cv-default-mark" aria-hidden="true">✓</span><span>Default for new jobs and searches</span></>}
+        </div>
         <div className="cv-template-actions">
+          {editingTrack !== activeTrack && <button type="button" className={button} disabled={locked} onClick={() => void makeDefault()}>Make default</button>}
           <button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button>
           <CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { deleteCapture.current={account, revision:library.updatedAt, name:getLabel(editingTrack), trigger:document.activeElement as HTMLElement}; setDeleteError(null); setDeleting(editingTrack) }} />
         </div>

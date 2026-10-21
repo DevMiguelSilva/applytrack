@@ -43,6 +43,7 @@ try {
 
 export function InboxPage() {
   const { user, isCloudEnabled } = useAuth()
+  const { activeTrack } = useMasterCv()
   const account = isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
   const {
     inbox,
@@ -410,7 +411,7 @@ export function InboxPage() {
 
           <div className="border-t border-[#e6eeeb] pt-4">
             {!showAddSearch ? (
-              <button type="button" onClick={() => setShowAddSearch(true)} className="ui-button ui-primary">
+              <button type="button" onClick={() => { setDraft({ ...emptyDraft, track: activeTrack }); setShowAddSearch(true) }} className="ui-button ui-primary">
                 Add search
               </button>
             ) : (

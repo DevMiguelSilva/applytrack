@@ -193,9 +193,11 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 .add-job-posting-actions { display: grid; gap: 8px; align-content: end; }
 .ui-cv-page { container-name: cv-page; container-type: inline-size; }
 .cv-template-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 12px 20px; min-width: 0; padding: 16px 20px; border: 1px solid var(--ui-line); border-radius: 18px; background: linear-gradient(110deg, #f2f8f5 0%, #fff 72%); }
+.cv-template-select { min-width: 0; }
 .cv-template-select > span { display: block; color: var(--ui-ink); font-weight: 600; }
 .cv-template-meta, .cv-template-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.cv-template-meta { min-height: 36px; color: var(--ui-muted); font: 500 12px/16px Inter, system-ui, sans-serif; white-space: nowrap; }
+.cv-template-actions { flex-wrap: wrap; }
+.cv-template-meta { min-height: 36px; color: var(--ui-muted); font: 500 12px/16px Inter, system-ui, sans-serif; flex-wrap: wrap; white-space: normal; }
 .cv-default-mark { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: #e2f3e9; color: #1d6b45; font-size: 12px; font-weight: 700; }
 .cv-rename-form { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; padding-top: 12px; border-top: 1px solid var(--ui-line); }
 .cv-import-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; min-width: 0; padding: 16px 20px; border: 1px dashed #b8d4c7; border-radius: 18px; background: #f5faf7; }
@@ -289,7 +291,7 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
   .cv-skill-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container cv-page (min-width: 900px) {
-  .cv-template-toolbar { grid-template-columns: minmax(220px, 1fr) auto auto; }
+  .cv-template-toolbar { grid-template-columns: minmax(220px, 360px) minmax(0, 1fr) auto; }
 }
 @media (max-width: 639px) {
   .cv-read-grid { grid-template-columns: minmax(0, 1fr); }
