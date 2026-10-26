@@ -9,7 +9,7 @@ async function source(path) {
 }
 const { BackgroundTasks } = await source('../src/lib/backgroundTasks.ts')
 const { CopyFeedback } = await source('../src/lib/copyFeedback.ts')
-const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
+const deferred = () => { let resolve, reject; const promise = new Promise((r, j) => { resolve = r; reject = j }); return { promise, resolve, reject } }
 
 test('different jobs run independently, duplicate starts do not generate, completion waits for persistence', async () => {
   const manager = new BackgroundTasks(() => {})
@@ -139,4 +139,75 @@ test('viewing an application hides its notification without losing work or save 
   const rerun = manager.start('a', 'A', 'v1', () => next.promise, () => true, async () => {})
   assert.equal(manager.tasks.a.notificationHidden, false)
   next.resolve('new files'); await rerun
+})
+
+test('dismissing while tailoring runs hides progress, continues saving, and stays hidden after success', async () => {
+  const manager = new BackgroundTasks(() => {})
+  const ai = deferred(), disk = deferred()
+  let requests = 0, saves = 0
+  const work = manager.start('a', 'A', 'v1', () => { requests++; return ai.promise }, () => true, async () => { saves++; await disk.promise })
+
+  manager.dismiss('a')
+  assert.equal(manager.tasks.a.phase, 'running')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  ai.resolve('generated files')
+  await Promise.resolve()
+  assert.equal(manager.tasks.a.phase, 'saving')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  disk.resolve()
+  await work
+
+  assert.equal(manager.tasks.a.phase, 'completed')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+  assert.equal(requests, 1)
+  assert.equal(saves, 1)
+})
+
+test('dismissing while saving re-shows save failures and allows save-only retry', async () => {
+  const manager = new BackgroundTasks(() => {})
+  const disk = deferred()
+  let requests = 0, saves = 0, persisted
+  const work = manager.start('a', 'A', 'v1', async () => { requests++; return 'generated files' }, () => true, async output => {
+    saves++
+    if (saves === 1) { await disk.promise; return }
+    persisted = output
+  })
+  await Promise.resolve()
+  assert.equal(manager.tasks.a.phase, 'saving')
+  manager.dismiss('a')
+  assert.equal(manager.tasks.a.phase, 'saving')
+  assert.equal(manager.tasks.a.notificationHidden, true)
+
+  disk.reject(new Error('Offline'))
+  await work
+  assert.equal(manager.tasks.a.phase, 'failed')
+  assert.equal(manager.tasks.a.error, 'Offline')
+  assert.equal(manager.tasks.a.output, 'generated files')
+  assert.equal(manager.tasks.a.notificationHidden, false)
+
+  await manager.retry('a', () => true, async output => { saves++; persisted = output })
+  assert.equal(manager.tasks.a.phase, 'completed')
+  assert.equal(persisted, 'generated files')
+  assert.equal(requests, 1)
+  assert.equal(saves, 2)
+})
+
+test('generation failure after early dismissal reappears with retry while View application stays hidden', async () => {
+  const manager = new BackgroundTasks(() => {})
+  const ai = deferred()
+  const work = manager.start('a', 'A', 'v1', () => ai.promise, () => true, async () => {})
+  manager.dismiss('a')
+  ai.reject(new Error('AI unavailable'))
+  await work
+  assert.equal(manager.tasks.a.phase, 'failed')
+  assert.equal(manager.tasks.a.error, 'AI unavailable')
+  assert.equal(manager.tasks.a.notificationHidden, false)
+
+  const retry = deferred()
+  const rerun = manager.start('a', 'A', 'v1', () => retry.promise, () => true, async () => {})
+  manager.hideNotification('a')
+  retry.reject(new Error('AI still unavailable'))
+  await rerun
+  assert.equal(manager.tasks.a.phase, 'failed')
+  assert.equal(manager.tasks.a.notificationHidden, true)
 })

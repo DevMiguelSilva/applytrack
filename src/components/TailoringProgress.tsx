@@ -10,7 +10,7 @@ export function TailoringProgress() {
       <div className="mt-2 flex flex-wrap gap-3">
         <Link className="ui-inline" to={`/job/${task.jobId}`} onClick={() => hideNotification(task.jobId)}>View application</Link>
         {task.phase === 'failed' && canStart(task.jobId) && <button className="ui-button ui-primary" onClick={() => void (task.output ? retrySave(task.jobId) : start(task.jobId))}>{task.output ? 'Retry save' : 'Restart tailoring'}</button>}
-        {(task.phase === 'failed' || task.phase === 'completed') && <button className="ui-button ui-secondary" onClick={() => dismiss(task.jobId)}>Dismiss</button>}
+        <button className="ui-button ui-secondary" onClick={() => dismiss(task.jobId)}>Dismiss</button>
       </div>
     </div>)}
   </aside>

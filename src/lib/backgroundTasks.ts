@@ -15,29 +15,45 @@ export class BackgroundTasks<T> {
   private epoch = 0
   private versions = new Map<string, number>()
   private hiddenNotifications = new Set<string>()
+  private restoreNotificationsOnFailure = new Set<string>()
   constructor(private notify: () => void) {}
-  reset() { this.epoch++; this.tasks = {}; this.hiddenNotifications.clear(); this.notify() }
+  reset() { this.epoch++; this.tasks = {}; this.hiddenNotifications.clear(); this.restoreNotificationsOnFailure.clear(); this.notify() }
   hideNotification(id: string) {
     const task = this.tasks[id]
     if (!task) return
+    this.restoreNotificationsOnFailure.delete(id)
     this.hiddenNotifications.add(id)
     this.publish(task)
   }
   dismiss(id: string) {
-    if (this.tasks[id]?.phase === 'running' || this.tasks[id]?.phase === 'saving') return
+    const task = this.tasks[id]
+    if (!task) return
+    if (task.phase === 'running' || task.phase === 'saving') {
+      this.hiddenNotifications.add(id)
+      this.restoreNotificationsOnFailure.add(id)
+      this.publish(task)
+      return
+    }
+    this.hiddenNotifications.delete(id)
+    this.restoreNotificationsOnFailure.delete(id)
     delete this.tasks[id]; this.notify()
   }
   invalidate(id: string) {
     const task = this.tasks[id]
     if (!task || (task.phase !== 'running' && task.phase !== 'saving' && !task.output)) return
     this.versions.set(id, (this.versions.get(id) ?? 0) + 1)
-    this.publish({ ...task, output: undefined, phase: 'failed', error: 'This job or its CV changed. Restart tailoring to use the latest information.' })
+    this.fail({ ...task, output: undefined }, 'This job or its CV changed. Restart tailoring to use the latest information.')
   }
   private publish(task: BackgroundTask<T>) { this.tasks = { ...this.tasks, [task.jobId]: { ...task, notificationHidden: this.hiddenNotifications.has(task.jobId) } }; this.notify() }
+  private fail(task: BackgroundTask<T>, error: string) {
+    if (this.restoreNotificationsOnFailure.delete(task.jobId)) this.hiddenNotifications.delete(task.jobId)
+    this.publish({ ...task, phase: 'failed', error })
+  }
   async start(jobId: string, label: string, fingerprint: string, generate: () => Promise<T>, validate: () => boolean, save: (output: T, valid: () => boolean) => Promise<void>) {
     const previous = this.tasks[jobId]
     if (previous?.phase === 'running' || previous?.phase === 'saving') return
     this.hiddenNotifications.delete(jobId)
+    this.restoreNotificationsOnFailure.delete(jobId)
     const epoch = this.epoch
     const version = (this.versions.get(jobId) ?? 0) + 1
     this.versions.set(jobId, version)
@@ -50,7 +66,7 @@ export class BackgroundTasks<T> {
       await this.persist(task, epoch, version, validate, save)
     } catch (error) {
       if (epoch !== this.epoch || this.versions.get(jobId) !== version) return
-      this.publish({ ...task, phase: 'failed', error: error instanceof Error ? error.message : 'Tailoring failed. Please retry.' })
+      this.fail(task, error instanceof Error ? error.message : 'Tailoring failed. Please retry.')
     }
   }
   async retry(jobId: string, validate: () => boolean, save: (output: T, valid: () => boolean) => Promise<void>) {
@@ -60,7 +76,7 @@ export class BackgroundTasks<T> {
   }
   private async persist(task: BackgroundTask<T>, epoch: number, version: number, validate: () => boolean, save: (output: T, valid: () => boolean) => Promise<void>) {
     if (!validate()) {
-      this.publish({ ...task, output: undefined, phase: 'failed', error: 'This job or its CV changed. Restart tailoring to use the latest information.' })
+      this.fail({ ...task, output: undefined }, 'This job or its CV changed. Restart tailoring to use the latest information.')
       return
     }
     this.publish({ ...task, phase: 'saving', error: undefined })
@@ -68,13 +84,14 @@ export class BackgroundTasks<T> {
       await save(task.output!, () => epoch === this.epoch && this.versions.get(task.jobId) === version && validate())
       if (epoch !== this.epoch || this.versions.get(task.jobId) !== version) return
       if (!validate()) {
-        this.publish({ ...task, output: undefined, phase: 'failed', error: 'This job or its CV changed. Restart tailoring to use the latest information.' })
+        this.fail({ ...task, output: undefined }, 'This job or its CV changed. Restart tailoring to use the latest information.')
         return
       }
+      this.restoreNotificationsOnFailure.delete(task.jobId)
       this.publish({ ...task, phase: 'completed', output: undefined, error: undefined })
     } catch (error) {
       if (epoch !== this.epoch || this.versions.get(task.jobId) !== version) return
-      this.publish({ ...task, phase: 'failed', error: error instanceof Error ? error.message : 'Could not save. Retry saving your generated files.' })
+      this.fail(task, error instanceof Error ? error.message : 'Could not save. Retry saving your generated files.')
     }
   }
 }
