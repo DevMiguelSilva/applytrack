@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type SetState
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { templateReferences } from '../lib/cvLibrary'
+import { performCvEditorSave } from '../lib/cvEditorSave'
 import { cvItemRevisionMatches, cvItemSignature, cvItems, isUntouchedEmptyCvItem, removeCvItemById, type CvItem, type CvItemKind, type CvItemProvenance, type CvItemRemoval } from '../lib/cvItemDeletion'
 import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
@@ -346,8 +347,7 @@ export function MasterCvPage() {
     resetItemEditorSession()
   })
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const persistEditor = async () => {
     if (!cv) return
     await run(async () => {
       assertDraftCurrent()
@@ -360,6 +360,17 @@ export function MasterCvPage() {
       setReviewingImport(false)
       draftOwner.current = null
     })
+  }
+  const keepSection = () => {
+    setEditingSection(null)
+    sectionSnapshot.current = null
+    resetItemEditorSession()
+  }
+  const saveEditorAction = (action: 'section' | 'form' | 'import') =>
+    performCvEditorSave(action, reviewingImport, { keepSection, persist: persistEditor })
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    void saveEditorAction('form')
   }
 
   const handleUpload = async (file: File | null) => {
@@ -449,7 +460,7 @@ export function MasterCvPage() {
     resetItemEditorSession()
   }
   const sectionActions = (section: string) => editingSection === section
-    ? <><button type="button" className={button} onClick={() => cancelSectionEdit(section)}>Cancel</button><button type="button" className="ui-button ui-primary" onClick={() => editorForm.current?.requestSubmit()}>Save section</button></>
+    ? <><button type="button" className={button} onClick={() => cancelSectionEdit(section)}>Cancel</button><button type="button" className="ui-button ui-primary" onClick={() => { if (reviewingImport) void saveEditorAction('section'); else editorForm.current?.requestSubmit() }}>{reviewingImport ? 'Keep section changes' : 'Save section'}</button></>
     : <button type="button" className={button} disabled={Boolean(editingSection)} onClick={() => beginSectionEdit(section)}>Edit</button>
 
   return (
@@ -526,7 +537,7 @@ export function MasterCvPage() {
             {importNote}
           </p>
         )}
-        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Saving updates contact, education, projects and certifications in every profile, and role details in profiles using the same role.</p><button type="button" className="ui-button ui-primary" onClick={() => editorForm.current?.requestSubmit()}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
+        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates contact, education, projects and certifications in every profile, and role details in profiles using the same role.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
       </section>
 
       <form ref={editorForm} onSubmit={handleSave} className="cv-editor-sections">
