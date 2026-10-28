@@ -11,8 +11,12 @@ function moduleUrl(path, replacements = {}) {
 }
 const typesUrl = moduleUrl('../src/types/cv.ts')
 const mutationUrl = moduleUrl('../src/lib/localMutation.ts')
+const sharedUrl = moduleUrl('../src/lib/sharedCv.ts', { '../types/cv': typesUrl })
+const importUrl = moduleUrl('../src/lib/resumeImport.ts', { '../types/cv': typesUrl })
 const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary, cleanMasterCvEntries } = await import(typesUrl)
-const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
+const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl, './sharedCv': sharedUrl }))
+const { migrateCloudSharedCv, migrateLocalSharedCv, migrateSharedCv, saveSharedCv } = await import(sharedUrl)
+const { mergeParsedCv } = await import(importUrl)
 const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
 
 test('legacy and dynamic libraries retain CV content, IDs, names and attachments', () => {
@@ -30,6 +34,128 @@ test('legacy and dynamic libraries retain CV content, IDs, names and attachments
   assert.notEqual(copied.cvs.frontend.contact.name, 'Different')
   assert.deepEqual(normalizeLibrary(copied), copied)
   assert.equal(normalizeLibrary(migrated.cvs.frontend).cvs.frontend.contact.name, migrated.cvs.frontend.contact.name)
+})
+
+test('migration retains the original and keeps ambiguous roles and highlights separate', () => {
+  const original = createDefaultLibrary()
+  original.cvs.powerPlatform.contact.name = 'Shared name'
+  original.cvs.frontend.contact.name = 'Former name'
+  const role = { id: 'same-id', company: 'Example', title: 'Developer', location: 'Remote', start: '2020', end: '', current: true, bullets: [{ id: 'bullet', text: 'First', tags: [] }] }
+  original.cvs.powerPlatform.experience = [role]
+  original.cvs.frontend.experience = [{ ...role, bullets: [{ id: 'other', text: 'Second', tags: [] }] }]
+  const migrated = migrateSharedCv(original)
+  assert.deepEqual(migrated.sharedDetails.original, original)
+  assert.equal(migrated.cvs.frontend.contact.name, 'Shared name')
+  assert.notEqual(migrated.cvs.frontend.experience[0].id, migrated.cvs.powerPlatform.experience[0].id)
+  assert.equal(migrated.cvs.frontend.experience[0].bullets[0].text, 'Second')
+  assert.deepEqual(normalizeLibrary(migrated), migrated)
+  const missing = structuredClone(original); delete missing.cvs.powerPlatform; delete missing.names.powerPlatform
+  assert.throws(() => migrateSharedCv(missing), /Power Platform/)
+})
+
+test('shared saves propagate facts and role deletion without changing other highlights', () => {
+  const source = createDefaultLibrary()
+  source.cvs.powerPlatform.experience = [{ id:'r', company:'Before', title:'Engineer', location:'', start:'2020', end:'', current:true, bullets:[{id:'a',text:'Original',tags:[]}] }]
+  const migrated = migrateSharedCv(source)
+  const role = migrated.cvs.powerPlatform.experience[0]
+  migrated.cvs.frontend.experience = [{...role, bullets:[{id:'b',text:'Different',tags:[]}]}]
+  const edit = structuredClone(migrated.cvs.powerPlatform)
+  edit.experience[0].company = 'After'
+  edit.contact.email = 'shared@example.test'
+  edit.education = []
+  const saved = saveSharedCv(migrated, 'powerPlatform', edit)
+  assert.equal(saved.cvs.frontend.experience[0].company, 'After')
+  assert.equal(saved.cvs.frontend.experience[0].bullets[0].text, 'Different')
+  assert.equal(saved.cvs.frontend.contact.email, 'shared@example.test')
+  const removed = saveSharedCv(saved, 'powerPlatform', {...saved.cvs.powerPlatform, experience: []})
+  assert.equal(removed.cvs.frontend.experience.length, 0)
+  assert.equal(removed.sharedDetails.roles.some(entry => entry.id === role.id), false)
+  const blank = addCvTemplate(removed, 'Blank')
+  assert.equal(blank.cvs[blank.activeTrack].contact.email, 'shared@example.test')
+  assert.deepEqual(blank.cvs[blank.activeTrack].experience, [])
+  const copy = addCvTemplate(saved, 'Copy', 'frontend')
+  assert.equal(copy.cvs[copy.activeTrack].experience[0].id, role.id)
+})
+
+test('new roles appear in existing profiles with independent highlights, and subsequent edits share their facts', () => {
+  const library = migrateSharedCv(createDefaultLibrary())
+  const initial = structuredClone(library.cvs.powerPlatform)
+  initial.experience.push({ id:'new-role', company:'Example', title:'Engineer', location:'Remote', start:'2022', end:'', current:true,
+    bullets:[{id:'first-highlight', text:'Platform work', tags:[]}] })
+  const saved = saveSharedCv(library, 'powerPlatform', initial)
+  assert.equal(saved.cvs.frontend.experience[0].id, 'new-role')
+  assert.deepEqual(saved.cvs.frontend.experience[0].bullets, [])
+  const frontend = structuredClone(saved.cvs.frontend)
+  frontend.experience[0].title = 'Senior Engineer'
+  frontend.experience[0].bullets = [{id:'second-highlight', text:'React work', tags:[]}]
+  const edited = saveSharedCv(saved, 'frontend', frontend)
+  const submittedSnapshot = structuredClone(edited.cvs.powerPlatform)
+  assert.equal(edited.cvs.powerPlatform.experience[0].title, 'Senior Engineer')
+  assert.equal(edited.cvs.powerPlatform.experience[0].bullets[0].text, 'Platform work')
+  assert.equal(edited.cvs.frontend.experience[0].bullets[0].text, 'React work')
+  const removed = saveSharedCv(edited, 'frontend', {...edited.cvs.frontend, experience:[]})
+  assert.equal(edited.cvs.powerPlatform.experience.length, 1)
+  assert.equal(submittedSnapshot.experience[0].bullets[0].text, 'Platform work')
+  assert.equal(resolveJobCv(removed, {status:'applied'}, {masterCvSnapshot:submittedSnapshot}), submittedSnapshot)
+  const later = saveSharedCv(removed, 'powerPlatform', removed.cvs.powerPlatform)
+  assert.equal(later.cvs.frontend.experience.length, 0)
+  assert.equal(later.cvs.powerPlatform.experience.length, 0)
+  assert.equal(later.sharedDetails.roles.some(entry => entry.id === 'new-role'), false)
+})
+
+test('local migration secures the original before writing and can retry a failed migration', () => {
+  const original = JSON.stringify(createDefaultLibrary())
+  const values = new Map([['applytrack-master-cv', original]])
+  let failBackup = true, failMigration = false
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => {
+    if (key.endsWith('before-shared-v1') && failBackup) throw new Error('Backup failed')
+    if (key === 'applytrack-master-cv' && failMigration) throw new Error('Write failed')
+    values.set(key, value)
+  } }
+  assert.throws(() => migrateLocalSharedCv(storage), /Backup failed/)
+  assert.equal(values.get('applytrack-master-cv'), original)
+  failBackup = false; failMigration = true
+  assert.throws(() => migrateLocalSharedCv(storage), /Write failed/)
+  assert.equal(values.get('applytrack-master-cv'), original)
+  assert.equal(values.get('applytrack-master-cv-before-shared-v1'), original)
+  failMigration = false
+  const migrated = migrateLocalSharedCv(storage)
+  assert.deepEqual(migrated.sharedDetails.original, JSON.parse(original))
+  assert.deepEqual(migrateLocalSharedCv(storage), migrated)
+})
+
+test('cloud migration requires a verified backup and rejects conflicts or account changes', async () => {
+  const original = createDefaultLibrary()
+  let stored = structuredClone(original), revision = '1', writes = 0, active = true
+  const write = async (document, expected) => {
+    writes++
+    if (expected !== revision) return null
+    stored = structuredClone(document); revision = '2'
+    return {document: stored, revision}
+  }
+  await assert.rejects(migrateCloudSharedCv(original, 'stale', write, () => active), /backup/)
+  assert.deepEqual(stored, original)
+  const prepared = await migrateCloudSharedCv(original, '1', write, () => active)
+  assert.deepEqual(stored.sharedMigrationBackup, original)
+  assert.deepEqual(prepared.library.sharedDetails.original, original)
+  assert.equal(prepared.revision, '2')
+  const retried = await migrateCloudSharedCv(stored, '2', write, () => active)
+  assert.deepEqual(retried.library.sharedDetails.original, original)
+  assert.equal(writes, 2)
+  active = false
+  await assert.rejects(migrateCloudSharedCv(stored, '2', write, () => active), /account changed/)
+  assert.equal(writes, 2)
+})
+
+test('import review stays in memory until saved and snapshots remain unchanged after shared edits', () => {
+  const library = migrateSharedCv(createDefaultLibrary())
+  const snapshot = structuredClone(library.cvs.powerPlatform)
+  const draft = mergeParsedCv(library.cvs.powerPlatform, {contact: {...snapshot.contact, email:'import@example.test'}})
+  assert.notEqual(library.cvs.frontend.contact.email, draft.contact.email)
+  const saved = saveSharedCv(library, 'powerPlatform', draft)
+  assert.equal(saved.cvs.frontend.contact.email, 'import@example.test')
+  assert.equal(resolveJobCv(saved, {status:'applied'}, {masterCvSnapshot:snapshot}), snapshot)
+  assert.notEqual(snapshot.contact.email, saved.cvs.frontend.contact.email)
 })
 
 test('removing a non-default CV preserves the default; removing the default picks a valid fallback', () => {

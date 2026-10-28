@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type SetState
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { templateReferences } from '../lib/cvLibrary'
+import { performCvEditorSave } from '../lib/cvEditorSave'
+import { moveCvItem } from '../lib/cvItemOrder'
 import { cvItemRevisionMatches, cvItemSignature, cvItems, isUntouchedEmptyCvItem, removeCvItemById, type CvItem, type CvItemKind, type CvItemProvenance, type CvItemRemoval } from '../lib/cvItemDeletion'
 import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
@@ -110,8 +112,11 @@ export function MasterCvPage() {
   const editorForm = useRef<HTMLFormElement>(null)
   const resumeFileInput = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
+  const importGeneration = useRef(0)
   const [importError, setImportError] = useState<string | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
+  const [reviewingImport, setReviewingImport] = useState(false)
+  const draftOwner = useRef<{ account: string; revision: string } | null>(null)
   const { jobs } = useJobs()
   const { searches } = useSavedSearches()
   const [busy, setBusy] = useState(false)
@@ -192,6 +197,15 @@ export function MasterCvPage() {
 
   useEffect(() => {
     resetItemEditorSession()
+    importGeneration.current++
+    setImporting(false)
+    draftOwner.current = null
+    draftRef.current = null
+    setDraftState(null)
+    setPendingAttachment(undefined)
+    setReviewingImport(false)
+    setEditingSection(null)
+    setImportNote(null)
   }, [account, resetItemEditorSession])
 
   useEffect(() => {
@@ -303,7 +317,11 @@ export function MasterCvPage() {
     catch (error) { setImportError(getErrorMessage(error, 'Could not save. Your draft is still here.')) }
     finally { setBusy(false) }
   }
-  const saveDraft = async () => { if (draft) await saveTemplate(editingTrack, cleanMasterCvEntries(draft), pendingAttachment) }
+  const assertDraftCurrent = () => {
+    if (draftOwner.current && (draftOwner.current.account !== account || draftOwner.current.revision !== library.updatedAt))
+      throw new Error('The CV library or account changed while editing. Your draft is preserved; reload before saving.')
+  }
+  const saveDraft = async () => { if (draft) { assertDraftCurrent(); await saveTemplate(editingTrack, cleanMasterCvEntries(draft), pendingAttachment, draftOwner.current?.revision); draftOwner.current = null } }
   const switchTrack = (track: CvTrack) => run(async () => {
     await saveDraft()
     setEditingTrack(track)
@@ -330,17 +348,30 @@ export function MasterCvPage() {
     resetItemEditorSession()
   })
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const persistEditor = async () => {
     if (!cv) return
     await run(async () => {
-      await saveTemplate(editingTrack, cleanMasterCvEntries(cv), pendingAttachment)
+      assertDraftCurrent()
+      await saveTemplate(editingTrack, cleanMasterCvEntries(cv), pendingAttachment, draftOwner.current?.revision)
       setDraft(null)
       setPendingAttachment(undefined)
       setEditingSection(null)
       sectionSnapshot.current = null
       resetItemEditorSession()
+      setReviewingImport(false)
+      draftOwner.current = null
     })
+  }
+  const keepSection = () => {
+    setEditingSection(null)
+    sectionSnapshot.current = null
+    resetItemEditorSession()
+  }
+  const saveEditorAction = (action: 'section' | 'form' | 'import') =>
+    performCvEditorSave(action, reviewingImport, { keepSection, persist: persistEditor })
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    void saveEditorAction('form')
   }
 
   const handleUpload = async (file: File | null) => {
@@ -348,11 +379,17 @@ export function MasterCvPage() {
     resetItemEditorSession()
     const target = editingTrack
     const base = cv
+    const owner = { account, revision: library.updatedAt }
+    const importVersion = ++importGeneration.current
+    const isCurrent = () => importGeneration.current === importVersion && liveDelete.current.account === owner.account && liveDelete.current.revision === owner.revision
+    setShowAdd(false)
+    setRename(null)
     setImporting(true)
     setImportError(null)
     setImportNote(null)
     try {
       const text = await extractTextFromResumeFile(file)
+      if (!isCurrent()) throw new Error('The account or library changed during import. Import again after reloading.')
       if (!text.trim()) throw new Error('No text could be extracted from that file.')
 
       const importedAttachment = {
@@ -361,28 +398,29 @@ export function MasterCvPage() {
         uploadedAt: new Date().toISOString(),
         extractedText: text,
       }
-      setPendingAttachment(importedAttachment)
-
       let next = sparseCvFromText(text, base)
       try {
         const parsed = await parseResumeText(text, target, getLabel(target))
+        if (!isCurrent()) return
         next = mergeParsedCv(base, parsed)
         setImportNote('Resume imported into the form. Review fields and save when ready.')
       } catch {
+        if (!isCurrent()) return
         setImportNote(
-          'Text extracted and saved in Summary. AI structuring failed — edit the form manually or try again later.'
+          'Text extracted into Summary. AI structuring failed — review the form before saving.'
         )
       }
 
+      if (!isCurrent()) throw new Error('The account or library changed during import. Import again after reloading.')
+      draftOwner.current = owner
       setDraft(next)
-      await saveTemplate(target, cleanMasterCvEntries(next), importedAttachment)
-      setDraft(null)
-      setPendingAttachment(undefined)
+      setPendingAttachment(importedAttachment)
+      setReviewingImport(true)
       resetItemEditorSession()
     } catch (err) {
-      setImportError(getErrorMessage(err, 'Import failed. Your draft is still here.'))
+      if (isCurrent()) setImportError(getErrorMessage(err, 'Import failed. Your draft is still here.'))
     } finally {
-      setImporting(false)
+      if (importGeneration.current === importVersion) setImporting(false)
     }
   }
 
@@ -401,6 +439,7 @@ export function MasterCvPage() {
   const beginSectionEdit = (section: string) => {
     resetItemEditorSession()
     sectionSnapshot.current = structuredClone(cv)
+    if (!draftOwner.current) draftOwner.current = { account, revision: library.updatedAt }
     setDraft(structuredClone(cv))
     setEditingSection(section)
   }
@@ -422,12 +461,12 @@ export function MasterCvPage() {
     resetItemEditorSession()
   }
   const sectionActions = (section: string) => editingSection === section
-    ? <><button type="button" className={button} onClick={() => cancelSectionEdit(section)}>Cancel</button><button type="button" className="ui-button ui-primary" onClick={() => editorForm.current?.requestSubmit()}>Save section</button></>
+    ? <><button type="button" className={button} onClick={() => cancelSectionEdit(section)}>Cancel</button><button type="button" className="ui-button ui-primary" onClick={() => { if (reviewingImport) void saveEditorAction('section'); else editorForm.current?.requestSubmit() }}>{reviewingImport ? 'Keep section changes' : 'Save section'}</button></>
     : <button type="button" className={button} disabled={Boolean(editingSection)} onClick={() => beginSectionEdit(section)}>Edit</button>
 
   return (
     <div className="ui-page ui-cv-page mx-auto min-w-0 w-full" aria-busy={locked}>
-      <SectionHeader title="CV library" description="Create and manage master CVs for the roles you apply to." actions={<button type="button" className="ui-button ui-primary" disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>} />
+      <SectionHeader title="CV library" description="Create and manage master CVs for the roles you apply to." actions={<button type="button" className="ui-button ui-primary" disabled={locked || reviewingImport} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>} />
       {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 legacy-size-text_sm"><p role="alert" className="ui-helper !text-red-700 legacy-size-text_sm">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
       {showAdd && <form className={card} onSubmit={(e) => { e.preventDefault(); void run(async () => { await saveDraft(); await addTemplate(newName, copyFrom || undefined); setNewName(''); setShowAdd(false) }) }}>
         <h2 className="break-words ui-section-title legacy-size-text_lg">New CV template</h2>
@@ -438,15 +477,15 @@ export function MasterCvPage() {
       <section className="cv-template-toolbar">
         <label className="ui-label block legacy-size-text_sm cv-template-select">
           <span>Editing CV</span>
-          <select aria-label="Selected CV" disabled={locked} className={`${field} mt-1 form-select`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select>
+          <select aria-label="Selected CV" disabled={locked || reviewingImport} className={`${field} mt-1 form-select`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select>
         </label>
         <div className="cv-template-meta">
           {editingTrack === activeTrack && <><span className="cv-default-mark" aria-hidden="true">✓</span><span>Default for new jobs and searches</span></>}
         </div>
         <div className="cv-template-actions">
-          {editingTrack !== activeTrack && <button type="button" className={button} disabled={locked} onClick={() => void makeDefault()}>Make default</button>}
-          <button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button>
-          <CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { deleteCapture.current={account, revision:library.updatedAt, name:getLabel(editingTrack), trigger:document.activeElement as HTMLElement}; setDeleteError(null); setDeleting(editingTrack) }} />
+          {editingTrack !== activeTrack && <button type="button" className={button} disabled={locked || reviewingImport} onClick={() => void makeDefault()}>Make default</button>}
+          <button type="button" className={button} disabled={locked || reviewingImport} onClick={() => setRename(getLabel(editingTrack))}>Rename</button>
+          <CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || reviewingImport || Object.keys(library.cvs).length <= 1} onClick={() => { deleteCapture.current={account, revision:library.updatedAt, name:getLabel(editingTrack), trigger:document.activeElement as HTMLElement}; setDeleteError(null); setDeleting(editingTrack) }} />
         </div>
         {rename !== null && <form className="cv-rename-form" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="ui-label block legacy-size-text_sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className="ui-button ui-primary" disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
       </section>
@@ -464,17 +503,17 @@ export function MasterCvPage() {
         onCancel={closeItemRemoval}
         onConfirm={confirmItemRemoval}
       >
-        {itemRemoval && <p>Remove ‘{itemRemoval.label}’ from this CV draft?{itemRemoval.hasChildren && <> This also removes its {itemRemoval.kind === 'skillGroup' ? 'skills' : 'highlights'}.</>} Save CV to keep this change.</p>}
+        {itemRemoval && <p>Remove ‘{itemRemoval.label}’ from this CV draft?{itemRemoval.kind === 'experience' ? ' Saving removes this role and its highlights from every profile.' : <>{itemRemoval.hasChildren && <> This also removes its {itemRemoval.kind === 'skillGroup' ? 'skills' : 'highlights'}.</>} {['education', 'project', 'certification'].includes(itemRemoval.kind) && 'Saving this removal updates every profile.'}</>} Save CV to keep this change.</p>}
       </DeleteDialog>
       {itemDeleteNotice && <p role="status" className="ui-helper legacy-size-text_sm">{itemDeleteNotice}</p>}
       <fieldset disabled={locked} className="cv-editor-form min-w-0">
       <section className="cv-import-panel">
-        <div className="cv-import-copy"><button type="button" className="cv-import-icon" aria-label="Choose a resume file" disabled={locked} onClick={() => resumeFileInput.current?.click()}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button><div><h2 className="ui-section-title">Start with your resume</h2><p className="ui-body text-brand-muted">Import a DOCX or text file to prefill this CV.</p></div></div>
+        <div className="cv-import-copy"><button type="button" className="cv-import-icon" aria-label="Choose a resume file" disabled={locked || reviewingImport || Boolean(editingSection)} onClick={() => resumeFileInput.current?.click()}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button><div><h2 className="ui-section-title">Start with your resume</h2><p className="ui-body text-brand-muted">Import a DOCX or text file to prefill this CV.</p></div></div>
         <input
           ref={resumeFileInput}
           type="file"
           accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          disabled={locked}
+          disabled={locked || reviewingImport || Boolean(editingSection)}
           onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
           className="cv-file-input-hidden"
           tabIndex={-1}
@@ -498,11 +537,12 @@ export function MasterCvPage() {
             {importNote}
           </p>
         )}
+        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates shared details in every profile. Added or removed roles also change every profile, including their highlights for removed roles.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
       </section>
 
       <form ref={editorForm} onSubmit={handleSave} className="cv-editor-sections">
         <section className="ui-panel cv-editor-section cv-profile-section min-w-0">
-          <CvSectionHeading step="01" title="Profile" description="Your contact information and professional introduction." action={sectionActions('profile')} />
+          <CvSectionHeading step="01" title="Profile" description="Contact details are shared across all profiles. Headline and summary belong to this profile." action={sectionActions('profile')} />
           <div className="cv-profile-grid">
             <div className="cv-profile-group cv-contact">
               <h3 className="cv-subsection-title">Contact details</h3>
@@ -657,11 +697,11 @@ function SkillGroupsEditor({
             <p className="cv-entry-label">
               Group {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`skill group ${group.group || index + 1}`} index={index} count={skills.length} onMove={direction => onChange(moveCvItem(skills, group.id, direction))} /><CvDeleteButton
               label={`Remove ${group.group || 'skill'} group`}
               itemKey={`skillGroup:${group.id}`}
               onClick={(trigger) => onRemove(group, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-skill-fields">
             <label className="cv-entry-field"><span>Category</span><input
@@ -716,6 +756,20 @@ function CvDeleteButton({ onClick, label, disabled, confirm = false, itemKey }: 
   )
 }
 
+function CvOrderButtons({ label, index, count, onMove }: { label: string; index: number; count: number; onMove: (direction: -1 | 1) => void }) {
+  const up = useRef<HTMLButtonElement>(null)
+  const down = useRef<HTMLButtonElement>(null)
+  const move = (direction: -1 | 1) => {
+    onMove(direction)
+    if ((direction === -1 && index === 1) || (direction === 1 && index === count - 2))
+      requestAnimationFrame(() => (direction === -1 ? down : up).current?.focus())
+  }
+  return <div className="cv-order-buttons" aria-label={`Reorder ${label}`}>
+    <button ref={up} type="button" className="ui-button ui-secondary ui-icon-button ui-compact" aria-label={`Move ${label} up`} title={`Move ${label} up`} disabled={index === 0} onClick={() => move(-1)}>↑</button>
+    <button ref={down} type="button" className="ui-button ui-secondary ui-icon-button ui-compact" aria-label={`Move ${label} down`} title={`Move ${label} down`} disabled={index === count - 1} onClick={() => move(1)}>↓</button>
+  </div>
+}
+
 function ExperienceEditor({
   experience,
   onChange,
@@ -733,7 +787,7 @@ function ExperienceEditor({
 }) {
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="02" title="Experience" description="Add roles and the results you delivered." action={<>{editing && <button
+      <CvSectionHeading step="02" title="Experience" description="Roles are shared; highlights are specific to this CV." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
           data-cv-section-add="experience"
@@ -763,11 +817,11 @@ function ExperienceEditor({
             <p className="cv-entry-label">
               Role {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`role ${[exp.title, exp.company].filter(Boolean).join(' at ') || index + 1}`} index={index} count={experience.length} onMove={direction => onChange(moveCvItem(experience, exp.id, direction))} /><CvDeleteButton
               label="Remove role"
               itemKey={`experience:${exp.id}`}
               onClick={(trigger) => onRemove(exp, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-experience-fields">
             <label className="cv-entry-field"><span>Job title</span><input
@@ -869,7 +923,7 @@ function ProjectsEditor({
 }) {
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="05" title="Projects" description="Showcase selected work, links, and outcomes." action={<>{editing && <button
+      <CvSectionHeading step="05" title="Projects" description="Shared across all profiles; saving changes updates each profile." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
           data-cv-section-add="project"
@@ -895,11 +949,11 @@ function ProjectsEditor({
             <p className="cv-entry-label">
               Project {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`project ${project.name || index + 1}`} index={index} count={projects.length} onMove={direction => onChange(moveCvItem(projects, project.id, direction))} /><CvDeleteButton
               label="Remove project"
               itemKey={`project:${project.id}`}
               onClick={(trigger) => onRemove(project, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-project-fields">
             <label className="cv-entry-field"><span>Project name</span><input
@@ -973,7 +1027,7 @@ function EducationEditor({
 
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="04" title="Education" description="Include degrees and other formal study." action={<>{editing && <div className="flex flex-wrap items-center gap-2">
+      <CvSectionHeading step="04" title="Education" description="Shared across all profiles; saving changes updates each profile." action={<>{editing && <div className="flex flex-wrap items-center gap-2">
           {movable > 0 && (
             <button
               type="button"
@@ -1001,11 +1055,11 @@ function EducationEditor({
             <p className="cv-entry-label">
               Education {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`education ${edu.degree || edu.school || index + 1}`} index={index} count={education.length} onMove={direction => onChange(moveCvItem(education, edu.id, direction))} /><CvDeleteButton
               label="Remove education"
               itemKey={`education:${edu.id}`}
               onClick={(trigger) => onRemove(edu, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-education-fields">
             <label className="cv-entry-field"><span>Degree or diploma</span><input
@@ -1063,7 +1117,7 @@ function CertificationsEditor({
 }) {
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="06" title="Certifications" description="Track licenses and professional credentials." action={<>{editing && <button
+      <CvSectionHeading step="06" title="Certifications" description="Shared across all profiles; saving changes updates each profile." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
           data-cv-section-add="certification"
@@ -1080,11 +1134,11 @@ function CertificationsEditor({
             <p className="cv-entry-label">
               Certification {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`certification ${cert.name || index + 1}`} index={index} count={certifications.length} onMove={direction => onChange(moveCvItem(certifications, cert.id, direction))} /><CvDeleteButton
               label="Remove certification"
               itemKey={`certification:${cert.id}`}
               onClick={(trigger) => onRemove(cert, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-certification-fields">
             <label className="cv-entry-field"><span>Name</span><input

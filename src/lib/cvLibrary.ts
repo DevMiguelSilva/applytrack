@@ -1,6 +1,7 @@
 import { createEmptyMasterCv, type MasterCvLibrary, type TailoredDocument } from '../types/cv'
 import type { InboxJob, JobApplication, SavedSearch } from '../types/job'
 import { commitLocalMutation, recoverLocalMutation } from './localMutation'
+import { blankSharedCv } from './sharedCv'
 
 export function cvLabel(library: MasterCvLibrary, id: string): string {
   return library.names[id] ?? 'Archived CV template'
@@ -13,7 +14,7 @@ export function addCvTemplate(library: MasterCvLibrary, name: string, copyFrom?:
   return {
     ...library, activeTrack: id,
     names: { ...library.names, [id]: name.trim() },
-    cvs: { ...library.cvs, [id]: copyFrom ? structuredClone(library.cvs[copyFrom]) : createEmptyMasterCv() },
+    cvs: { ...library.cvs, [id]: copyFrom ? structuredClone(library.cvs[copyFrom]) : library.sharedDetails ? blankSharedCv(library) : createEmptyMasterCv() },
     attachments: { ...library.attachments, [id]: copyFrom ? structuredClone(library.attachments[copyFrom] ?? null) : null },
   }
 }
