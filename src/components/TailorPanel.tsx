@@ -22,7 +22,7 @@ import { useTailoring } from '../hooks/useTailoring'
 import { useSkillExplanations } from '../hooks/skillExplanationsContext'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { useAuth } from '../hooks/useAuth'
-import { createJobReviewPanelState, updateJobReviewPanel, type JobReviewPanelId } from '../lib/jobReviewPanels'
+import { createJobReviewPanelState, shouldOpenGapForExplanation, updateJobReviewPanel, type JobReviewPanelId } from '../lib/jobReviewPanels'
 import { LoadingSpinner } from './LoadingSpinner'
 
 interface TailorPanelProps {
@@ -109,6 +109,15 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const setPanelOpen = useCallback((id: JobReviewPanelId, open: boolean) => {
     setPanelState(current => updateJobReviewPanel(current, panelScope, id, open))
   }, [panelScope])
+  const skillExplanations = useSkillExplanations()
+  const explainSkillName = skillExplanations.get(job.id)?.skill ?? null
+  const previousExplanation = useRef<{ scope: string; skill: string | null }>({ scope: panelScope, skill: null })
+  useEffect(() => {
+    const previous = previousExplanation.current
+    const previousSkill = previous.scope === panelScope ? previous.skill : null
+    previousExplanation.current = { scope: panelScope, skill: explainSkillName }
+    if (shouldOpenGapForExplanation(previousSkill, explainSkillName)) setPanelOpen('gap', true)
+  }, [explainSkillName, panelScope, setPanelOpen])
   const { library, loading, loadError, getLabel } = useMasterCv()
   const { getForJob, loading: docsLoading } = useTailoredDocs()
   const doc = getForJob(job.id)
@@ -258,10 +267,6 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate, openPan
 
   const skillExplanation = skillExplanations.get(job.id)
   const explainSkillName = skillExplanation?.skill ?? null
-  useEffect(() => {
-    if (!explainSkillName) return
-    if (!openPanels.has('gap')) setPanelOpen('gap', true)
-  }, [explainSkillName, openPanels, setPanelOpen])
   const lookupSkill = (skill: string) => skillExplanations.toggle(job.id, skill)
 
   const onTailorClick = () => {

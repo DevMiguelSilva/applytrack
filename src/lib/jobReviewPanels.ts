@@ -20,3 +20,7 @@ export function updateJobReviewPanel(
   else open.delete(panel)
   return { scope, open }
 }
+
+export function shouldOpenGapForExplanation(previousSkill: string | null, nextSkill: string | null): boolean {
+  return Boolean(nextSkill && nextSkill !== previousSkill)
+}
