@@ -8,6 +8,7 @@ import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { templateReferences } from '../lib/cvLibrary'
 import { performCvEditorSave } from '../lib/cvEditorSave'
+import { moveCvItem } from '../lib/cvItemOrder'
 import { cvItemRevisionMatches, cvItemSignature, cvItems, isUntouchedEmptyCvItem, removeCvItemById, type CvItem, type CvItemKind, type CvItemProvenance, type CvItemRemoval } from '../lib/cvItemDeletion'
 import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
@@ -537,7 +538,7 @@ export function MasterCvPage() {
             {importNote}
           </p>
         )}
-        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates contact, education, projects and certifications in every profile, and role details in profiles using the same role.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
+        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates contact, education, projects and certifications in every profile, adds new roles to every profile, and updates shared role details.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
       </section>
 
       <form ref={editorForm} onSubmit={handleSave} className="cv-editor-sections">
@@ -602,7 +603,6 @@ export function MasterCvPage() {
 
         <ExperienceEditor
           experience={cv.experience}
-          availableRoles={library.sharedDetails?.roles ?? []}
           onChange={(experience) => updateItems('experience', experience)}
           onAdd={(item) => registerNewItem('experience', item)}
           onRemove={(item, trigger) => { const copy = cvItemRemovalCopy('experience', item); requestItemRemoval('experience', copy.type, item, copy.label, copy.hasChildren, trigger) }}
@@ -698,11 +698,11 @@ function SkillGroupsEditor({
             <p className="cv-entry-label">
               Group {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`skill group ${group.group || index + 1}`} index={index} count={skills.length} onMove={direction => onChange(moveCvItem(skills, group.id, direction))} /><CvDeleteButton
               label={`Remove ${group.group || 'skill'} group`}
               itemKey={`skillGroup:${group.id}`}
               onClick={(trigger) => onRemove(group, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-skill-fields">
             <label className="cv-entry-field"><span>Category</span><input
@@ -757,9 +757,22 @@ function CvDeleteButton({ onClick, label, disabled, confirm = false, itemKey }: 
   )
 }
 
+function CvOrderButtons({ label, index, count, onMove }: { label: string; index: number; count: number; onMove: (direction: -1 | 1) => void }) {
+  const up = useRef<HTMLButtonElement>(null)
+  const down = useRef<HTMLButtonElement>(null)
+  const move = (direction: -1 | 1) => {
+    onMove(direction)
+    if ((direction === -1 && index === 1) || (direction === 1 && index === count - 2))
+      requestAnimationFrame(() => (direction === -1 ? down : up).current?.focus())
+  }
+  return <div className="cv-order-buttons" aria-label={`Reorder ${label}`}>
+    <button ref={up} type="button" className="ui-button ui-secondary ui-icon-button ui-compact" aria-label={`Move ${label} up`} title={`Move ${label} up`} disabled={index === 0} onClick={() => move(-1)}>↑</button>
+    <button ref={down} type="button" className="ui-button ui-secondary ui-icon-button ui-compact" aria-label={`Move ${label} down`} title={`Move ${label} down`} disabled={index === count - 1} onClick={() => move(1)}>↓</button>
+  </div>
+}
+
 function ExperienceEditor({
   experience,
-  availableRoles,
   onChange,
   onAdd,
   onRemove,
@@ -767,7 +780,6 @@ function ExperienceEditor({
   action,
 }: {
   experience: CvExperience[]
-  availableRoles: Omit<CvExperience, 'bullets'>[]
   onChange: (experience: CvExperience[]) => void
   onAdd: (item: CvExperience) => void
   onRemove: (item: CvExperience, trigger: HTMLElement | null) => void
@@ -776,7 +788,7 @@ function ExperienceEditor({
 }) {
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="02" title="Experience" description="Role details are shared wherever the role is used; highlights and role selection belong to this profile." action={<>{editing && <button
+      <CvSectionHeading step="02" title="Experience" description="New roles are added to every profile. Role details are shared; highlights and removal belong to this profile." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
           data-cv-section-add="experience"
@@ -799,7 +811,6 @@ function ExperienceEditor({
         </button>}{action}</>} />
       {!editing && <CvReadItems empty="No experience added yet." items={experience.map((exp) => ({ title: [exp.title, exp.company].filter(Boolean).join(' · '), detail: [[exp.location, [formatCvDate(exp.start), formatCvDate(exp.current ? 'Present' : exp.end)].filter(Boolean).join(' – ')].filter(Boolean).join(' · '), exp.current ? 'Current role' : ''].filter(Boolean).join(' · '), bullets: exp.bullets.map((bullet) => bullet.text).filter((text) => text.trim()) }))} />}
       {editing && <>
-      {availableRoles.some(role => !experience.some(item => item.id === role.id)) && <label className="ui-label">Add an existing role<select className="ui-field" value="" onChange={(event) => { const role = availableRoles.find(item => item.id === event.target.value); if (role) onChange([...experience, { ...role, bullets: [] }]) }}><option value="">Choose a role</option>{availableRoles.filter(role => !experience.some(item => item.id === role.id)).map(role => <option key={role.id} value={role.id}>{[role.title, role.company, role.start].filter(Boolean).join(' · ') || 'Untitled role'}</option>)}</select></label>}
       {experience.length === 0 && <p className="cv-empty-state">Your experience will appear here. Add your most relevant role first.</p>}
       {experience.map((exp, index) => (
         <div key={exp.id} className="cv-entry cv-experience-entry cv-entry-card space-y-3">
@@ -807,11 +818,11 @@ function ExperienceEditor({
             <p className="cv-entry-label">
               Role {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`role ${[exp.title, exp.company].filter(Boolean).join(' at ') || index + 1}`} index={index} count={experience.length} onMove={direction => onChange(moveCvItem(experience, exp.id, direction))} /><CvDeleteButton
               label="Remove role"
               itemKey={`experience:${exp.id}`}
               onClick={(trigger) => onRemove(exp, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-experience-fields">
             <label className="cv-entry-field"><span>Job title</span><input
@@ -939,11 +950,11 @@ function ProjectsEditor({
             <p className="cv-entry-label">
               Project {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`project ${project.name || index + 1}`} index={index} count={projects.length} onMove={direction => onChange(moveCvItem(projects, project.id, direction))} /><CvDeleteButton
               label="Remove project"
               itemKey={`project:${project.id}`}
               onClick={(trigger) => onRemove(project, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-project-fields">
             <label className="cv-entry-field"><span>Project name</span><input
@@ -1045,11 +1056,11 @@ function EducationEditor({
             <p className="cv-entry-label">
               Education {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`education ${edu.degree || edu.school || index + 1}`} index={index} count={education.length} onMove={direction => onChange(moveCvItem(education, edu.id, direction))} /><CvDeleteButton
               label="Remove education"
               itemKey={`education:${edu.id}`}
               onClick={(trigger) => onRemove(edu, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-education-fields">
             <label className="cv-entry-field"><span>Degree or diploma</span><input
@@ -1124,11 +1135,11 @@ function CertificationsEditor({
             <p className="cv-entry-label">
               Certification {String(index + 1).padStart(2, '0')}
             </p>
-            <CvDeleteButton
+            <div className="cv-entry-actions"><CvOrderButtons label={`certification ${cert.name || index + 1}`} index={index} count={certifications.length} onMove={direction => onChange(moveCvItem(certifications, cert.id, direction))} /><CvDeleteButton
               label="Remove certification"
               itemKey={`certification:${cert.id}`}
               onClick={(trigger) => onRemove(cert, trigger)}
-            />
+            /></div>
           </div>
           <div className="cv-certification-fields">
             <label className="cv-entry-field"><span>Name</span><input

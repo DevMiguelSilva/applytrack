@@ -44,9 +44,10 @@ export function migrateSharedCv(raw: unknown): MasterCvLibrary {
 export function saveSharedCv(library: MasterCvLibrary, id: string, cv: MasterCv): MasterCvLibrary {
   if (!library.cvs[id] || !library.sharedDetails) throw new Error('The shared CV library is unavailable. Reload before saving.')
   const roles = [...library.sharedDetails.roles]
+  const added: Role[] = []
   for (const entry of cv.experience) {
     const index = roles.findIndex(role => role.id === entry.id)
-    if (index < 0) roles.push(facts(entry))
+    if (index < 0) { const role = facts(entry); roles.push(role); added.push(role) }
     else roles[index] = facts(entry)
   }
   const byId = new Map(roles.map(role => [role.id, role]))
@@ -54,7 +55,8 @@ export function saveSharedCv(library: MasterCvLibrary, id: string, cv: MasterCv)
     const profile = key === id ? cv : existing
     return [key, { ...profile, contact: structuredClone(cv.contact), education: structuredClone(cv.education),
       projects: structuredClone(cv.projects), certifications: structuredClone(cv.certifications),
-      experience: profile.experience.map(entry => ({ ...entry, ...byId.get(entry.id), bullets: entry.bullets })) }]
+      experience: [...profile.experience.map(entry => ({ ...entry, ...byId.get(entry.id), bullets: entry.bullets })),
+        ...(key === id ? [] : added.map(role => ({ ...role, bullets: [] })))] }]
   }))
   return { ...library, cvs, sharedDetails: { ...library.sharedDetails, roles } }
 }

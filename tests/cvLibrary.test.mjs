@@ -76,6 +76,27 @@ test('shared saves propagate facts and deletions without changing another profil
   assert.equal(copy.cvs[copy.activeTrack].experience[0].id, role.id)
 })
 
+test('new roles appear in existing profiles with independent highlights, and subsequent edits share their facts', () => {
+  const library = migrateSharedCv(createDefaultLibrary())
+  const initial = structuredClone(library.cvs.powerPlatform)
+  initial.experience.push({ id:'new-role', company:'Example', title:'Engineer', location:'Remote', start:'2022', end:'', current:true,
+    bullets:[{id:'first-highlight', text:'Platform work', tags:[]}] })
+  const saved = saveSharedCv(library, 'powerPlatform', initial)
+  assert.equal(saved.cvs.frontend.experience[0].id, 'new-role')
+  assert.deepEqual(saved.cvs.frontend.experience[0].bullets, [])
+  const frontend = structuredClone(saved.cvs.frontend)
+  frontend.experience[0].title = 'Senior Engineer'
+  frontend.experience[0].bullets = [{id:'second-highlight', text:'React work', tags:[]}]
+  const edited = saveSharedCv(saved, 'frontend', frontend)
+  assert.equal(edited.cvs.powerPlatform.experience[0].title, 'Senior Engineer')
+  assert.equal(edited.cvs.powerPlatform.experience[0].bullets[0].text, 'Platform work')
+  assert.equal(edited.cvs.frontend.experience[0].bullets[0].text, 'React work')
+  const removed = saveSharedCv(edited, 'frontend', {...edited.cvs.frontend, experience:[]})
+  const later = saveSharedCv(removed, 'powerPlatform', removed.cvs.powerPlatform)
+  assert.equal(later.cvs.frontend.experience.length, 0)
+  assert.equal(later.cvs.powerPlatform.experience.length, 1)
+})
+
 test('local migration secures the original before writing and can retry a failed migration', () => {
   const original = JSON.stringify(createDefaultLibrary())
   const values = new Map([['applytrack-master-cv', original]])
