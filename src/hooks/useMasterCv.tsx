@@ -45,7 +45,11 @@ function migrateLocal() {
 
 export function MasterCvProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
+  const userId = user?.id
   const [library, setLibrary] = useState(createDefaultLibrary)
+  const emptyLibrary = useMemo(createDefaultLibrary, [])
+  const loadedOwner = useRef<string | null>(null)
+  const [loadErrorOwner, setLoadErrorOwner] = useState<string | null>(null)
   const current = useRef(library)
   const queue = useRef<Promise<void>>(Promise.resolve())
   const ready = useRef(false)
@@ -54,18 +58,20 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const cloud = isCloudEnabled && Boolean(user)
+  const owner = cloud && userId ? `cloud:${userId}` : 'local'
 
   const reload = useCallback(async () => {
     const version = ++generation.current
     ready.current = false
     setLoading(true)
     setLoadError(null)
+    setLoadErrorOwner(null)
     try {
       let next: MasterCvLibrary
       let revision: string | null = null
-      if (cloud && supabase && user) {
+      if (cloud && supabase && userId) {
         const client = supabase
-        const { data, error } = await supabase.from('master_cvs').select('document, updated_at').eq('user_id', user.id).maybeSingle()
+        const { data, error } = await supabase.from('master_cvs').select('document, updated_at').eq('user_id', userId).maybeSingle()
         if (error) throw error
         revision = data?.updated_at ?? null
         let document: unknown = data?.document
@@ -73,7 +79,7 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
           const migration = await migrateCloudSharedCv(document, revision!, async (backupDocument, expected) => {
             const backupRevision = nextRevision(expected)
             const { data: backedUp, error: backupError } = await client.from('master_cvs').update({ document: backupDocument, updated_at: backupRevision })
-              .eq('user_id', user.id).eq('updated_at', expected).select('document, updated_at').maybeSingle()
+              .eq('user_id', userId).eq('updated_at', expected).select('document, updated_at').maybeSingle()
             if (backupError) throw backupError
             return backedUp ? { document: backedUp.document, revision: backedUp.updated_at } : null
           }, () => generation.current === version)
@@ -87,12 +93,12 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
           if (generation.current !== version) return
           if (data) {
             const {data: migrated, error: writeError} = await supabase.from('master_cvs').update({document:next, updated_at:next.updatedAt})
-              .eq('user_id', user.id).eq('updated_at', revision!).select('updated_at').maybeSingle()
+              .eq('user_id', userId).eq('updated_at', revision!).select('updated_at').maybeSingle()
             if (writeError) throw writeError
             if (!migrated) throw new Error('Your CV library changed while loading. Retry to load the latest version.')
             revision = migrated.updated_at
           } else {
-            const {data: inserted, error: writeError} = await supabase.from('master_cvs').insert({user_id:user.id, document:next, updated_at:next.updatedAt}).select('updated_at').single()
+            const {data: inserted, error: writeError} = await supabase.from('master_cvs').insert({user_id:userId, document:next, updated_at:next.updatedAt}).select('updated_at').single()
             if (writeError) throw writeError
             revision = inserted.updated_at
           }
@@ -104,13 +110,17 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
       cloudRevision.current = revision
       current.current = next
       setLibrary(next)
+      loadedOwner.current = owner
       ready.current = true
     } catch (error) {
-      if (generation.current === version) setLoadError(getErrorMessage(error, 'Could not load your CV library. Retry before editing.'))
+      if (generation.current === version) {
+        setLoadError(getErrorMessage(error, 'Could not load your CV library. Retry before editing.'))
+        setLoadErrorOwner(owner)
+      }
     } finally {
       if (generation.current === version) setLoading(false)
     }
-  }, [cloud, user])
+  }, [cloud, owner, userId])
   useEffect(() => { void reload() }, [reload])
   useEffect(()=>{const refresh=(event:StorageEvent)=>{if(!cloud && event.key===LOCAL_KEY)void reload()};window.addEventListener('storage',refresh);return()=>window.removeEventListener('storage',refresh)},[cloud,reload])
 
@@ -186,16 +196,20 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     })
     window.dispatchEvent(new Event(CV_LIBRARY_EVENT))
   }, [cloud, user, runMutation])
-  const getCv = useCallback((id: string) => library.cvs[id], [library])
-  const getLabel = useCallback((id: string) => cvLabel(library, id), [library])
+  const ownerReady = loadedOwner.current === owner
+  const visibleLibrary = ownerReady ? library : emptyLibrary
+  const visibleLoading = loading || (!ownerReady && loadErrorOwner !== owner)
+  const visibleError = loadErrorOwner === owner ? loadError : null
+  const getCv = useCallback((id: string) => visibleLibrary.cvs[id], [visibleLibrary])
+  const getLabel = useCallback((id: string) => cvLabel(visibleLibrary, id), [visibleLibrary])
   const saveLibrary = useCallback((next: MasterCvLibrary) => persist(() => normalizeLibrary(next)), [persist])
   const saveMasterCv = useCallback((cv: MasterCv) => saveTrackCv(current.current.activeTrack, cv), [saveTrackCv])
   const updateMasterCv = useCallback((updates: Partial<MasterCv>) => persist((value) =>
     saveSharedCv(value, value.activeTrack, {...value.cvs[value.activeTrack], ...updates})), [persist])
-  const value = useMemo(() => ({library, masterCv:library.cvs[library.activeTrack], activeTrack:library.activeTrack,
-    loading, loadError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
+  const value = useMemo(() => ({library:visibleLibrary, masterCv:visibleLibrary.cvs[visibleLibrary.activeTrack], activeTrack:visibleLibrary.activeTrack,
+    loading:visibleLoading, loadError:visibleError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
     saveLibrary, saveMasterCv, updateMasterCv, addTemplate, renameTemplate, deleteTemplate}),
-  [library, loading, loadError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
+  [visibleLibrary, visibleLoading, visibleError, reload, setDefaultTrack, getCv, getLabel, saveTrackCv, saveTemplate, saveAttachment,
     saveLibrary, saveMasterCv, updateMasterCv, addTemplate, renameTemplate, deleteTemplate])
   return <MasterCvContext.Provider value={value}>{children}</MasterCvContext.Provider>
 }
