@@ -5,6 +5,11 @@ export interface JobReviewPanelState {
   open: ReadonlySet<JobReviewPanelId>
 }
 
+export interface ScopedJobReviewSnapshot<T> {
+  scope: string
+  data: T
+}
+
 export function createJobReviewPanelState(scope: string): JobReviewPanelState {
   return { scope, open: new Set() }
 }
@@ -23,4 +28,14 @@ export function updateJobReviewPanel(
 
 export function shouldOpenGapForExplanation(previousSkill: string | null, nextSkill: string | null): boolean {
   return Boolean(nextSkill && nextSkill !== previousSkill)
+}
+
+export function retainJobReviewSnapshot<T>(
+  scope: string,
+  loading: boolean,
+  current: T | null,
+  previous: ScopedJobReviewSnapshot<T> | null,
+): ScopedJobReviewSnapshot<T> | null {
+  if (loading) return previous?.scope === scope ? previous : null
+  return current === null ? null : { scope, data: current }
 }

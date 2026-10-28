@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../src/lib/jobReviewPanels.ts', import.meta
 const code = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText
-const { createJobReviewPanelState, shouldOpenGapForExplanation, updateJobReviewPanel } = await import(
+const { createJobReviewPanelState, retainJobReviewSnapshot, shouldOpenGapForExplanation, updateJobReviewPanel } = await import(
   `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 )
 
@@ -31,6 +31,20 @@ test('switching accounts or jobs never carries open review sections into the new
 
   state = updateJobReviewPanel(state, 'account-b:job-2', 'cover', true)
   assert.deepEqual([...state.open], ['cover'])
+})
+
+test('a same-scope load retains review data, while account/job changes clear the snapshot', () => {
+  const initial = { report: 'gap report', action: 'packing' }
+  const ready = retainJobReviewSnapshot('account-a:job-1', false, initial, null)
+  const loading = retainJobReviewSnapshot('account-a:job-1', true, null, ready)
+  assert.equal(loading, ready)
+  assert.deepEqual(loading?.data, initial)
+
+  const refreshed = retainJobReviewSnapshot('account-a:job-1', false, { report: 'updated report', action: null }, loading)
+  assert.deepEqual(refreshed?.data, { report: 'updated report', action: null })
+  assert.equal(retainJobReviewSnapshot('account-b:job-1', true, null, refreshed), null)
+  assert.equal(retainJobReviewSnapshot('account-a:job-2', true, null, refreshed), null)
+  assert.equal(retainJobReviewSnapshot('account-a:job-1', false, null, refreshed), null)
 })
 
 test('an explanation opens Gap Check only when a different explanation becomes active', () => {
@@ -58,17 +72,29 @@ test('an explanation opens Gap Check only when a different explanation becomes a
 test('explanation auto-open tracking remains above the loading boundary and ignores panel toggles', () => {
   const component = readFileSync(new URL('../src/components/TailorPanel.tsx', import.meta.url), 'utf8')
   const trackingStart = component.indexOf('const previousExplanation = useRef')
-  const loadingBoundary = component.indexOf('if (loading || docsLoading) return')
+  const loadingBoundary = component.indexOf('if (!snapshot) {')
   const tracking = component.slice(trackingStart, loadingBoundary)
   assert.ok(trackingStart >= 0 && loadingBoundary > trackingStart)
   assert.match(tracking, /shouldOpenGapForExplanation\(previousSkill, explainSkillName\)/)
   assert.doesNotMatch(tracking, /openPanels/)
 })
 
+test('same-scope loading keeps TailorPanelContent mounted behind an inert, non-layout overlay', () => {
+  const component = readFileSync(new URL('../src/components/TailorPanel.tsx', import.meta.url), 'utf8')
+  assert.match(component, /retainJobReviewSnapshot\(panelScope, dataLoading, currentSnapshot, lastReady\.current\)/)
+  assert.match(component, /<TailorPanelContent key=\{`\$\{panelScope\}:\$\{job\.id\}`\}/)
+  assert.match(component, /className="absolute inset-0 z-20[^"]*"/)
+  assert.match(component, /element\.setAttribute\('inert', ''\)/)
+  assert.match(component, /if \(!snapshot\) \{\s*if \(dataLoading\) return/)
+})
+
 test('same-account token refresh does not re-run the CV load callback', () => {
   const hook = readFileSync(new URL('../src/hooks/useMasterCv.tsx', import.meta.url), 'utf8')
   assert.match(hook, /const userId = user\?\.id/)
-  assert.match(hook, /\}, \[cloud, userId\]\)/)
+  assert.match(hook, /const owner = cloud && userId \? `cloud:\$\{userId\}` : 'local'/)
+  assert.match(hook, /loadedOwner\.current === owner/)
+  assert.match(hook, /visibleLibrary = ownerReady \? library : emptyLibrary/)
+  assert.match(hook, /\}, \[cloud, owner, userId\]\)/)
   assert.doesNotMatch(hook, /\}, \[cloud, user\]\)/)
 })
 
