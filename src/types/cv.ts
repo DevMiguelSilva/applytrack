@@ -164,6 +164,14 @@ export interface MasterCvLibrary {
   cvs: Record<CvTrack, MasterCv>
   attachments: Record<CvTrack, ResumeAttachment | null>
   updatedAt: string
+  sharedDetails?: SharedCvDetails
+}
+
+/** Migration keeps the exact original document, including fields unknown to this version. */
+export interface SharedCvDetails {
+  version: 1
+  original: unknown
+  roles: Omit<CvExperience, 'bullets'>[]
 }
 
 /** have = already on the master CV. added = checked for this job. missing = not included. */
@@ -355,6 +363,12 @@ export function normalizeLibrary(raw: unknown): MasterCvLibrary {
 
   // Already a library
   if (obj.cvs && typeof obj.cvs === 'object') {
+    if (obj.sharedDetails !== undefined && (!obj.sharedDetails || typeof obj.sharedDetails !== 'object'
+      || (obj.sharedDetails as SharedCvDetails).version !== 1
+      || !Array.isArray((obj.sharedDetails as SharedCvDetails).roles)
+      || !('original' in obj.sharedDetails))) {
+      throw new Error('The shared CV library metadata is invalid. Restore a backup before editing.')
+    }
     const rawCvs = obj.cvs as Record<string, MasterCv>
     const ids = Object.keys(rawCvs).filter((key) => !['auto', '__proto__', 'constructor', 'prototype'].includes(key))
     if (!ids.length) return base
@@ -369,6 +383,7 @@ export function normalizeLibrary(raw: unknown): MasterCvLibrary {
       cvs: Object.fromEntries(ids.map((key) => [key, normalizeMasterCv(rawCvs[key], base.cvs[key] ?? createEmptyMasterCv())])),
       attachments: Object.fromEntries(ids.map((key) => [key, attachments[key] ?? null])),
       updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : base.updatedAt,
+      ...(obj.sharedDetails && typeof obj.sharedDetails === 'object' ? { sharedDetails: obj.sharedDetails as SharedCvDetails } : {}),
     }
   }
 
