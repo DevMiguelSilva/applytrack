@@ -669,7 +669,7 @@ export function JobDetailPage() {
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
       {job.status === 'saved' && !job.deletedAt && <label className="ui-label block legacy-size-text_sm">CV template<select aria-label="CV template" className="mt-2 w-full ui-field form-select" value={job.needsCvSelection ? "" : job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, needsCvSelection: false, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.needsCvSelection ? "" : job.cvTrack ?? activeTrack}>Choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
-      {job.jdComplete && <TailorPanel job={job} />}
+      {job.jdComplete && <TailorPanel key={`${account}:${job.id}`} job={job} />}
       <dialog ref={trashDialog} aria-labelledby="trash-job-title" aria-describedby="trash-job-description" aria-busy={sendingTrash || trashPending.current}
         onKeyDown={event => {
           if (event.key !== 'Tab') return

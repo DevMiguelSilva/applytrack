@@ -21,9 +21,9 @@ import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoring } from '../hooks/useTailoring'
 import { useSkillExplanations } from '../hooks/skillExplanationsContext'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
+import { useAuth } from '../hooks/useAuth'
+import { createJobReviewPanelState, updateJobReviewPanel, type JobReviewPanelId } from '../lib/jobReviewPanels'
 import { LoadingSpinner } from './LoadingSpinner'
-
-type PanelId = 'gap' | 'tailor' | 'cover'
 
 interface TailorPanelProps {
   job: JobApplication
@@ -102,6 +102,13 @@ function SkillAnswer({
 }
 
 export function TailorPanel({ job }: TailorPanelProps) {
+  const { user, isCloudEnabled } = useAuth()
+  const panelScope = `${isCloudEnabled ? user?.id ?? 'signed-out' : 'local'}:${job.id}`
+  const [panelState, setPanelState] = useState(() => createJobReviewPanelState(panelScope))
+  const openPanels = panelState.scope === panelScope ? panelState.open : new Set<JobReviewPanelId>()
+  const setPanelOpen = useCallback((id: JobReviewPanelId, open: boolean) => {
+    setPanelState(current => updateJobReviewPanel(current, panelScope, id, open))
+  }, [panelScope])
   const { library, loading, loadError, getLabel } = useMasterCv()
   const { getForJob, loading: docsLoading } = useTailoredDocs()
   const doc = getForJob(job.id)
@@ -110,10 +117,16 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const masterCv = liveCv ?? storedCvContent(doc?.masterCvSnapshot) ?? storedCvContent(doc?.tailoredCv) ?? (doc?.coverLetter ? emptyStoredCv : null)
   if (loading || docsLoading) return <p className="ui-helper text-brand-muted legacy-size-text_sm">Loading application documents…</p>
   if (!masterCv) return <section className="ui-panel  "><h2 className=" ui-section-title">Application document unavailable</h2><p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
-  return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} canGenerate={canGenerate} templateLabel={canGenerate ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
+  return <TailorPanelContent key={`${panelScope}:${job.id}`} job={job} masterCv={masterCv} canGenerate={canGenerate} templateLabel={canGenerate ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} openPanels={openPanels} setPanelOpen={setPanelOpen} />
 }
 
-function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: TailorPanelProps & { masterCv: MasterCv; templateLabel: string; canGenerate: boolean }) {
+function TailorPanelContent({ job, masterCv, templateLabel, canGenerate, openPanels, setPanelOpen }: TailorPanelProps & {
+  masterCv: MasterCv
+  templateLabel: string
+  canGenerate: boolean
+  openPanels: ReadonlySet<JobReviewPanelId>
+  setPanelOpen: (id: JobReviewPanelId, open: boolean) => void
+}) {
   const { updateJob } = useJobs()
   const { getForJob } = useTailoredDocs()
   const { tasks, start, retrySave } = useTailoring()
@@ -133,8 +146,6 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
     ...(existing?.gapReport ?? {}),
     claimedKeywords: existing?.gapReport?.claimedKeywords ?? [],
   }))
-  /** Panels start collapsed even when saved results exist. */
-  const [openPanels, setOpenPanels] = useState<Set<PanelId>>(() => new Set())
   useEffect(() => {
     if (existing?.gapReport) setGapReport(existing.gapReport)
   }, [existing])
@@ -154,15 +165,6 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
   const cvSelectionKey = gapCvSelectionKey(job.cvTrack, masterCvSearchText(masterCv))
   const gapRefreshTracker = useRef<GapCvRefreshTracker | null>(null)
   if (!gapRefreshTracker.current) gapRefreshTracker.current = new GapCvRefreshTracker(cvSelectionKey)
-
-  const setPanelOpen = (id: PanelId, open: boolean) => {
-    setOpenPanels((prev) => {
-      const next = new Set(prev)
-      if (open) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }
 
   const computeGap = useCallback((claimed: string[]) =>
     buildGapReport(
@@ -258,13 +260,8 @@ function TailorPanelContent({ job, masterCv, templateLabel, canGenerate }: Tailo
   const explainSkillName = skillExplanation?.skill ?? null
   useEffect(() => {
     if (!explainSkillName) return
-    setOpenPanels((prev) => {
-      if (prev.has('gap')) return prev
-      const next = new Set(prev)
-      next.add('gap')
-      return next
-    })
-  }, [explainSkillName])
+    if (!openPanels.has('gap')) setPanelOpen('gap', true)
+  }, [explainSkillName, openPanels, setPanelOpen])
   const lookupSkill = (skill: string) => skillExplanations.toggle(job.id, skill)
 
   const onTailorClick = () => {
