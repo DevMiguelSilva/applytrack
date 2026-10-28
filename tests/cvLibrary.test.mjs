@@ -53,7 +53,7 @@ test('migration retains the original and keeps ambiguous roles and highlights se
   assert.throws(() => migrateSharedCv(missing), /Power Platform/)
 })
 
-test('shared saves propagate facts and deletions without changing another profile’s highlights or selection', () => {
+test('shared saves propagate facts and role deletion without changing other highlights', () => {
   const source = createDefaultLibrary()
   source.cvs.powerPlatform.experience = [{ id:'r', company:'Before', title:'Engineer', location:'', start:'2020', end:'', current:true, bullets:[{id:'a',text:'Original',tags:[]}] }]
   const migrated = migrateSharedCv(source)
@@ -68,11 +68,12 @@ test('shared saves propagate facts and deletions without changing another profil
   assert.equal(saved.cvs.frontend.experience[0].bullets[0].text, 'Different')
   assert.equal(saved.cvs.frontend.contact.email, 'shared@example.test')
   const removed = saveSharedCv(saved, 'powerPlatform', {...saved.cvs.powerPlatform, experience: []})
-  assert.equal(removed.cvs.frontend.experience.length, 1)
+  assert.equal(removed.cvs.frontend.experience.length, 0)
+  assert.equal(removed.sharedDetails.roles.some(entry => entry.id === role.id), false)
   const blank = addCvTemplate(removed, 'Blank')
   assert.equal(blank.cvs[blank.activeTrack].contact.email, 'shared@example.test')
   assert.deepEqual(blank.cvs[blank.activeTrack].experience, [])
-  const copy = addCvTemplate(removed, 'Copy', 'frontend')
+  const copy = addCvTemplate(saved, 'Copy', 'frontend')
   assert.equal(copy.cvs[copy.activeTrack].experience[0].id, role.id)
 })
 
@@ -88,13 +89,18 @@ test('new roles appear in existing profiles with independent highlights, and sub
   frontend.experience[0].title = 'Senior Engineer'
   frontend.experience[0].bullets = [{id:'second-highlight', text:'React work', tags:[]}]
   const edited = saveSharedCv(saved, 'frontend', frontend)
+  const submittedSnapshot = structuredClone(edited.cvs.powerPlatform)
   assert.equal(edited.cvs.powerPlatform.experience[0].title, 'Senior Engineer')
   assert.equal(edited.cvs.powerPlatform.experience[0].bullets[0].text, 'Platform work')
   assert.equal(edited.cvs.frontend.experience[0].bullets[0].text, 'React work')
   const removed = saveSharedCv(edited, 'frontend', {...edited.cvs.frontend, experience:[]})
+  assert.equal(edited.cvs.powerPlatform.experience.length, 1)
+  assert.equal(submittedSnapshot.experience[0].bullets[0].text, 'Platform work')
+  assert.equal(resolveJobCv(removed, {status:'applied'}, {masterCvSnapshot:submittedSnapshot}), submittedSnapshot)
   const later = saveSharedCv(removed, 'powerPlatform', removed.cvs.powerPlatform)
   assert.equal(later.cvs.frontend.experience.length, 0)
-  assert.equal(later.cvs.powerPlatform.experience.length, 1)
+  assert.equal(later.cvs.powerPlatform.experience.length, 0)
+  assert.equal(later.sharedDetails.roles.some(entry => entry.id === 'new-role'), false)
 })
 
 test('local migration secures the original before writing and can retry a failed migration', () => {

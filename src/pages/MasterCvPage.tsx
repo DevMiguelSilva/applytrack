@@ -503,7 +503,7 @@ export function MasterCvPage() {
         onCancel={closeItemRemoval}
         onConfirm={confirmItemRemoval}
       >
-        {itemRemoval && <p>Remove ‘{itemRemoval.label}’ from this CV draft?{itemRemoval.hasChildren && <> This also removes its {itemRemoval.kind === 'skillGroup' ? 'skills' : 'highlights'}.</>} {['education', 'project', 'certification'].includes(itemRemoval.kind) ? 'Saving this removal updates every profile.' : itemRemoval.kind === 'experience' ? 'Other profiles keep this role.' : ''} Save CV to keep this change.</p>}
+        {itemRemoval && <p>Remove ‘{itemRemoval.label}’ from this CV draft?{itemRemoval.kind === 'experience' ? ' Saving removes this role and its highlights from every profile.' : <>{itemRemoval.hasChildren && <> This also removes its {itemRemoval.kind === 'skillGroup' ? 'skills' : 'highlights'}.</>} {['education', 'project', 'certification'].includes(itemRemoval.kind) && 'Saving this removal updates every profile.'}</>} Save CV to keep this change.</p>}
       </DeleteDialog>
       {itemDeleteNotice && <p role="status" className="ui-helper legacy-size-text_sm">{itemDeleteNotice}</p>}
       {library.sharedDetails && <details className="ui-panel"><summary>Recover details from before sharing</summary><p className="ui-helper">The original library includes each profile’s previous contact, education, projects, certifications, and roles. Download it to compare or copy details into your current profiles.</p><button type="button" className={button} onClick={() => { const url = URL.createObjectURL(new Blob([JSON.stringify(library.sharedDetails!.original, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'applytrack-cv-library-before-sharing.json'; link.click(); URL.revokeObjectURL(url) }}>Download original library</button></details>}
@@ -538,7 +538,7 @@ export function MasterCvPage() {
             {importNote}
           </p>
         )}
-        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates contact, education, projects and certifications in every profile, adds new roles to every profile, and updates shared role details.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
+        {reviewingImport && <div className="space-y-2"><p className="ui-helper">Review the imported fields below. Section changes stay in the draft until you save the imported CV. Saving updates shared details in every profile. Added or removed roles also change every profile, including their highlights for removed roles.</p><button type="button" className="ui-button ui-primary" onClick={() => void saveEditorAction('import')}>Save imported CV</button> <button type="button" className={button} onClick={() => { setDraft(null); setPendingAttachment(undefined); setReviewingImport(false); setImportNote(null); setEditingSection(null); draftOwner.current = null }}>Discard import</button></div>}
       </section>
 
       <form ref={editorForm} onSubmit={handleSave} className="cv-editor-sections">
@@ -788,7 +788,7 @@ function ExperienceEditor({
 }) {
   return (
     <section className="ui-panel cv-editor-section min-w-0">
-      <CvSectionHeading step="02" title="Experience" description="New roles are added to every profile. Role details are shared; highlights and removal belong to this profile." action={<>{editing && <button
+      <CvSectionHeading step="02" title="Experience" description="Roles are shared; highlights are specific to this CV." action={<>{editing && <button
           type="button"
           className="ui-button ui-secondary cv-add-button"
           data-cv-section-add="experience"
