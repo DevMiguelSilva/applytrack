@@ -25,6 +25,7 @@ import { useAuth } from './useAuth'
 
 const LOCAL_KEY = 'applytrack-saved-searches'
 const SEEDED_KEY = 'applytrack-searches-seeded-v2'
+const EMPTY_SEARCHES: SavedSearch[] = []
 
 function seededStorageKey(userId?: string | null): string {
   return userId ? `${SEEDED_KEY}:${userId}` : SEEDED_KEY
@@ -130,34 +131,41 @@ function buildDefaultSearches(): SavedSearch[] {
 export function SavedSearchesProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
   const {library} = useMasterCv()
-  const owner=isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
+  const userId=isCloudEnabled ? user?.id : undefined
+  const owner=isCloudEnabled ? userId ?? 'signed-out' : 'local'
   const live=useRef({owner,library}); live.current={owner,library}
   const queue=useRef<Promise<unknown>>(Promise.resolve())
   const version=useRef(0)
   const [searches,setSearches]=useState<SavedSearch[]>([])
   const [loading,setLoading]=useState(true)
-  const cloud=isCloudEnabled && Boolean(user)
+  const loadedOwner=useRef<string | null>(null)
+  const cloud=isCloudEnabled && Boolean(userId)
   const readCloud=useCallback(async()=>{
-    const {data,error}=await supabase!.from('saved_searches').select('*').eq('user_id',user!.id).order('sort_order')
+    const {data,error}=await supabase!.from('saved_searches').select('*').eq('user_id',userId!).order('sort_order')
     if(error)throw error
     return sortSearches((data??[]).map((row,i)=>normalizeSearch(rowToSavedSearch(row),i)))
-  },[user])
+  },[userId])
   const load=useCallback(async()=>{
     const attempt=++version.current, account=owner
     setLoading(true)
     try {
       let next=cloud ? await readCloud() : await withLocalMutation(readLocal)
       if(live.current.owner!==account || attempt!==version.current)return
-      if(!next.length && !hasSeeded(user?.id)) {
+      if(!next.length && !hasSeeded(userId)) {
         next=buildDefaultSearches()
-        if(cloud){const {error}=await supabase!.from('saved_searches').insert(next.map(s=>savedSearchToRow(s,user!.id)));if(error)throw error}
+        if(cloud){const {error}=await supabase!.from('saved_searches').insert(next.map(s=>savedSearchToRow(s,userId!)));if(error)throw error}
         else next=await withLocalMutation(()=>{if(live.current.owner!==account)throw new Error('Account changed');const latest=readLocal();if(latest.length)return latest;writeLocal(next);return next})
       }
       if(live.current.owner!==account || attempt!==version.current)return
-      markSeeded(user?.id);setSearches(next)
-    } catch(error) {if(live.current.owner===account)console.error('Could not load saved searches',error)}
+      markSeeded(userId);loadedOwner.current=account;setSearches(next)
+    } catch(error) {
+      if(live.current.owner===account && attempt===version.current){
+        if(loadedOwner.current!==account){loadedOwner.current=account;setSearches([])}
+        console.error('Could not load saved searches',error)
+      }
+    }
     finally {if(live.current.owner===account && attempt===version.current)setLoading(false)}
-  },[cloud,readCloud,owner,user])
+  },[cloud,readCloud,owner,userId])
   const invalidateLoad=useCallback(()=>{version.current++},[])
   useEffect(()=>{setSearches([]);void load();const refresh=()=>{void load()};const storage=(event:StorageEvent)=>{if(!cloud && ['applytrack-saved-searches','applytrack-master-cv'].includes(event.key??''))refresh()};window.addEventListener(CV_LIBRARY_EVENT,refresh);window.addEventListener('storage',storage);return()=>{invalidateLoad();window.removeEventListener(CV_LIBRARY_EVENT,refresh);window.removeEventListener('storage',storage)}},[load,invalidateLoad,cloud])
   const mutate=useCallback((change:(current:SavedSearch[])=>SavedSearch[])=>{
@@ -172,27 +180,27 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
         next.forEach(search=>validateSearchSource(live.current.library,search))
         for(const search of next){
           const old=before.find(s=>s.id===search.id)
-          const after=savedSearchToRow(search,user!.id)
+          const after=savedSearchToRow(search,userId!)
           if(!old){const {error}=await supabase!.from('saved_searches').insert(after);if(error)throw error}
           else {
-            const previous=savedSearchToRow(old,user!.id)
+            const previous=savedSearchToRow(old,userId!)
             const patch=Object.fromEntries(Object.entries(after).filter(([key,value])=>key!=='updated_at' && JSON.stringify(value)!==JSON.stringify(previous[key as keyof typeof previous])))
-            if(Object.keys(patch).length){const {error}=await supabase!.from('saved_searches').update({...patch,updated_at:new Date().toISOString()}).eq('id',search.id).eq('user_id',user!.id);if(error)throw error}
+            if(Object.keys(patch).length){const {error}=await supabase!.from('saved_searches').update({...patch,updated_at:new Date().toISOString()}).eq('id',search.id).eq('user_id',userId!);if(error)throw error}
           }
           check()
         }
         const removed=before.filter(s=>!next.some(n=>n.id===s.id)).map(s=>s.id)
-        if(removed.length){const {error}=await supabase!.from('saved_searches').delete().eq('user_id',user!.id).in('id',removed);if(error)throw error}
+        if(removed.length){const {error}=await supabase!.from('saved_searches').delete().eq('user_id',userId!).in('id',removed);if(error)throw error}
         next=await readCloud()
       } else next=await withLocalMutation(()=>{
         check();const current=readLocal();const updated=sortSearches(change(current))
         const currentLibrary=normalizeLibrary(JSON.parse(localStorage.getItem('applytrack-master-cv')??'null'))
         updated.forEach(search=>validateSearchSource(currentLibrary,search));writeLocal(updated);return updated
       })
-      check();version.current++;markSeeded(user?.id);setSearches(next);setLoading(false);return next
+      check();version.current++;markSeeded(userId);loadedOwner.current=account;setSearches(next);setLoading(false);return next
     })
     queue.current=operation.catch(()=>{});return operation
-  },[owner,cloud,readCloud,user])
+  },[owner,cloud,readCloud,userId])
   const addSearch=useCallback(async(search:SavedSearch)=>{await mutate(current=>[...current,normalizeSearch({...search,needsCvSelection:false,sortOrder:current.length})])},[mutate])
   const updateSearch=useCallback(async(id:string,updates:Partial<SavedSearch>)=>{await mutate(current=>current.map(search=>{
     if(search.id!==id)return search
@@ -211,7 +219,9 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
     const next=[...current];next.splice(to,0,...next.splice(from,1));return next.map((s,i)=>({...s,sortOrder:i}))
   })},[mutate])
   const seedDefaults=useCallback(async()=>{for(const search of buildDefaultSearches())await addSearch(search)},[addSearch])
-  const value=useMemo(()=>({searches,loading,addSearch,updateSearch,deleteSearch,activateOnly,activateAll,reorderSearches,seedDefaults}),[searches,loading,addSearch,updateSearch,deleteSearch,activateOnly,activateAll,reorderSearches,seedDefaults])
+  const visibleSearches=loadedOwner.current===owner ? searches : EMPTY_SEARCHES
+  const visibleLoading=loading || loadedOwner.current!==owner
+  const value=useMemo(()=>({searches:visibleSearches,loading:visibleLoading,addSearch,updateSearch,deleteSearch,activateOnly,activateAll,reorderSearches,seedDefaults}),[visibleSearches,visibleLoading,addSearch,updateSearch,deleteSearch,activateOnly,activateAll,reorderSearches,seedDefaults])
   return <SavedSearchesContext.Provider value={value}>{children}</SavedSearchesContext.Provider>
 }
 export function useSavedSearches() {

@@ -14,7 +14,7 @@ export interface SearchOutcome {
 }
 export interface RefreshReport {
   outcomes: SearchOutcome[]
-  persistence: 'saved' | 'failed' | 'unchanged'
+  persistence: 'saved' | 'failed' | 'pending' | 'unchanged'
   saveError?: string
   invalidated?: boolean
 }

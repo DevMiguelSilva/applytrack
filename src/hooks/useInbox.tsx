@@ -17,6 +17,7 @@ import { fetchAdzunaSearch } from '../api/client'
 import { parseJobPosting } from '../api/gemini'
 import { inboxJobToRow, rowToInboxJob } from '../lib/database'
 import { InboxSaveError, inboxSaveStep, safeInboxSaveError, saveCloudInboxResults } from '../lib/inboxPersistence'
+import { observeInboxSave } from '../lib/inboxSaveWait'
 import {
   dualTrackReasonLine,
   createCvMatcher,
@@ -138,18 +139,22 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const [refreshReport, setRefreshReport] = useState<RefreshReport | null>(null)
   type PendingRefresh = { account: string; outcomes: SearchOutcome[]; rows: InboxJob[]; started: number; runAlone: boolean; valid: () => boolean }
   const pending = useRef<PendingRefresh | null>(null)
+  const inFlightSave = useRef<{ batch: PendingRefresh } | null>(null)
   const session = useRef<{ account: string; requests: SearchOutcome[]; started: number; runAlone: boolean; baseline: Map<string, InboxJob> } | null>(null)
   const refreshBusy = useRef(false)
+  const refreshGeneration = useRef(0)
   const validRequests = useCallback((requests: SearchOutcome[], owner: string) => current.current.account === owner && requests.every(request => {
     const source = sourcesNow()
     const search = source.searches.find(entry => entry.id === request.search.id)
     return search && searchHasLiveSource(source.library, search) && searchFingerprint(search) === searchFingerprint(request.search)
   }), [sourcesNow])
   useEffect(() => {
+    const generation = refreshGeneration
     manager.invalidate()
+    generation.current++
     pending.current = null; session.current = null; refreshBusy.current = false
     setRefreshing(false); setRefreshReport(null); setRefreshError(null)
-    return () => manager.invalidate()
+    return () => { generation.current++; manager.invalidate() }
   }, [manager])
   useEffect(() => {
     if (session.current && !validRequests(session.current.requests, session.current.account)) {
@@ -208,7 +213,8 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => { window.removeEventListener(CV_LIBRARY_EVENT, refresh); window.removeEventListener('storage', storage) }
   }, [load, isCloudSync])
 
-  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false) => {
+  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false, phase?: (value: 'read' | 'write') => void) => {
+    if (inFlightSave.current) return Promise.reject(new Error('A previous Inbox save is still awaiting a response. Try again after it finishes.'))
     const owner = account
     const operation = mutations.current.catch(() => {}).then(async () => {
       const check = () => { if (current.current.account !== owner || owner === 'signed-out' || !valid()) throw new RefreshInvalidated('Searches or account changed. Refresh again.') }
@@ -217,7 +223,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const before = inboxRef.current
       let next = transform(before)
       if (fetched && isCloudSync && supabase && userId) {
-        next = await saveCloudInboxResults(supabase, userId, transform, check)
+        next = await saveCloudInboxResults(supabase, userId, transform, check, phase)
       } else if (isCloudSync && supabase && userId) {
         const oldById = new Map(before.map(item => [item.id, item]))
         const changed = next.filter(item => JSON.stringify(item) !== JSON.stringify(oldById.get(item.id)))
@@ -262,21 +268,53 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       setRefreshReport({ outcomes: batch.outcomes, persistence: 'unchanged' })
       return
     }
-    try {
-      await persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), batch.valid, true)
-      pending.current = null
-      setRefreshReport({ outcomes: batch.outcomes, persistence: 'saved' })
-    } catch (error) {
-      if (error instanceof RefreshInvalidated || !batch.valid()) throw new RefreshInvalidated()
-      // Retain fetched rows for save-only retry; keep the previous review list visible.
-      pending.current = batch
-      setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed', saveError: (error instanceof InboxSaveError ? error : safeInboxSaveError(isCloudSync ? 'upsert' : 'local', error)).message })
+    const control: { phase: 'queued' | 'read' | 'write'; canceled: boolean } = { phase: 'queued', canceled: false }
+    const operation = persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), () => !control.canceled && batch.valid(), true, phase => { control.phase = phase })
+    const attempt = { batch }
+    inFlightSave.current = attempt
+    const observed = observeInboxSave(operation)
+    const finish = (result: Awaited<typeof observed.result>) => {
+      if (inFlightSave.current !== attempt) return
+      inFlightSave.current = null
+      if (!batch.valid()) return
+      setRefreshError(null)
+      if (result.status === 'fulfilled') {
+        pending.current = null
+        setRefreshReport({ outcomes: batch.outcomes, persistence: 'saved' })
+      } else if (result.error instanceof RefreshInvalidated) {
+        pending.current = null
+        setRefreshError('Searches or account changed. Refresh again to use the latest filters.')
+      } else {
+        pending.current = batch
+        setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed', saveError: (result.error instanceof InboxSaveError ? result.error : safeInboxSaveError(isCloudSync ? 'upsert' : 'local', result.error)).message })
+      }
     }
+    const initial = await observed.initial
+    if (initial.status === 'pending') {
+      void observed.result.then(finish)
+      if (control.phase === 'read') {
+        // A read cannot commit changes. Revoke this attempt before allowing a new one;
+        // a late response is checked before it can dispatch any further database writes.
+        control.canceled = true
+        if (inFlightSave.current === attempt) inFlightSave.current = null
+        if (mutations.current === operation) mutations.current = Promise.resolve()
+        if (batch.valid()) {
+          pending.current = batch
+          setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed', saveError: 'Reading saved Inbox results timed out. Retry saving without another search request.' })
+        }
+        return
+      }
+      if (!batch.valid()) return
+      pending.current = batch
+      setRefreshReport({ outcomes: batch.outcomes, persistence: 'pending' })
+    } else finish(initial)
   }
 
   const collect = async (retry: boolean, options?: RefreshInboxOptions) => {
+    if (inFlightSave.current) { setRefreshError('A previous Inbox save is still awaiting a response. Try again after it finishes.'); return }
     if (refreshBusy.current || loading || account === 'signed-out') return
     refreshBusy.current = true
+    const generation = ++refreshGeneration.current
     setRefreshing(true); setRefreshError(null); setRefreshReport(null)
     const owner = account
     try {
@@ -310,20 +348,22 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
       await saveFetched({ account: owner, outcomes, rows, started: run.started, runAlone: run.runAlone, valid })
     } catch (error) {
-      if (current.current.account === owner) setRefreshError(error instanceof RefreshInvalidated ? 'Searches or account changed. Refresh again to use the latest filters.' : 'Could not prepare the fetched jobs. Check the selected CVs and refresh again. Your existing jobs are safe.')
+      if (current.current.account === owner && refreshGeneration.current === generation) setRefreshError(error instanceof RefreshInvalidated ? 'Searches or account changed. Refresh again to use the latest filters.' : 'Could not prepare the fetched jobs. Check the selected CVs and refresh again. Your existing jobs are safe.')
     } finally {
-      if (current.current.account === owner) { refreshBusy.current = false; setRefreshing(false) }
+      if (current.current.account === owner && refreshGeneration.current === generation) { refreshBusy.current = false; setRefreshing(false) }
     }
   }
   const refreshInbox = (options?: RefreshInboxOptions) => collect(false, options)
   const retryFailedSearches = () => collect(true)
   const retryInboxSave = async () => {
+    if (inFlightSave.current) { setRefreshError('A previous Inbox save is still awaiting a response. Try again after it finishes.'); return }
     if (refreshBusy.current || !pending.current) return
     refreshBusy.current = true; setRefreshing(true); setRefreshError(null)
+    const generation = ++refreshGeneration.current
     const batch = pending.current
     try { await saveFetched(batch) }
-    catch { if (current.current.account === batch.account) setRefreshError('Searches changed. Refresh again to use the latest filters.') }
-    finally { if (current.current.account === batch.account) { refreshBusy.current = false; setRefreshing(false) } }
+    catch { if (current.current.account === batch.account && refreshGeneration.current === generation) setRefreshError('Searches changed. Refresh again to use the latest filters.') }
+    finally { if (current.current.account === batch.account && refreshGeneration.current === generation) { refreshBusy.current = false; setRefreshing(false) } }
   }
 
   const updateInboxItem = useCallback(async (id: string, updates: Partial<InboxJob>) => {
@@ -332,6 +372,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
   const approveJob = useCallback(
     async (id: string) => {
+      if (inFlightSave.current) throw new Error('A previous Inbox save is still awaiting a response. Try again after it finishes.')
       const owner = account
       const item = (isCloudSync ? inboxRef.current : await withLocalMutation(readLocal)).find((i) => i.id === id)
       if (!item) throw new Error('Inbox item not found')
@@ -394,6 +435,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         jdComplete: false,
       })
 
+      if (inFlightSave.current) throw new Error('A previous Inbox save is still awaiting a response. Try again after it finishes.')
       await addJob(job)
       await updateInboxItem(id, { status: 'approved' })
       return job.id
