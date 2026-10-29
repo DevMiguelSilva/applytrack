@@ -163,6 +163,27 @@ test('a timed-out write may commit late but invalidation prevents subsequent wri
   assert(!state.calls.includes('delete'))
 })
 
+test('a stalled read can be revoked and retried without letting its late response write', async () => {
+  const { client, state } = cloud([fixture('history', 'dismissed')])
+  let release
+  state.stall = 'read'
+  state.stallUntil = new Promise(resolve => { release = resolve })
+  let valid = true
+  let phase = ''
+  const merge = items => mergeInboxResults(items, [fixture('fresh')], new Set(), false, false, 0)
+  const old = observeInboxSave(saveCloudInboxResults(client, 'owner', merge, () => { if (!valid) throw new RefreshInvalidated() }, value => { phase = value }), 5)
+  assert.equal((await old.initial).status, 'pending')
+  assert.equal(phase, 'read')
+  valid = false
+  state.stall = null
+  const result = await saveCloudInboxResults(client, 'owner', merge, () => {})
+  assert.equal(result.find(row => row.externalId === 'history').status, 'dismissed')
+  release()
+  assert.equal((await old.result).status, 'rejected')
+  assert.equal(state.calls.filter(call => call === 'insert').length, 1)
+  assert.equal(state.rows.filter(row => row.external_id === 'fresh').length, 1)
+})
+
 test('cloud failures before writing and invalidation during reads leave storage unchanged', async () => {
   const { client, state } = cloud([fixture('history', 'dismissed')])
   const merge = items => mergeInboxResults(items, [fixture('fresh')], new Set(), true, false, 0)

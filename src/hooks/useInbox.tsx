@@ -139,7 +139,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const [refreshReport, setRefreshReport] = useState<RefreshReport | null>(null)
   type PendingRefresh = { account: string; outcomes: SearchOutcome[]; rows: InboxJob[]; started: number; runAlone: boolean; valid: () => boolean }
   const pending = useRef<PendingRefresh | null>(null)
-  const inFlightSave = useRef<PendingRefresh | null>(null)
+  const inFlightSave = useRef<{ batch: PendingRefresh } | null>(null)
   const session = useRef<{ account: string; requests: SearchOutcome[]; started: number; runAlone: boolean; baseline: Map<string, InboxJob> } | null>(null)
   const refreshBusy = useRef(false)
   const refreshGeneration = useRef(0)
@@ -213,7 +213,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => { window.removeEventListener(CV_LIBRARY_EVENT, refresh); window.removeEventListener('storage', storage) }
   }, [load, isCloudSync])
 
-  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false) => {
+  const persistAll = useCallback((transform: (items: InboxJob[]) => InboxJob[], valid: () => boolean = () => true, fetched = false, phase?: (value: 'read' | 'write') => void) => {
     if (inFlightSave.current) return Promise.reject(new Error('A previous Inbox save is still awaiting a response. Try again after it finishes.'))
     const owner = account
     const operation = mutations.current.catch(() => {}).then(async () => {
@@ -223,7 +223,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const before = inboxRef.current
       let next = transform(before)
       if (fetched && isCloudSync && supabase && userId) {
-        next = await saveCloudInboxResults(supabase, userId, transform, check)
+        next = await saveCloudInboxResults(supabase, userId, transform, check, phase)
       } else if (isCloudSync && supabase && userId) {
         const oldById = new Map(before.map(item => [item.id, item]))
         const changed = next.filter(item => JSON.stringify(item) !== JSON.stringify(oldById.get(item.id)))
@@ -268,11 +268,13 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       setRefreshReport({ outcomes: batch.outcomes, persistence: 'unchanged' })
       return
     }
-    const operation = persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), batch.valid, true)
-    inFlightSave.current = batch
+    const control: { phase: 'queued' | 'read' | 'write'; canceled: boolean } = { phase: 'queued', canceled: false }
+    const operation = persistAll(items => mergeInboxResults(items, batch.rows, new Set(current.current.jobs.filter(job => job.externalId && !job.deletedAt).map(job => job.externalId)), complete, batch.runAlone, batch.started), () => !control.canceled && batch.valid(), true, phase => { control.phase = phase })
+    const attempt = { batch }
+    inFlightSave.current = attempt
     const observed = observeInboxSave(operation)
     const finish = (result: Awaited<typeof observed.result>) => {
-      if (inFlightSave.current !== batch) return
+      if (inFlightSave.current !== attempt) return
       inFlightSave.current = null
       if (!batch.valid()) return
       setRefreshError(null)
@@ -290,6 +292,18 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     const initial = await observed.initial
     if (initial.status === 'pending') {
       void observed.result.then(finish)
+      if (control.phase === 'read') {
+        // A read cannot commit changes. Revoke this attempt before allowing a new one;
+        // a late response is checked before it can dispatch any further database writes.
+        control.canceled = true
+        if (inFlightSave.current === attempt) inFlightSave.current = null
+        if (mutations.current === operation) mutations.current = Promise.resolve()
+        if (batch.valid()) {
+          pending.current = batch
+          setRefreshReport({ outcomes: batch.outcomes, persistence: 'failed', saveError: 'Reading saved Inbox results timed out. Retry saving without another search request.' })
+        }
+        return
+      }
       if (!batch.valid()) return
       pending.current = batch
       setRefreshReport({ outcomes: batch.outcomes, persistence: 'pending' })

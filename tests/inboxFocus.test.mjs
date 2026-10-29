@@ -147,7 +147,11 @@ test('an old account request cannot end a newer refresh after switching away and
   globalThis.__inboxFocus = {
     auth: { user: { id: 'account-a' }, isCloudEnabled: true }, searches: [search],
     fetch: () => new Promise(resolve => deferred.push(resolve)),
-    save: () => new Promise((resolve, reject) => saves.push({ resolve, reject })),
+    savePhase: 'write',
+    save: (_client, _user, _transform, check, phase) => {
+      phase(globalThis.__inboxFocus.savePhase)
+      return new Promise((resolve, reject) => saves.push({ resolve, reject })).then(result => { check(); return result })
+    },
     supabase: { from: () => ({ select: () => ({ eq: () => ({ order: async () => ({ data: [], error: null }) }) }) }) },
   }
   const inboxMocks = {
@@ -245,6 +249,24 @@ test('an old account request cannot end a newer refresh after switching away and
   assert.equal(deferred.length, 7)
   await act(async () => { deferred[6]({ results: [], requestId: 'account-b' }); await afterSwitch })
   assert.equal(inbox.refreshReport.persistence, 'unchanged')
+
+  globalThis.__inboxFocus.savePhase = 'read'
+  let stalledRead
+  await act(async () => { stalledRead = inbox.refreshInbox() })
+  await act(async () => { deferred[7]({ results: [job], requestId: 'fixture' }) })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); await stalledRead })
+  assert.equal(inbox.refreshReport.persistence, 'failed')
+  assert.match(inbox.refreshReport.saveError, /Reading saved Inbox results timed out/)
+  globalThis.__inboxFocus.savePhase = 'write'
+  let readRetry
+  await act(async () => { readRetry = inbox.retryInboxSave() })
+  assert.equal(saves.length, 8)
+  assert.equal(deferred.length, 8)
+  await act(async () => { saves[6].resolve([]); await Promise.resolve() })
+  assert.equal(inbox.refreshing, true)
+  await assert.rejects(inbox.clearReviewList(), /still awaiting a response/)
+  await act(async () => { saves[7].resolve([]); await readRetry })
+  assert.equal(inbox.refreshReport.persistence, 'saved')
   await act(async () => tree.unmount())
   delete globalThis.__inboxFocus
 })
