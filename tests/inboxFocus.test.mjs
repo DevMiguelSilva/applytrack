@@ -33,6 +33,19 @@ const { InboxRefresh, searchRequests } = await import(transpile('../src/lib/inbo
   '../../shared/adzunaErrors': errorUrl, './searchLocations': locationUrl,
 }))
 
+test('the summary explains an unknown save and offers retry after a known failure', async () => {
+  const { InboxRefreshSummary } = await import(transpile('../src/components/InboxRefreshSummary.tsx', {}))
+  const report = { outcomes: [], persistence: 'pending' }
+  const props = { report, busy: false, retryFailed: async () => {}, retrySave: async () => {} }
+  const view = TestRenderer.create(React.createElement(InboxRefreshSummary, props))
+  assert.match(JSON.stringify(view.toJSON()), /Save status unknown/)
+  assert.match(JSON.stringify(view.toJSON()), /may still finish/)
+  assert.equal(view.root.findAllByType('button').length, 0)
+  view.update(React.createElement(InboxRefreshSummary, { ...props, report: { ...report, persistence: 'failed' } }))
+  assert.equal(view.root.findAllByType('button')[0].children.join(''), 'Retry saving results')
+  view.unmount()
+})
+
 test('a delayed refresh survives a same-account auth update and rejects changed account or searches', async () => {
   const search = { id: 'one', query: 'developer', location: 'Toronto', country: 'ca', maxDaysOld: 7, excludeTerms: '', track: 'auto', label: 'Fixture', active: true, sortOrder: 0, createdAt: '2020-01-01', updatedAt: '2020-01-01' }
   const stored = new Map([['applytrack-searches-seeded-v2:account-a', '1'], ['applytrack-searches-seeded-v2:account-b', '1']])
@@ -147,6 +160,7 @@ test('an old account request cannot end a newer refresh after switching away and
     '../api/gemini': 'export const parseJobPosting = async () => ({})',
     '../lib/inboxRefresh': `export { InboxRefresh, RefreshInvalidated, searchFingerprint, searchRequests, mergeInboxResults } from '${transpile('../src/lib/inboxRefresh.ts', { '../../shared/adzunaErrors': errorUrl, './searchLocations': locationUrl })}'`,
     '../lib/inboxPersistence': 'export class InboxSaveError extends Error {}; export const inboxSaveStep = async (_stage, fn) => fn(); export const safeInboxSaveError = () => new InboxSaveError("Save failed"); export const saveCloudInboxResults = (...args) => globalThis.__inboxFocus.save(...args)',
+    '../lib/inboxSaveWait': `import { observeInboxSave as observe } from '${transpile('../src/lib/inboxSaveWait.ts', {})}'; export const observeInboxSave = operation => observe(operation, 10)`,
     '../lib/database': 'export const inboxJobToRow = x => x; export const rowToInboxJob = x => x',
     '../lib/matchScore': 'export const createCvMatcher = () => () => ({ bestTrack: "frontend", bestScore: 80, scores: { frontend: { score: 80, reasons: [] } } }); export const dualTrackReasonLine = () => ""; export const scoreDualTracks = () => ({}); export const scoreMasterCvAgainstJob = () => ({}); export const withRequirementSignals = () => []',
     '../types/job': 'export const createEmptyJob = x => x',
@@ -189,6 +203,48 @@ test('an old account request cannot end a newer refresh after switching away and
   await act(async () => { saves[1].resolve([]); await retry })
   assert.equal(inbox.refreshReport.persistence, 'saved')
   assert.equal(inbox.refreshing, false)
+
+  let stalled
+  await act(async () => { stalled = inbox.refreshInbox() })
+  await act(async () => { deferred[3]({ results: [job], requestId: 'fixture' }) })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); await stalled })
+  assert.equal(inbox.refreshing, false)
+  assert.equal(inbox.refreshReport.persistence, 'pending')
+  await act(async () => { await inbox.retryInboxSave(); await inbox.refreshInbox() })
+  assert.equal(saves.length, 3)
+  assert.equal(deferred.length, 4)
+  await assert.rejects(inbox.clearReviewList(), /still awaiting a response/)
+  await act(async () => { saves[2].resolve([]); await Promise.resolve() })
+  assert.equal(inbox.refreshReport.persistence, 'saved')
+
+  let stalledFailure
+  await act(async () => { stalledFailure = inbox.refreshInbox() })
+  await act(async () => { deferred[4]({ results: [job], requestId: 'fixture' }) })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); await stalledFailure })
+  assert.equal(inbox.refreshReport.persistence, 'pending')
+  await act(async () => { saves[3].reject(new Error('late failure')); await Promise.resolve() })
+  assert.equal(inbox.refreshReport.persistence, 'failed')
+  let lateRetry
+  await act(async () => { lateRetry = inbox.retryInboxSave() })
+  assert.equal(deferred.length, 5)
+  await act(async () => { saves[4].resolve([]); await lateRetry })
+  assert.equal(inbox.refreshReport.persistence, 'saved')
+
+  let beforeSwitch
+  await act(async () => { beforeSwitch = inbox.refreshInbox() })
+  await act(async () => { deferred[5]({ results: [job], requestId: 'fixture' }) })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); await beforeSwitch })
+  await act(async () => { globalThis.__inboxFocus.auth = { user: { id: 'account-b' }, isCloudEnabled: true }; tree.update(view()) })
+  assert.equal(inbox.refreshReport, null)
+  await act(async () => { await inbox.refreshInbox() })
+  assert.equal(deferred.length, 6)
+  await act(async () => { saves[5].resolve([]); await Promise.resolve() })
+  assert.equal(inbox.refreshReport, null)
+  let afterSwitch
+  await act(async () => { afterSwitch = inbox.refreshInbox() })
+  assert.equal(deferred.length, 7)
+  await act(async () => { deferred[6]({ results: [], requestId: 'account-b' }); await afterSwitch })
+  assert.equal(inbox.refreshReport.persistence, 'unchanged')
   await act(async () => tree.unmount())
   delete globalThis.__inboxFocus
 })

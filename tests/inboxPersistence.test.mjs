@@ -15,6 +15,7 @@ function moduleUrl(url) {
 const { inboxSaveStep, safeInboxSaveError, saveCloudInboxResults } = await import(moduleUrl(new URL('../src/lib/inboxPersistence.ts', import.meta.url)))
 const { mergeInboxResults, RefreshInvalidated } = await import(moduleUrl(new URL('../src/lib/inboxRefresh.ts', import.meta.url)))
 const { inboxJobToRow } = await import(moduleUrl(new URL('../src/lib/database.ts', import.meta.url)))
+const { observeInboxSave } = await import(moduleUrl(new URL('../src/lib/inboxSaveWait.ts', import.meta.url)))
 
 test('save diagnostics distinguish stages and safely classify known database failures', async () => {
   for (const [code, category] of [['23505', 'conflict'], ['42501', 'access'], ['PGRST301', 'access'], ['23503', 'reference'], ['42703', 'schema'], ['PGRST204', 'schema'], ['arbitrary private code', 'unavailable']]) {
@@ -52,7 +53,7 @@ test('failed storage operation can be repeated with the retained payload after r
 
 const fixture = (externalId, status = 'new', id = externalId) => ({ id, externalId, source: 'adzuna', company: 'Fixture', role: 'Developer', location: '', jobUrl: '', salary: '', description: '', matchScore: 70, matchReasons: [], matchedTrack: null, status, savedSearchId: null, seenCount: 1, fetchedAt: '2026-10-16T12:00:00Z', createdAt: '2026-10-16T12:00:00Z', updatedAt: '2026-10-16T12:00:00Z' })
 function cloud(items = []) {
-  const state = { rows: items.map(item => inboxJobToRow(item, 'owner')), fail: null, race: null, beforeUpdate: null, calls: [] }
+  const state = { rows: items.map(item => inboxJobToRow(item, 'owner')), fail: null, race: null, beforeUpdate: null, calls: [], stall: null, stallUntil: null }
   const client = { from(table) {
     assert.equal(table, 'job_inbox')
     let operation, payload, options, range, filters = []
@@ -66,8 +67,9 @@ function cloud(items = []) {
       order() { return this },
       range(start, end) { range = [start, end]; return this },
       then(resolve, reject) {
-        return Promise.resolve().then(() => {
+        return Promise.resolve().then(async () => {
           state.calls.push(operation)
+          if (state.stall === operation) await state.stallUntil
           if (state.fail === operation) return { error: { code: '42501', message: 'private' } }
           if (operation === 'insert') {
             if (state.race) { const run = state.race; state.race = null; run(state) }
@@ -139,6 +141,26 @@ test('partial cloud commit retries retain history, deduplicate and recover pruni
   const result = await saveCloudInboxResults(client, 'owner', merge, () => {})
   assert.deepEqual(result.map(row => row.externalId).sort(), ['fresh', 'history'])
   assert.equal(result.find(row => row.externalId === 'history').status, 'approved')
+})
+
+test('a timed-out write may commit late but invalidation prevents subsequent writes or pruning', async () => {
+  const { client, state } = cloud([fixture('old'), fixture('history', 'approved')])
+  let release
+  state.stall = 'insert'
+  state.stallUntil = new Promise(resolve => { release = resolve })
+  let valid = true
+  const check = () => { if (!valid) throw new RefreshInvalidated() }
+  const merge = items => mergeInboxResults(items, [fixture('fresh')], new Set(), true, false, Date.now())
+  const observed = observeInboxSave(saveCloudInboxResults(client, 'owner', merge, check), 5)
+  assert.equal((await observed.initial).status, 'pending')
+  assert.deepEqual(state.calls, ['read', 'insert'])
+  valid = false
+  release()
+  assert.equal((await observed.result).status, 'rejected')
+  assert.equal(state.rows.find(row => row.external_id === 'history').status, 'approved')
+  assert(state.rows.some(row => row.external_id === 'old'))
+  assert(state.rows.some(row => row.external_id === 'fresh'))
+  assert(!state.calls.includes('delete'))
 })
 
 test('cloud failures before writing and invalidation during reads leave storage unchanged', async () => {
