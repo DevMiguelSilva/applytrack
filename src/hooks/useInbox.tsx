@@ -140,16 +140,19 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const pending = useRef<PendingRefresh | null>(null)
   const session = useRef<{ account: string; requests: SearchOutcome[]; started: number; runAlone: boolean; baseline: Map<string, InboxJob> } | null>(null)
   const refreshBusy = useRef(false)
+  const refreshGeneration = useRef(0)
   const validRequests = useCallback((requests: SearchOutcome[], owner: string) => current.current.account === owner && requests.every(request => {
     const source = sourcesNow()
     const search = source.searches.find(entry => entry.id === request.search.id)
     return search && searchHasLiveSource(source.library, search) && searchFingerprint(search) === searchFingerprint(request.search)
   }), [sourcesNow])
   useEffect(() => {
+    const generation = refreshGeneration
     manager.invalidate()
+    generation.current++
     pending.current = null; session.current = null; refreshBusy.current = false
     setRefreshing(false); setRefreshReport(null); setRefreshError(null)
-    return () => manager.invalidate()
+    return () => { generation.current++; manager.invalidate() }
   }, [manager])
   useEffect(() => {
     if (session.current && !validRequests(session.current.requests, session.current.account)) {
@@ -277,6 +280,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const collect = async (retry: boolean, options?: RefreshInboxOptions) => {
     if (refreshBusy.current || loading || account === 'signed-out') return
     refreshBusy.current = true
+    const generation = ++refreshGeneration.current
     setRefreshing(true); setRefreshError(null); setRefreshReport(null)
     const owner = account
     try {
@@ -310,9 +314,9 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
       await saveFetched({ account: owner, outcomes, rows, started: run.started, runAlone: run.runAlone, valid })
     } catch (error) {
-      if (current.current.account === owner) setRefreshError(error instanceof RefreshInvalidated ? 'Searches or account changed. Refresh again to use the latest filters.' : 'Could not prepare the fetched jobs. Check the selected CVs and refresh again. Your existing jobs are safe.')
+      if (current.current.account === owner && refreshGeneration.current === generation) setRefreshError(error instanceof RefreshInvalidated ? 'Searches or account changed. Refresh again to use the latest filters.' : 'Could not prepare the fetched jobs. Check the selected CVs and refresh again. Your existing jobs are safe.')
     } finally {
-      if (current.current.account === owner) { refreshBusy.current = false; setRefreshing(false) }
+      if (current.current.account === owner && refreshGeneration.current === generation) { refreshBusy.current = false; setRefreshing(false) }
     }
   }
   const refreshInbox = (options?: RefreshInboxOptions) => collect(false, options)
@@ -320,10 +324,11 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const retryInboxSave = async () => {
     if (refreshBusy.current || !pending.current) return
     refreshBusy.current = true; setRefreshing(true); setRefreshError(null)
+    const generation = ++refreshGeneration.current
     const batch = pending.current
     try { await saveFetched(batch) }
-    catch { if (current.current.account === batch.account) setRefreshError('Searches changed. Refresh again to use the latest filters.') }
-    finally { if (current.current.account === batch.account) { refreshBusy.current = false; setRefreshing(false) } }
+    catch { if (current.current.account === batch.account && refreshGeneration.current === generation) setRefreshError('Searches changed. Refresh again to use the latest filters.') }
+    finally { if (current.current.account === batch.account && refreshGeneration.current === generation) { refreshBusy.current = false; setRefreshing(false) } }
   }
 
   const updateInboxItem = useCallback(async (id: string, updates: Partial<InboxJob>) => {

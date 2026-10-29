@@ -1,5 +1,11 @@
 # Inbox search reliability
 
+## Focus and authentication refresh
+
+An authentication event can replace the user object while keeping the same account ID. Previously that restarted the saved-search provider, cleared its search list and caused an in-flight Inbox refresh to invalidate its results. Saved-search loading now depends on the account ID and keeps each owner's searches isolated. Inbox refresh completion also uses a generation guard so an older request cannot clear a newer refresh after an account switch. The job-review focus change already stabilized CV loading on same-account auth updates; it did not stabilize the separate saved-search provider. This is a reproduced code path, not confirmation that it caused the reported browser incident.
+
+The app cannot run JavaScript while its page is suspended by the browser or operating system. The existing Adzuna timeout and partial-result/save-only retry behavior apply when execution resumes; database requests do not have an app-level timeout and an already dispatched write cannot be recalled. Automated tests use delayed mocked requests, not a suspended browser or live services.
+
 ## Save conflict correction (October 16, 2026; local implementation)
 
 The user reports Supabase error `23505`, establishing a unique constraint violation. The exact deployed constraint/request was not inspected. A controlled database mock reproduces `23505` when the old default-ID upsert sends a different row ID for an existing `(user_id, external_id)` listing, matching the repository schema. Missing/limited loaded history and partially committed attempts can expose that mismatch; which triggered the live incident remains unverified.
