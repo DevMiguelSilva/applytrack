@@ -20,6 +20,7 @@ import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoring } from '../hooks/useTailoring'
 import { useSkillExplanations } from '../hooks/skillExplanationsContext'
+import { buildSkillJobContext, skillJobContextKey } from '../../shared/skillContext'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { useAuth } from '../hooks/useAuth'
 import { createJobReviewPanelState, retainJobReviewSnapshot, shouldOpenGapForExplanation, updateJobReviewPanel, type JobReviewPanelId, type ScopedJobReviewSnapshot } from '../lib/jobReviewPanels'
@@ -117,7 +118,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
     setPanelState(current => updateJobReviewPanel(current, panelScope, id, open))
   }, [panelScope])
   const skillExplanations = useSkillExplanations()
-  const explainSkillName = skillExplanations.get(job.id)?.skill ?? null
+  const explainSkillName = skillExplanations.get(job.id, skillJobContextKey(job))?.skill ?? null
   const previousExplanation = useRef<{ scope: string; skill: string | null }>({ scope: panelScope, skill: null })
   useEffect(() => {
     const previous = previousExplanation.current
@@ -298,9 +299,10 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
     if (gapCheckMode === 'run') void runGap()
   }
 
-  const skillExplanation = skillExplanations.get(job.id)
+  const explanationContextKey = skillJobContextKey(job)
+  const skillExplanation = skillExplanations.get(job.id, explanationContextKey)
   const explainSkillName = skillExplanation?.skill ?? null
-  const lookupSkill = (skill: string) => skillExplanations.toggle(job.id, skill)
+  const lookupSkill = (skill: string) => skillExplanations.toggle(job.id, skill, explanationContextKey, buildSkillJobContext(skill, job))
 
   const onTailorClick = () => {
     if (loading || refreshing) return
@@ -556,7 +558,7 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
                         loading={skillExplanation?.status === 'loading'}
                         error={skillExplanation?.error ?? null}
                         summary={skillExplanation?.summary ?? null}
-                        onRetry={() => skillExplanations.retry(job.id, row.skill)}
+                        onRetry={() => skillExplanations.retry(job.id, row.skill, explanationContextKey, buildSkillJobContext(row.skill, job))}
                       />
                     )}
                   </li>
@@ -605,7 +607,7 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
                                 loading={skillExplanation?.status === 'loading'}
                                 error={skillExplanation?.error ?? null}
                                 summary={skillExplanation?.summary ?? null}
-                                onRetry={() => skillExplanations.retry(job.id, row.skill)}
+                                onRetry={() => skillExplanations.retry(job.id, row.skill, explanationContextKey, buildSkillJobContext(row.skill, job))}
                               />
                             </td>
                           </tr>
