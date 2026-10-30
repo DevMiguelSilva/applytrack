@@ -14,6 +14,7 @@ function source(path, replacements = {}) {
 const requirementUrl = source('../shared/jobRequirements.ts')
 const requirementPromptUrl = source('../shared/jobRequirementPrompt.ts')
 const { jobRequirementEvaluation } = await import(new URL('../evaluation/job-requirements-synthetic.mjs', import.meta.url))
+const { scoreRequirementExtraction } = await import('../scripts/requirementBenchmarkMetrics.mjs')
 const cvUrl = source('../src/types/cv.ts')
 const matchUrl = source('../src/lib/matchScore.ts', {
   "'../types/cv'": `'${cvUrl}'`,
@@ -39,6 +40,28 @@ test('live benchmark refuses unreviewed labels before checking credentials or ma
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /30 annotation records still need a human reviewer/)
   assert.doesNotMatch(result.stderr, /GEMINI_API_KEY/)
+})
+
+test('benchmark recall and critical misses require every AND component', () => {
+  const expected = [{ label: 'React and TypeScript', components: ['React', 'TypeScript'], logic: 'all', critical: true }]
+  const partial = scoreRequirementExtraction(expected, [{ label: 'React', components: ['React'], logic: 'all' }])
+  assert.equal(partial.found, 0)
+  assert.equal(partial.recall, 0)
+  assert.deepEqual(partial.criticalMisses, ['React and TypeScript'])
+
+  const complete = scoreRequirementExtraction(expected, [{ label: 'React and TypeScript', components: ['React', 'TypeScript'], logic: 'all' }])
+  assert.equal(complete.found, 1)
+  assert.equal(complete.recall, 1)
+  assert.deepEqual(complete.criticalMisses, [])
+})
+
+test('benchmark group matching preserves ANY versus ALL semantics', () => {
+  const expected = [{ label: 'React or Angular', components: ['React', 'Angular'], logic: 'any', critical: true }]
+  const sameComponentsWrongLogic = scoreRequirementExtraction(expected, [{ label: 'React and Angular', components: ['React', 'Angular'], logic: 'all' }])
+  assert.equal(sameComponentsWrongLogic.found, 0)
+  assert.deepEqual(sameComponentsWrongLogic.criticalMisses, ['React or Angular'])
+  const any = scoreRequirementExtraction(expected, [{ label: 'React or Angular', components: ['React', 'Angular'], logic: 'any' }])
+  assert.equal(any.recall, 1)
 })
 
 function analysis(text, requirements) {

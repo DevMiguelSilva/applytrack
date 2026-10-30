@@ -27,4 +27,6 @@ node scripts/benchmarkJobRequirementAnalysis.mjs
 
 The runner compares the same extraction prompt on the configured baseline model (`gemini-3.5-flash-lite` by default) and a Flash candidate (`gemini-3.8-flash` by default). It runs once on development rows and five times per held-out row, recording per-posting and per-category precision/recall, ALL/ANY group and qualifier accuracy, completeness, critical misses, latency, token counts and estimated list-price cost. Results are written under `evaluation/results/`, which is ignored by Git. Override either model with `JOB_REQUIREMENT_BASELINE_MODEL` or `JOB_REQUIREMENT_FLASH_CANDIDATE`. Model selection and operational cost limits remain open until human-verified measurements exist.
 
+Requirement recall and critical-miss matching require an exact normalized component set and the same ALL/ANY operator. Partial component overlap is a miss; group and qualifier accuracy are reported separately for fully matched groups.
+
 The current draft labels are not human-reviewed, the live comparison has not been run, and no historical user records were reviewed. The prior research only established synthetic score failures and code-path risks; it does not establish how often omissions occurred or their effect on applications.

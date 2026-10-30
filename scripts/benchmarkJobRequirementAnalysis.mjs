@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { jobRequirementEvaluation } from '../evaluation/job-requirements-synthetic.mjs'
+import { scoreRequirementExtraction } from './requirementBenchmarkMetrics.mjs'
 
 const primaryModel = process.env.JOB_REQUIREMENT_BASELINE_MODEL || 'gemini-3.5-flash-lite'
 const flashCandidate = process.env.JOB_REQUIREMENT_FLASH_CANDIDATE || 'gemini-3.8-flash'
@@ -51,32 +52,12 @@ async function request(model, description) {
   }
 }
 
-function compare(expected, predicted) {
-  const used = new Set()
-  const links = new Map()
-  for (const [index, want] of expected.entries()) {
-    const wantParts = want.components ?? [want.label]
-    let best = -1
-    let bestExact = false
-    for (const [candidateIndex, got] of predicted.entries()) {
-      if (used.has(candidateIndex)) continue
-      const parts = Array.isArray(got.components) && got.components.length ? got.components : [got.label]
-      const exact = sameSet(wantParts, parts) || norm(want.label) === norm(got.label)
-      const overlap = wantParts.filter(part => parts.some(other => norm(part) === norm(other))).length
-      if (exact || overlap > best) { best = candidateIndex; bestExact = exact; if (exact) break }
-    }
-    if (best >= 0 && (bestExact || wantParts.some(part => (predicted[best]?.components ?? []).some(other => norm(part) === norm(other))))) {
-      used.add(best); links.set(index, { predictedIndex: best, exact: bestExact })
-    }
-  }
-  return links
-}
-
 function rate(model, row, sample) {
   const expected = row.requirements
   const result = sample.result
   const predicted = Array.isArray(result?.requirements) ? result.requirements : []
-  const links = compare(expected, predicted)
+  const requirementScore = scoreRequirementExtraction(expected, predicted)
+  const { links } = requirementScore
   const extracted = predicted.length
   const parsedSections = Array.isArray(result?.sections) ? result.sections : []
   const predictedSectionIds = new Set(parsedSections.map(section => section?.id))
@@ -106,8 +87,6 @@ function rate(model, row, sample) {
     category[name] ??= { expected: 0, predicted: 0, found: 0 }
     category[name].predicted++
   }
-  const expectedCritical = expected.filter(item => item.critical)
-  const criticalMisses = expectedCritical.filter(item => !expected.some((other, i) => other === item && links.has(i))).map(item => item.label)
   const usage = sample.usage ?? {}
   const price = prices[model]
   const inputTokens = usage.promptTokenCount ?? null
@@ -118,11 +97,11 @@ function rate(model, row, sample) {
       predictedSectionIds.size === sections.length && accountedSections === sections.length &&
       sections.every(section => predictedSectionIds.has(section.id)) && parsedSections.every(section => section.disposition !== 'uncertain') &&
       predicted.length > 0 && evidence === predicted.length ? 'complete' : 'incomplete',
-    expected: expected.length, predicted: extracted, found: links.size,
-    precision: extracted ? links.size / extracted : 0, recall: expected.length ? links.size / expected.length : 0,
+    expected: expected.length, predicted: extracted, found: requirementScore.found,
+    precision: requirementScore.precision, recall: requirementScore.recall,
     category, groupAccuracy: linked ? groupCorrect / linked : 0, qualifierAccuracy: linked ? qualifierCorrect / linked : 0,
     validSourceEvidence: predicted ? evidence / Math.max(predicted.length, 1) : 0,
-    sectionsAccounted: accountedSections / Math.max(sections.length, 1), criticalMisses,
+    sectionsAccounted: accountedSections / Math.max(sections.length, 1), criticalMisses: requirementScore.criticalMisses,
     latencyMs: sample.elapsedMs, inputTokens, outputTokens,
     estimatedListCostUSD: price && inputTokens != null && outputTokens != null ? (inputTokens * price.input + outputTokens * price.output) / 1_000_000 : null,
   }
