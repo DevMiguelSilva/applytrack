@@ -507,27 +507,38 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
               Not on this CV
             </span>
           </div>
-          <ul className="space-y-2">
+          <div className="flex flex-wrap gap-2">
             {displaySkills.map((item) => {
               const className = `${chipClass(item.state)} disabled:opacity-60`
-              const stateText = item.state === 'have' ? 'On CV' : item.state === 'added' ? 'Confirmed by you' : item.state === 'uncertain' ? 'Qualifier needs evidence' : 'Missing from CV'
+              const details = [
+                item.importance ?? 'unclear',
+                item.logic && item.components?.length ? `${item.logic.toUpperCase()}: ${item.components.join(item.logic === 'all' ? ' + ' : ' / ')}` : '',
+                item.constraints?.length ? `Conditions: ${item.constraints.join(', ')}` : '',
+                item.sourceQuote ? `Source: “${item.sourceQuote}”` : '',
+              ].filter(Boolean).join(' · ')
+              const title = [
+                item.state === 'have' ? 'On your CV' : item.state === 'added' ? 'Confirmed by you' : item.state === 'uncertain' ? 'Condition needs evidence' : 'Not on this CV',
+                details,
+                item.state === 'added' ? 'Click to remove this confirmation.' : item.state === 'missing' && !skillsLocked ? 'Click if you know this skill.' : '',
+              ].filter(Boolean).join(' · ')
+              if (item.state === 'have' || item.state === 'uncertain' || skillsLocked) {
+                return <span key={item.skill} className={className} title={title} aria-label={title}>{item.skill}</span>
+              }
               return (
-                <li key={item.skill} className="rounded-lg border border-brand-line p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {item.state === 'missing' && !skillsLocked ? (
-                      <button type="button" disabled={!!loading || refreshing} onClick={() => void toggleClaimedSkill(item.skill)} className={`${className} ui-skill-control`}>{item.skill}</button>
-                    ) : item.state === 'added' && !skillsLocked ? (
-                      <button type="button" disabled={!!loading || refreshing} onClick={() => void toggleClaimedSkill(item.skill)} className={`${className} ui-skill-control`} title="Click to remove this confirmation">{item.skill}</button>
-                    ) : <span className={className}>{item.skill}</span>}
-                    {item.logic && item.components && item.components.length > 1 && <span className="ui-meta rounded bg-[#f4faf8] px-2 py-1">{item.logic.toUpperCase()}: {item.components.join(item.logic === 'all' ? ' + ' : ' / ')}</span>}
-                    <span className="ui-meta text-brand-muted">{stateText} · {item.importance ?? 'unclear'}</span>
-                  </div>
-                  {item.sourceQuote && <p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">“{item.sourceQuote}”</p>}
-                  {item.constraints?.length ? <p className="mt-1 ui-meta text-brand-muted">Conditions: {item.constraints.join(' · ')}</p> : null}
-                </li>
+                <button
+                  key={item.skill}
+                  type="button"
+                  disabled={!!loading || refreshing}
+                  onClick={() => void toggleClaimedSkill(item.skill)}
+                  title={title}
+                  aria-label={title}
+                  className={`${className} ui-skill-control`}
+                >
+                  {item.skill}
+                </button>
               )
             })}
-          </ul>
+          </div>
           <ul className="mt-3 space-y-1 ui-body text-brand-ink legacy-size-text_sm">
             {gapReport.suggestions
               .filter((s) => !(skillsLocked && s.startsWith('Warm chips')))

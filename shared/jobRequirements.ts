@@ -97,3 +97,14 @@ export function validJobRequirementAnalysis(value: unknown, sourceText?: string)
   if (a.status === 'complete' && (a.sections.length === 0 || a.sections.some((s) => s.disposition === 'uncertain'))) return false
   return true
 }
+
+/** Reuse a stored complete analysis only when its exact source text is unchanged. */
+export function reusableJobRequirementAnalysis(
+  description: string,
+  existingDescription: string,
+  analysis: unknown
+): analysis is JobRequirementAnalysis {
+  return description === existingDescription &&
+    validJobRequirementAnalysis(analysis, description) &&
+    analysis.status === 'complete'
+}

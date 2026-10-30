@@ -13,7 +13,7 @@ import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
-import { incompleteJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
+import { incompleteJobRequirementAnalysis, reusableJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
 export function JobDetailPage() {
@@ -228,9 +228,10 @@ export function JobDetailPage() {
       return
     }
 
+    const reuseAnalysis = reusableJobRequirementAnalysis(fullJd, job.jobDescription, job.requirementAnalysis)
     setSavingJd(true)
     setJdError(null)
-    setParsingJd(true)
+    setParsingJd(!reuseAnalysis)
     const sourceDescriptionAtStart = job.jobDescription
     const accountAtStart = accountRef.current
     try {
@@ -243,29 +244,31 @@ export function JobDetailPage() {
       let location = job.location
       let salary = job.salary
 
-      try {
-        const parsed = await parseJobPosting(fullJd)
-        jdSummary = parsed.summary || jdSummary
-        if (parsed.skills?.length) extractedSkills = parsed.skills
-        else extractedSkills = []
-        if (parsed.requirements?.length) extractedRequirements = parsed.requirements
-        requirementAnalysis = parsed.requirementAnalysis
-        if (parsed.company) company = parsed.company
-        if (parsed.role) role = parsed.role
-        if (parsed.location) location = parsed.location
-        if (parsed.salary) salary = parsed.salary
-      } catch (err) {
-        setJdError(
-          err instanceof Error
-            ? `${err.message} — saved description and rescored without AI parse.`
-            : 'AI parse failed — saved description and rescored without AI parse.'
-        )
-        extractedSkills = []
-        extractedRequirements = []
-        jdSummary = ''
-        requirementAnalysis = incompleteJobRequirementAnalysis(fullJd, 'Extraction failed. Retry analysis before viewing a match score or tailoring this job.')
-      } finally {
-        setParsingJd(false)
+      if (!reuseAnalysis) {
+        try {
+          const parsed = await parseJobPosting(fullJd)
+          jdSummary = parsed.summary || jdSummary
+          if (parsed.skills?.length) extractedSkills = parsed.skills
+          else extractedSkills = []
+          if (parsed.requirements?.length) extractedRequirements = parsed.requirements
+          requirementAnalysis = parsed.requirementAnalysis
+          if (parsed.company) company = parsed.company
+          if (parsed.role) role = parsed.role
+          if (parsed.location) location = parsed.location
+          if (parsed.salary) salary = parsed.salary
+        } catch (err) {
+          setJdError(
+            err instanceof Error
+              ? `${err.message} — saved description and rescored without AI parse.`
+              : 'AI parse failed — saved description and rescored without AI parse.'
+          )
+          extractedSkills = []
+          extractedRequirements = []
+          jdSummary = ''
+          requirementAnalysis = incompleteJobRequirementAnalysis(fullJd, 'Extraction failed. Retry analysis before viewing a match score or tailoring this job.')
+        } finally {
+          setParsingJd(false)
+        }
       }
 
       const track = job.cvTrack ?? activeTrack

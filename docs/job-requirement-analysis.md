@@ -16,6 +16,10 @@ Tailoring receives job basics plus the validated, complete analysis. It no longe
 
 Inbox source previews have only preliminary keyword ranking. A preview is marked incomplete and receives no requirement-coverage percentage until the user supplies a complete posting and the analysis succeeds.
 
+## Repeatability
+
+Extraction policy is passed as a fixed Gemini system instruction, separate from the untrusted posting. The UI keeps a bounded in-memory cache of complete results keyed by exact posting text and coalesces simultaneous parses; a saved job also reuses its current validated analysis when its description has not changed. This prevents repeated clicks/reloads on that saved record from silently replacing the extracted skill set. The cache is session-local and does not span tabs or fresh sessions. A new posting parse on another session or a changed posting still invokes the model. Exact model output is not guaranteed to repeat across fresh calls, model updates, or provider execution. We do not set `temperature`: Google recommends defaults for Gemini 3.x and newer models ignore or deprecate sampling overrides. The fixed instructions reduce ambiguity but do not establish extraction accuracy.
+
 ## Evaluation
 
 `evaluation/job-requirements-synthetic.mjs` contains 30 synthetic examples, with six held out. Their labels and quotes are draft annotations, explicitly marked `needs-human-review`; they are not evidence of model accuracy. Have a reviewer verify every expected group, category, qualifier and exact source quote before changing the review metadata. The live runner refuses to make provider requests while any annotation is pending:
@@ -30,3 +34,5 @@ The runner compares the same extraction prompt on the configured baseline model 
 Requirement recall and critical-miss matching require an exact normalized component set and the same ALL/ANY operator. Partial component overlap is a miss; group and qualifier accuracy are reported separately for fully matched groups.
 
 The current draft labels are not human-reviewed, the live comparison has not been run, and no historical user records were reviewed. The prior research only established synthetic score failures and code-path risks; it does not establish how often omissions occurred or their effect on applications.
+
+Model repeatability guidance: [Gemini 3.5 update](https://ai.google.dev/gemini-api/docs/whats-new-gemini-3.5) and [GenerateContent API reference](https://ai.google.dev/api/generate-content).

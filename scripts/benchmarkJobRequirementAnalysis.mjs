@@ -19,7 +19,7 @@ const transpile = async (file) => {
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
 }
-const { buildJobRequirementPrompt } = await transpile('../shared/jobRequirementPrompt.ts')
+const { buildJobRequirementPrompt, JOB_REQUIREMENT_SYSTEM_INSTRUCTION } = await transpile('../shared/jobRequirementPrompt.ts')
 const { splitJobDescription } = await transpile('../shared/jobRequirements.ts')
 
 const prices = {
@@ -35,6 +35,7 @@ async function request(model, description) {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
+        systemInstruction: { parts: [{ text: JOB_REQUIREMENT_SYSTEM_INSTRUCTION }] },
         contents: [{ parts: [{ text: buildJobRequirementPrompt(splitJobDescription(description)) }] }],
         generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json' },
       }),

@@ -11,6 +11,8 @@ async function source(path, replacements = []) {
 
 const errorMessage = ts.transpileModule(readFileSync(new URL('../src/lib/errorMessage.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
 const errorMessageUrl = `data:text/javascript;base64,${Buffer.from(errorMessage).toString('base64')}`
+const jobRequirements = ts.transpileModule(readFileSync(new URL('../shared/jobRequirements.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+const jobRequirementsUrl = `data:text/javascript;base64,${Buffer.from(jobRequirements).toString('base64')}`
 const { SkillExplanationSession } = await source('../src/lib/skillExplanationSession.ts', [["'./errorMessage'", JSON.stringify(errorMessageUrl)]])
 const { buildSkillJobContext, skillJobContextKey, validSkillJobContext } = await source('../shared/skillContext.ts')
 const deferred = () => {
@@ -126,7 +128,7 @@ test('the client sends the selected skill and posting context to the explanation
   let sent
   globalThis.__skillRequest = body => { sent = body; return Promise.resolve('Explanation') }
   const mock = `data:text/javascript;base64,${Buffer.from('export const callGemini = body => globalThis.__skillRequest(body)').toString('base64')}`
-  const { explainSkill } = await source('../src/api/gemini.ts', [["'./client'", JSON.stringify(mock)]])
+  const { explainSkill } = await source('../src/api/gemini.ts', [["'./client'", JSON.stringify(mock)], ["'../../shared/jobRequirements'", JSON.stringify(jobRequirementsUrl)]])
   const context = { role: 'Data engineer', description: 'Microsoft Fabric', skills: ['Fabric'], requirements: [] }
   assert.equal(await explainSkill('Fabric', context), 'Explanation')
   assert.deepEqual(sent, { action: 'explainSkill', skill: 'Fabric', context })

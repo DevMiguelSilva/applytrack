@@ -15,12 +15,19 @@ const requirementUrl = source('../shared/jobRequirements.ts')
 const requirementPromptUrl = source('../shared/jobRequirementPrompt.ts')
 const { jobRequirementEvaluation } = await import(new URL('../evaluation/job-requirements-synthetic.mjs', import.meta.url))
 const { scoreRequirementExtraction } = await import('../scripts/requirementBenchmarkMetrics.mjs')
+const clientStubUrl = `data:text/javascript;base64,${Buffer.from('export let callCount = 0; let reply; export function setReply(value) { reply = value }; export async function callGemini() { callCount++; return structuredClone(reply) }').toString('base64')}`
+const parseClientUrl = source('../src/api/gemini.ts', {
+  "'./client'": `'${clientStubUrl}'`,
+  "'../../shared/jobRequirements'": `'${requirementUrl}'`,
+})
+const clientStub = await import(clientStubUrl)
+const { parseJobPosting } = await import(parseClientUrl)
 const cvUrl = source('../src/types/cv.ts')
 const matchUrl = source('../src/lib/matchScore.ts', {
   "'../types/cv'": `'${cvUrl}'`,
   "'../../shared/jobRequirements'": `'${requirementUrl}'`,
 })
-const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis } = await import(requirementUrl)
+const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis, reusableJobRequirementAnalysis } = await import(requirementUrl)
 const { buildRequirementGapReport } = await import(matchUrl)
 
 test('synthetic extraction evaluation has a held-out split and exact source evidence', () => {
@@ -30,6 +37,79 @@ test('synthetic extraction evaluation has a held-out split and exact source evid
   assert.ok(jobRequirementEvaluation.every(row => row.requirements.length > 0 && row.requirements.every(item => row.description.includes(item.sourceQuote))))
   assert.ok(jobRequirementEvaluation.some(row => row.description.length > 3500))
   assert.ok(new Set(jobRequirementEvaluation.flatMap(row => row.requirements.map(item => item.category))).size >= 6)
+})
+
+test('Gap Check keeps compact skill chips and places source details in tooltips', () => {
+  const sourceText = readFileSync(new URL('../src/components/TailorPanel.tsx', import.meta.url), 'utf8')
+  assert.match(sourceText, /className="flex flex-wrap gap-2">\s*\{displaySkills\.map/)
+  assert.match(sourceText, /title=\{title\}/)
+  assert.match(sourceText, /item\.sourceQuote \? `Source:/)
+  assert.match(sourceText, /onClick=\{\(\) => void toggleClaimedSkill\(item\.skill\)\}/)
+  assert.doesNotMatch(sourceText, /<li key=\{item\.skill\} className="rounded-lg border border-brand-line p-3">/)
+})
+
+test('unchanged complete saved analysis can be reused while changed, stale and incomplete analysis cannot', () => {
+  const text = 'Required: React.'
+  const complete = analysis(text, [{ label: 'React', quote: 'Required: React.' }])
+  assert.equal(reusableJobRequirementAnalysis(text, text, complete), true)
+  assert.equal(reusableJobRequirementAnalysis(`${text} TypeScript.`, text, complete), false)
+  assert.equal(reusableJobRequirementAnalysis(text, `${text} TypeScript.`, complete), false)
+  assert.equal(reusableJobRequirementAnalysis(text, text, { ...complete, status: 'incomplete' }), false)
+})
+
+test('same complete posting reuses one validated parse result during the app session', async () => {
+  const text = 'Required: React and TypeScript.'
+  const result = {
+    company: '', role: 'Engineer', location: '', salary: '', summary: '',
+    skills: ['React', 'TypeScript'], requirements: ['React and TypeScript'],
+    requirementAnalysis: analysis(text, [{ label: 'React and TypeScript', quote: text, components: ['React', 'TypeScript'], logic: 'all' }]),
+  }
+  clientStub.setReply(result)
+  const [first, second] = await Promise.all([parseJobPosting(text), parseJobPosting(text)])
+  assert.equal(clientStub.callCount, 1)
+  assert.deepEqual(first, second)
+  first.requirementAnalysis.requirements[0].label = 'mutated caller copy'
+  assert.equal((await parseJobPosting(text)).requirementAnalysis.requirements[0].label, 'React and TypeScript')
+  assert.equal(clientStub.callCount, 1)
+
+  const changed = `${text}\n\nPreferred: Azure.`
+  clientStub.setReply({ ...result, requirementAnalysis: analysis(changed, [{ label: 'Azure', quote: 'Preferred: Azure.' }]) })
+  await parseJobPosting(changed)
+  assert.equal(clientStub.callCount, 2)
+})
+
+test('incomplete analysis is not cached so the user can retry extraction', async () => {
+  const text = 'Possibly relevant: React.'
+  const incomplete = analysis(text, [{ label: 'React', quote: text }])
+  incomplete.status = 'incomplete'
+  incomplete.sections[0].disposition = 'uncertain'
+  clientStub.setReply({ company: '', role: 'Engineer', location: '', salary: '', summary: '', skills: ['React'], requirements: ['React'], requirementAnalysis: incomplete })
+  await parseJobPosting(text)
+  await parseJobPosting(text)
+  assert.equal(clientStub.callCount, 4)
+})
+
+test('Gemini parse request uses fixed system instructions and does not rely on sampling controls', async () => {
+  const envStub = `data:text/javascript;base64,${Buffer.from('export const getGeminiApiKey = env => env.GEMINI_API_KEY; export const getGeminiLiteModel = env => env.GEMINI_MODEL_LITE || "mock-model"; export const getGeminiExplainModels = () => []; export const getGeminiTailorModels = () => []').toString('base64')}`
+  const geminiUrl = source('../api/_lib/gemini.ts', { "'./env.js'": `'${envStub}'` })
+  const { generateGeminiLiteText } = await import(geminiUrl)
+  const originalFetch = globalThis.fetch
+  let requestBody
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body)
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }), { status: 200 })
+  }
+  try {
+    await generateGeminiLiteText('Sections: [s1] Required: React.', { GEMINI_API_KEY: 'test-key', GEMINI_MODEL_LITE: 'mock-model' }, {
+      jsonMode: true, retries: 0, systemInstruction: 'Fixed extraction policy.',
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+  assert.deepEqual(requestBody.systemInstruction, { parts: [{ text: 'Fixed extraction policy.' }] })
+  assert.match(requestBody.contents[0].parts[0].text, /Sections: \[s1\]/)
+  assert.equal(requestBody.generationConfig.responseMimeType, 'application/json')
+  assert.equal('temperature' in requestBody.generationConfig, false)
 })
 
 test('live benchmark refuses unreviewed labels before checking credentials or making requests', () => {
@@ -151,9 +231,11 @@ test('job parse endpoint validates a mocked complete extraction and fails visibl
   assert.equal(result.body.result.requirementAnalysis.status, 'complete')
   assert.equal(result.body.result.requirementAnalysis.modelId, 'configured-lite')
   assert.equal(capturedOptions.jsonMode, true)
+  assert.match(capturedOptions.systemInstruction, /Process sections and qualifications in their source order/)
+  assert.match(capturedOptions.systemInstruction, /"requirements":\[/)
   assert.match(capturedPrompt, /\[s1\] Required: React and TypeScript\./)
-  assert.match(capturedPrompt, /Every input section ID must appear exactly once/)
-  assert.deepEqual(result.body.result.skills, ['React and TypeScript', 'Azure'])
+  assert.match(capturedOptions.systemInstruction, /Mark every supplied section exactly once/)
+  assert.deepEqual(result.body.result.skills, ['React', 'TypeScript', 'Azure'])
 
   const invalid = await handleGemini({ action: 'parse', description }, {}, undefined, async () => JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] }))
   assert.equal(invalid.status, 502)

@@ -36,6 +36,8 @@ export async function generateGeminiText(
     disableThinking?: boolean
     /** Ask Gemini to return a JSON object. Used for the resume. */
     jsonMode?: boolean
+    /** Fixed extraction policy, separated from untrusted job-posting content. */
+    systemInstruction?: string
   } = {}
 ): Promise<string> {
   const apiKey = getGeminiApiKey(env)
@@ -56,6 +58,7 @@ export async function generateGeminiText(
         },
         signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
         body: JSON.stringify({
+          ...(options.systemInstruction ? { systemInstruction: { parts: [{ text: options.systemInstruction }] } } : {}),
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             maxOutputTokens,
@@ -135,7 +138,7 @@ export async function generateGeminiText(
 export async function generateGeminiLiteText(
   prompt: string,
   env: ServerEnv,
-  options: { maxOutputTokens?: number; retries?: number; timeoutMs?: number; jsonMode?: boolean } = {}
+  options: { maxOutputTokens?: number; retries?: number; timeoutMs?: number; jsonMode?: boolean; systemInstruction?: string } = {}
 ): Promise<string> {
   return generateGeminiText(prompt, env, {
     ...options,
