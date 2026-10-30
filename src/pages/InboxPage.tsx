@@ -316,7 +316,7 @@ export function InboxPage() {
 
   return (
     <div className="ui-page">
-      <SectionHeader title="Inbox" description="Review job matches from your saved searches, then approve or dismiss them." actions={<div className="m-actions flex flex-wrap gap-2">
+      <SectionHeader title="Inbox" description="Review preliminary keyword estimates from your saved searches. Requirement coverage is available after you add the complete job description." actions={<div className="m-actions flex flex-wrap gap-2">
           <button ref={searchToggle} type="button" onClick={() => setShowSearches((v) => !v)} className="ui-button ui-secondary">
             {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
           </button>

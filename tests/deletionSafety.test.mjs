@@ -9,12 +9,13 @@ function moduleUrl(path,replacements={}) {
 }
 const mutationUrl=moduleUrl('../src/lib/localMutation.ts')
 const cvUrl=moduleUrl('../src/types/cv.ts')
+const requirementsUrl=moduleUrl('../shared/jobRequirements.ts')
 const {commitLocalMutation,recoverLocalMutation,withLocalMutation}=await import(mutationUrl)
 const {createDefaultLibrary,createEmptyMasterCv}=await import(cvUrl)
 const sharedUrl=moduleUrl('../src/lib/sharedCv.ts',{'../types/cv':cvUrl})
 const {deleteLocalCv,removeCvTemplate}=await import(moduleUrl('../src/lib/cvLibrary.ts',{'./localMutation':mutationUrl,'../types/cv':cvUrl,'./sharedCv':sharedUrl}))
 const {purgeLocalJobs,purgeSnapshot,capturePurgeTargets}=await import(moduleUrl('../src/lib/purgeJobs.ts',{'./localMutation':mutationUrl}))
-const {captureTailoringInput}=await import(moduleUrl('../src/lib/tailoringInputs.ts'))
+const {captureTailoringInput}=await import(moduleUrl('../src/lib/tailoringInputs.ts',{'../../shared/jobRequirements':requirementsUrl}))
 const {validateJobSource,validateSearchSource,searchHasLiveSource}=await import(moduleUrl('../src/lib/cvSources.ts'))
 const {storedCvContent}=await import(moduleUrl('../src/lib/storedCv.ts',{'../types/cv':cvUrl}))
 const storage=initial=>{const values=new Map(Object.entries(initial));return {values,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}}
@@ -63,7 +64,7 @@ test('CV deletion pins implicit defaults and Saved Trash, pauses explicit search
   assert.deepEqual(saved[2],searches[2]);assert.equal(next.activeTrack,'frontend')
   assert.equal(captureTailoringInput(updated[0],next),null)
   const chosen={...updated[0],cvTrack:'frontend',needsCvSelection:false}
-  assert.ok(captureTailoringInput(chosen,next));assert.equal(store.getItem('applytrack-tailored-docs'),docs)
+  assert.equal(captureTailoringInput(chosen,next),null);assert.equal(store.getItem('applytrack-tailored-docs'),docs)
   assert.throws(()=>validateJobSource(next,{...updated[0],needsCvSelection:false}),/Choose/)
   assert.throws(()=>validateSearchSource(next,{...saved[0],active:true}),/Choose/)
   assert.equal(searchHasLiveSource(next,saved[0]),false)
@@ -88,15 +89,19 @@ test('legacy stored output remains usable without a source snapshot or fabricate
   assert.equal(storedCvContent(null),null)
 })
 
-test('source flags round-trip in database mappings and legacy rows default false', async()=>{
+test('source flags and requirement analyses round-trip in database mappings; old rows stay legacy', async()=>{
   const jobUrl=moduleUrl('../src/types/job.ts')
   const queryUrl=moduleUrl('../src/lib/adzunaQuery.ts')
   const db=await import(moduleUrl('../src/lib/database.ts',{'../types/cv':cvUrl,'../types/job':jobUrl,'./adzunaQuery':queryUrl}))
   const {createEmptyJob,createEmptySavedSearch}=await import(jobUrl)
   const job=createEmptyJob({cvTrack:'archived',needsCvSelection:true})
   assert.equal(db.rowToJob(db.jobToRow(job,'owner')).needsCvSelection,true)
+  const requirementAnalysis={schemaVersion:1,status:'complete',sourceHash:'abc',sections:[],requirements:[]}
+  const analyzed={...job,requirementAnalysis}
+  assert.deepEqual(db.rowToJob(db.jobToRow(analyzed,'owner')).requirementAnalysis,requirementAnalysis)
   const row=db.jobToRow(job,'owner');delete row.needs_cv_selection
-  assert.equal(db.rowToJob(row).needsCvSelection,false)
+  delete row.requirement_analysis
+  assert.equal(db.rowToJob(row).needsCvSelection,false);assert.equal(db.rowToJob(row).requirementAnalysis,null)
   const search=createEmptySavedSearch({track:'archived',active:false,needsCvSelection:true})
   assert.equal(db.rowToSavedSearch(db.savedSearchToRow(search,'owner')).needsCvSelection,true)
   const library=createDefaultLibrary();delete library.cvs.powerPlatform

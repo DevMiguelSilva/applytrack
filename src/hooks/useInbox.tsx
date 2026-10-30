@@ -22,11 +22,11 @@ import {
   dualTrackReasonLine,
   createCvMatcher,
   scoreDualTracks,
-  scoreMasterCvAgainstJob,
   withRequirementSignals,
   type MatchResult,
   type DualTrackMatch,
 } from '../lib/matchScore'
+import { incompleteJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { supabase } from '../lib/supabase'
 import { type CvTrack, type MasterCv } from '../types/cv'
 import type { InboxJob, SavedSearch, SearchTrack } from '../types/job'
@@ -382,6 +382,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       let jdSummary = ''
       let extractedSkills: string[] = []
       let extractedRequirements: string[] = []
+      let requirementAnalysis = null as import('../types/job').JobApplication['requirementAnalysis']
       let salary = item.salary
       let location = item.location
       let company = item.company
@@ -393,6 +394,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
           jdSummary = parsed.summary || ''
           if (parsed.skills?.length) extractedSkills = parsed.skills
           if (parsed.requirements?.length) extractedRequirements = parsed.requirements
+          requirementAnalysis = parsed.requirementAnalysis
           if (parsed.salary) salary = parsed.salary
           if (parsed.location) location = parsed.location
           if (parsed.company) company = parsed.company
@@ -412,7 +414,9 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const currentMatch = pickMatch(jobText, search?.track ?? (item.matchedTrack && latest.library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), latest.library.cvs, latest.library.names)
       const track = currentMatch.track
       extractedSkills = withRequirementSignals(jobText, extractedSkills)
-      const coverage = scoreMasterCvAgainstJob(jobText, latest.library.cvs[track], extractedSkills)
+      requirementAnalysis = requirementAnalysis
+        ? { ...requirementAnalysis, status: 'incomplete', statusReason: 'The Inbox listing is a preview; paste the complete job description to score its requirements.' }
+        : incompleteJobRequirementAnalysis(item.description, 'The Inbox listing is a preview and extraction did not complete.')
 
       const job = createEmptyJob({
         company,
@@ -423,13 +427,14 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         status: 'saved',
         jobDescription: item.description,
         jdSummary,
-        extractedSkills: extractedSkills.length ? extractedSkills : coverage.targets,
+        extractedSkills,
         extractedRequirements,
-        notes: `Approved from inbox (${item.source}). Match ${coverage.score}% · ${latest.library.names[track]}.`,
+        requirementAnalysis,
+        notes: `Approved from inbox (${item.source}). Full job description needed for requirement matching · ${latest.library.names[track]}.`,
         source: item.source,
         externalId: item.externalId,
         savedSearchId: item.savedSearchId,
-        matchScore: coverage.score,
+        matchScore: null,
         cvTrack: track,
         // API listings are usually snippets — paste full JD on Job Detail to complete.
         jdComplete: false,

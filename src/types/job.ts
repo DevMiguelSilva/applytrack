@@ -1,4 +1,5 @@
 import type { CvTrack } from './cv'
+import type { JobRequirementAnalysis } from '../../shared/jobRequirements'
 
 export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
 export type InboxStatus = 'new' | 'approved' | 'dismissed'
@@ -36,6 +37,8 @@ export interface JobApplication {
   jdSummary: string
   extractedSkills: string[]
   extractedRequirements: string[]
+  /** Null on older saved jobs until the user explicitly reanalyzes their JD. */
+  requirementAnalysis: JobRequirementAnalysis | null
   /**
    * Gap-check skills the user confirmed they know (were "missing" on Master CV).
    * Used for coverage % and included when tailoring the resume for this job.
@@ -83,6 +86,7 @@ export interface ParsedJobPosting {
   salary: string
   skills: string[]
   requirements: string[]
+  requirementAnalysis: JobRequirementAnalysis
   summary: string
 }
 
@@ -273,6 +277,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     jdSummary: '',
     extractedSkills: [],
     extractedRequirements: [],
+    requirementAnalysis: null,
     claimedSkills: [],
     source: 'indeed',
     externalId: '',

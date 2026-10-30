@@ -25,6 +25,7 @@ create table if not exists job_applications (
   jd_summary text not null default '',
   extracted_skills jsonb not null default '[]'::jsonb,
   extracted_requirements jsonb not null default '[]'::jsonb,
+  requirement_analysis jsonb,
   claimed_skills jsonb not null default '[]'::jsonb,
   source text not null default 'manual',
   external_id text not null default '',
@@ -39,6 +40,7 @@ create table if not exists job_applications (
 alter table job_applications add column if not exists source text not null default 'manual';
 alter table job_applications add column if not exists external_id text not null default '';
 alter table job_applications add column if not exists match_score integer;
+alter table job_applications add column if not exists requirement_analysis jsonb;
 alter table job_applications add column if not exists jd_summary text not null default '';
 alter table job_applications add column if not exists jd_complete boolean;
 update job_applications
@@ -476,7 +478,7 @@ begin
   if library is distinct from p_expected_library then raise exception 'CV library changed. Restart tailoring'; end if;
   select * into job from public.job_applications where id=(p_document->>'job_application_id')::uuid and user_id=owner_id for update;
   if job.id is null or job.status<>'saved' or job.deleted_at is not null or job.needs_cv_selection then raise exception 'Application changed. Restart tailoring'; end if;
-  foreach key in array array['company','role','location','salary','job_url','job_description','jd_summary','extracted_skills','extracted_requirements','claimed_skills','cv_track'] loop
+  foreach key in array array['company','role','location','salary','job_url','job_description','jd_summary','extracted_skills','extracted_requirements','requirement_analysis','claimed_skills','cv_track'] loop
     if to_jsonb(job)->key is distinct from p_expected_job->key then raise exception 'Tailoring inputs changed'; end if;
   end loop;
   insert into public.tailored_documents(id,user_id,job_application_id,master_cv_snapshot,tailored_cv,cover_letter,gap_report,match_score,created_at,updated_at)

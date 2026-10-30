@@ -135,7 +135,7 @@ export async function generateGeminiText(
 export async function generateGeminiLiteText(
   prompt: string,
   env: ServerEnv,
-  options: { maxOutputTokens?: number; retries?: number; timeoutMs?: number } = {}
+  options: { maxOutputTokens?: number; retries?: number; timeoutMs?: number; jsonMode?: boolean } = {}
 ): Promise<string> {
   return generateGeminiText(prompt, env, {
     ...options,

@@ -22,6 +22,7 @@ export interface JobRow {
   jd_summary?: string
   extracted_skills: string[]
   extracted_requirements: string[]
+  requirement_analysis?: unknown
   claimed_skills?: string[] | null
   source?: string
   external_id?: string
@@ -139,6 +140,7 @@ export function rowToJob(row: JobRow): JobApplication {
     jdSummary: row.jd_summary ?? '',
     extractedSkills: row.extracted_skills ?? [],
     extractedRequirements: row.extracted_requirements ?? [],
+    requirementAnalysis: (row.requirement_analysis as JobApplication['requirementAnalysis']) ?? null,
     claimedSkills: row.claimed_skills ?? [],
     source: row.source ?? 'manual',
     externalId: row.external_id ?? '',
@@ -175,6 +177,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     jd_summary: job.jdSummary,
     extracted_skills: job.extractedSkills,
     extracted_requirements: job.extractedRequirements,
+    requirement_analysis: job.requirementAnalysis,
     claimed_skills: job.claimedSkills ?? [],
     source: job.source,
     external_id: job.externalId,

@@ -10,6 +10,7 @@ function moduleUrl(path, replacements = {}) {
   return `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 }
 const typesUrl = moduleUrl('../src/types/cv.ts')
+const requirementsUrl = moduleUrl('../shared/jobRequirements.ts')
 const mutationUrl = moduleUrl('../src/lib/localMutation.ts')
 const sharedUrl = moduleUrl('../src/lib/sharedCv.ts', { '../types/cv': typesUrl })
 const importUrl = moduleUrl('../src/lib/resumeImport.ts', { '../types/cv': typesUrl })
@@ -17,7 +18,7 @@ const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary, cleanMaster
 const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl, './sharedCv': sharedUrl }))
 const { migrateCloudSharedCv, migrateLocalSharedCv, migrateSharedCv, saveSharedCv } = await import(sharedUrl)
 const { mergeParsedCv } = await import(importUrl)
-const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl }))
+const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl, './localMutation': mutationUrl, '../../shared/jobRequirements': requirementsUrl }))
 
 test('legacy and dynamic libraries retain CV content, IDs, names and attachments', () => {
   const legacy = createDefaultLibrary()

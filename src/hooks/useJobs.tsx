@@ -71,6 +71,7 @@ function normalizeJob(
     jdSummary: job.jdSummary ?? '',
     extractedSkills: job.extractedSkills ?? [],
     extractedRequirements: job.extractedRequirements ?? [],
+    requirementAnalysis: job.requirementAnalysis ?? null,
     claimedSkills: job.claimedSkills ?? [],
     interviews: resolveInterviews({
       interviews: rest.interviews,

@@ -68,7 +68,7 @@ function useTailoringState() {
         projects: result.projects?.length ? result.projects : cv.projects,
         updatedAt: new Date().toISOString(),
       }
-      const gapReport = buildGapReport(`${job.role}\n${job.jobDescription}`, job.extractedSkills, masterCvSearchText(cv), job.claimedSkills ?? [])
+      const gapReport = buildGapReport(job.jobDescription, job.extractedSkills, masterCvSearchText(cv), job.claimedSkills ?? [], job.requirementAnalysis)
       const now = new Date().toISOString()
       return { id: previous?.id ?? crypto.randomUUID(), jobApplicationId: id, masterCvSnapshot: cv, tailoredCv, coverLetter, gapReport, matchScore: gapReport.coveragePercent, createdAt: previous?.createdAt ?? now, updatedAt: now }
     }, () => validate(id, fingerprint), (doc, valid) => save(doc, fingerprint, valid))

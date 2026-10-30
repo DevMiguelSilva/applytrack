@@ -20,6 +20,7 @@ const mocks = {
   '../lib/supabase': 'export const supabase = globalThis.__inboxFocus.supabase',
   '../lib/adzunaQuery': 'export const coalesceSearchQuery = x => x.query',
   '../types/job': 'export const DEFAULT_SAVED_SEARCHES = []; export const createEmptySavedSearch = x => x',
+  '../../shared/jobRequirements': 'export const incompleteJobRequirementAnalysis = () => ({})',
 }
 function transpile(path, replacements) {
   let source = readFileSync(new URL(path, import.meta.url), 'utf8')

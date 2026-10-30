@@ -13,6 +13,7 @@ import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { incompleteJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
 export function JobDetailPage() {
@@ -24,6 +25,8 @@ export function JobDetailPage() {
   const { getForJob } = useTailoredDocs()
   const { user, isCloudEnabled } = useAuth()
   const account = isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
+  const accountRef = useRef(account)
+  accountRef.current = account
   const job = id ? getJob(id) : undefined
   const hasResume = Boolean(id && getForJob(id)?.tailoredCv)
   const [showFullJd, setShowFullJd] = useState(false)
@@ -131,16 +134,14 @@ export function JobDetailPage() {
 
   const matchPercent = useMemo(() => {
     if (!job) return null
-    const savedScore = getForJob(job.id)?.matchScore
-    if (savedScore != null) return savedScore
+    const analysis = job.requirementAnalysis
+    if (!analysis || analysis.status !== 'complete' || !validJobRequirementAnalysis(analysis, job.jobDescription)) return null
+    const savedDoc = getForJob(job.id)
+    if (job.status !== 'saved' && savedDoc?.gapReport?.sourceHash === analysis.sourceHash && savedDoc.matchScore != null) return savedDoc.matchScore
     if (job.status !== 'saved' || !jobHasLiveSource(library, job)) return getForJob(job.id)?.matchScore ?? job.matchScore
     const selectedCv = getCv(job.cvTrack ?? activeTrack)
     if (!selectedCv) return null
-    return scoreMasterCvAgainstJob(
-      `${job.role}\n${job.jobDescription}`,
-      selectedCv,
-      job.extractedSkills
-    ).score
+    return scoreMasterCvAgainstJob(job.jobDescription, selectedCv, job.extractedSkills, analysis).score
   }, [job, getCv, activeTrack, getForJob, library])
 
   useEffect(() => {
@@ -198,6 +199,7 @@ export function JobDetailPage() {
 
   const hasUrl = Boolean(job.jobUrl.trim())
   const jdIncomplete = !job.jdComplete
+  const requirementAnalysisCurrent = Boolean(job.requirementAnalysis && validJobRequirementAnalysis(job.requirementAnalysis, job.jobDescription))
 
   const copyFullJd = async () => {
     const text = job.jobDescription.trim()
@@ -229,10 +231,13 @@ export function JobDetailPage() {
     setSavingJd(true)
     setJdError(null)
     setParsingJd(true)
+    const sourceDescriptionAtStart = job.jobDescription
+    const accountAtStart = accountRef.current
     try {
       let jdSummary = job.jdSummary
       let extractedSkills = job.extractedSkills
       let extractedRequirements = job.extractedRequirements
+      let requirementAnalysis = job.requirementAnalysis
       let company = job.company
       let role = job.role
       let location = job.location
@@ -244,6 +249,7 @@ export function JobDetailPage() {
         if (parsed.skills?.length) extractedSkills = parsed.skills
         else extractedSkills = []
         if (parsed.requirements?.length) extractedRequirements = parsed.requirements
+        requirementAnalysis = parsed.requirementAnalysis
         if (parsed.company) company = parsed.company
         if (parsed.role) role = parsed.role
         if (parsed.location) location = parsed.location
@@ -255,6 +261,9 @@ export function JobDetailPage() {
             : 'AI parse failed — saved description and rescored without AI parse.'
         )
         extractedSkills = []
+        extractedRequirements = []
+        jdSummary = ''
+        requirementAnalysis = incompleteJobRequirementAnalysis(fullJd, 'Extraction failed. Retry analysis before viewing a match score or tailoring this job.')
       } finally {
         setParsingJd(false)
       }
@@ -264,21 +273,28 @@ export function JobDetailPage() {
       extractedSkills = withRequirementSignals(described, extractedSkills)
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template for this job.')
-      const match = scoreMasterCvAgainstJob(described, selectedCv, extractedSkills)
+      const match = requirementAnalysis?.status === 'complete'
+        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, requirementAnalysis)
+        : null
 
+      const valid = () => {
+        const current = getJob(job.id)
+        return accountRef.current === accountAtStart && current?.jobDescription === sourceDescriptionAtStart && current.status === 'saved' && !current.deletedAt
+      }
       await updateJob(job.id, {
         jobDescription: fullJd,
         jdSummary,
-        extractedSkills: extractedSkills.length ? extractedSkills : match.targets,
+        extractedSkills: extractedSkills.length ? extractedSkills : match?.targets ?? [],
         extractedRequirements,
+        requirementAnalysis,
         company,
         role,
         location,
         salary,
-        matchScore: match.score,
+        matchScore: match?.score ?? null,
         jdComplete: true,
         needsRescore: false,
-      })
+      }, valid)
       setEditingJd(false)
       setShowFullJd(false)
     } catch (err) {
@@ -533,6 +549,22 @@ export function JobDetailPage() {
             <div>
               <h3 className="mb-1 ui-label legacy-size-text_sm">Summary</h3>
               <p className="ui-helper !text-brand-ink legacy-size-text_sm">{job.jdSummary}</p>
+            </div>
+          )}
+          {job.jobDescription && (
+            <div className="rounded-xl border border-brand-line bg-[#f8fbfa] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="ui-helper text-brand-ink legacy-size-text_sm">
+                  {requirementAnalysisCurrent && job.requirementAnalysis?.status === 'complete'
+                    ? `Requirement analysis complete · ${job.requirementAnalysis.requirements.length} source-backed requirements`
+                    : job.requirementAnalysis?.status === 'incomplete'
+                      ? `Analysis incomplete: ${job.requirementAnalysis.statusReason ?? 'coverage and tailoring are unavailable.'}`
+                      : 'Legacy analysis: reanalyze this job description to enable requirement matching.'}
+                </p>
+                {(job.requirementAnalysis?.status !== 'complete' || !requirementAnalysisCurrent) && job.status === 'saved' && !job.deletedAt && (
+                  <button type="button" className={quietBtn} onClick={openJdEditor}>Reanalyze job description</button>
+                )}
+              </div>
             </div>
           )}
           {job.extractedSkills.length > 0 && (

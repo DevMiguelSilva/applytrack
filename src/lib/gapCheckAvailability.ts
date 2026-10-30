@@ -6,6 +6,7 @@ export type GapCheckMode = 'run' | 'view' | 'disabled' | 'hidden'
 export function hasGapContent(gap: GapReport | null | undefined): boolean {
   return Boolean(
     gap && (
+      gap.analysisStatus === 'incomplete' || gap.analysisStatus === 'legacy' ||
       gap.matchedKeywords.length > 0 ||
       (gap.claimedKeywords?.length ?? 0) > 0 ||
       gap.missingKeywords.length > 0

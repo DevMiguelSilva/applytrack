@@ -169,10 +169,12 @@ test('retry retains the selected posting context', async () => {
 test('the explain endpoint sends bounded posting data to a mocked model and handles ambiguity and failures', async () => {
   const dataUrl = text => `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`
   const contextUrl = dataUrl(ts.transpileModule(readFileSync(new URL('../shared/skillContext.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+  const requirementsUrl = dataUrl(ts.transpileModule(readFileSync(new URL('../shared/jobRequirements.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+  const requirementPromptUrl = dataUrl(ts.transpileModule(readFileSync(new URL('../shared/jobRequirementPrompt.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
   const errors = dataUrl('export class AdzunaError extends Error {}')
   const adzuna = dataUrl('export const searchAdzuna = async () => []')
   const gemini = dataUrl('export const extractJsonArray = () => []; export const extractJsonObject = () => ({}); export const generateGeminiExplainText = async () => ""; export const generateGeminiLiteText = async () => ""; export const generateGeminiTailorText = async () => ({})')
-  const { handleGemini } = await source('../api/_lib/handlers.ts', [["'../../shared/adzunaErrors.js'", JSON.stringify(errors)], ["'../../shared/skillContext.js'", JSON.stringify(contextUrl)], ["'./adzuna.js'", JSON.stringify(adzuna)], ["'./gemini.js'", JSON.stringify(gemini)]])
+  const { handleGemini } = await source('../api/_lib/handlers.ts', [["'../../shared/adzunaErrors.js'", JSON.stringify(errors)], ["'../../shared/skillContext.js'", JSON.stringify(contextUrl)], ["'../../shared/jobRequirements.js'", JSON.stringify(requirementsUrl)], ["'../../shared/jobRequirementPrompt.js'", JSON.stringify(requirementPromptUrl)], ["'./adzuna.js'", JSON.stringify(adzuna)], ["'./gemini.js'", JSON.stringify(gemini)]])
   let prompt = ''
   const explain = async value => { prompt = value; return 'Microsoft Fabric is a data platform used with Power BI.' }
   const context = { role: 'Data engineer', description: 'Microsoft Fabric and Power BI', skills: ['Fabric'], requirements: ['Microsoft data tools'] }

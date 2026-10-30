@@ -5,6 +5,7 @@ import { emptyStoredCv, storedCvContent } from '../lib/storedCv'
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
+import { validJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { gapCvSelectionKey, GapCvRefreshTracker, refreshGapReportForCvChange } from '../lib/gapCheckRefresh'
 import { getGapCheckMode, hasGapContent } from '../lib/gapCheckAvailability'
 import { getErrorMessage } from '../lib/errorMessage'
@@ -58,6 +59,7 @@ const chipMissing = 'rounded-lg bg-[#faf6ef] px-2.5 py-1 text-sm text-[#8a6230]'
 function chipClass(state: GapSkill['state']): string {
   if (state === 'have') return chipHave
   if (state === 'added') return chipAdded
+  if (state === 'uncertain') return 'rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-sm text-amber-900'
   return chipMissing
 }
 
@@ -188,9 +190,6 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
     ...(existing?.gapReport ?? {}),
     claimedKeywords: existing?.gapReport?.claimedKeywords ?? [],
   }))
-  useEffect(() => {
-    if (existing?.gapReport) setGapReport(existing.gapReport)
-  }, [existing])
   const [copied, setCopied] = useState(0)
   const feedback = useMemo(() => new CopyFeedback(
     id => { setCopied(id); if (id) setError(null) },
@@ -200,7 +199,8 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
   const copyLetter = () => feedback.copy(coverLetter, text => navigator.clipboard.writeText(text))
 
   const claimedSkills = useMemo(() => job.claimedSkills ?? [], [job.claimedSkills])
-  const skillsLocked = !canGenerate || job.status !== 'saved' || Boolean(job.deletedAt)
+  const analysisCurrent = Boolean(job.requirementAnalysis && job.requirementAnalysis.status === 'complete' && validJobRequirementAnalysis(job.requirementAnalysis, job.jobDescription))
+  const skillsLocked = !canGenerate || job.status !== 'saved' || Boolean(job.deletedAt) || !analysisCurrent
   const gapCheckMode = getGapCheckMode(job.status, canGenerate, Boolean(job.deletedAt), existing?.gapReport)
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
@@ -210,11 +210,16 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
 
   const computeGap = useCallback((claimed: string[]) =>
     buildGapReport(
-      `${job.role}\n${job.jobDescription}`,
+      job.jobDescription,
       job.extractedSkills,
       masterCvSearchText(masterCv),
-      claimed
-    ), [job.role, job.jobDescription, job.extractedSkills, masterCv])
+      claimed,
+      job.requirementAnalysis
+    ), [job.jobDescription, job.extractedSkills, job.requirementAnalysis, masterCv])
+
+  useEffect(() => {
+    setGapReport(computeGap(claimedSkills))
+  }, [existing, computeGap, claimedSkills])
 
   useEffect(() => {
     const refresh = refreshGapReportForCvChange(
@@ -229,7 +234,7 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
     const { version, report: gap } = refresh
     setGapReport(gap)
     setError(null)
-    void updateJob(job.id, { matchScore: gap.coveragePercent }).catch((err) => {
+    void updateJob(job.id, { matchScore: gap.analysisStatus === 'complete' ? gap.coveragePercent : null }).catch((err) => {
       if (gapRefreshTracker.current?.isLatest(version)) {
         setError(getErrorMessage(err, 'Could not update the CV match score'))
       }
@@ -251,15 +256,20 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
   const runGap = () =>
     run('gap', async () => {
       if (refreshing) return
+      if (!analysisCurrent) {
+        setGapReport(computeGap(claimedSkills))
+        setPanelOpen('gap', true)
+        return
+      }
       if (skillsLocked) throw new Error('Choose a CV before checking this job.')
       const gap = computeGap(claimedSkills)
-      await updateJob(job.id, { matchScore: gap.coveragePercent })
+      await updateJob(job.id, { matchScore: gap.analysisStatus === 'complete' ? gap.coveragePercent : null })
       setGapReport(gap)
       setPanelOpen('gap', true)
     })
 
   const toggleClaimedSkill = async (skill: string) => {
-    if (skillsLocked || refreshing) return
+    if (skillsLocked || !analysisCurrent || refreshing) return
     const key = skillKey(skill)
     const nextClaimed = claimedSkills.some((s) => skillKey(s) === key)
       ? claimedSkills.filter((s) => skillKey(s) !== key)
@@ -270,7 +280,7 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
     try {
       await updateJob(job.id, {
         claimedSkills: nextClaimed,
-        matchScore: gap.coveragePercent,
+        matchScore: gap.analysisStatus === 'complete' ? gap.coveragePercent : null,
       })
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to save claimed skill'))
@@ -475,7 +485,9 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
         <div className={nested}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className=" ui-label legacy-size-text_sm">
-              Keyword coverage: {gapReport.coveragePercent}%
+              {gapReport.analysisStatus === 'complete'
+                ? `Required coverage: ${gapReport.requiredCovered ?? 0}/${gapReport.requiredTotal ?? 0} · ${gapReport.coveragePercent}%`
+                : gapReport.statusMessage ?? 'Requirement analysis unavailable'}
             </h3>
             <button type="button" className={quietBtn} onClick={() => setPanelOpen('gap', false)}>
               Close
@@ -495,30 +507,27 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
               Not on this CV
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <ul className="space-y-2">
             {displaySkills.map((item) => {
               const className = `${chipClass(item.state)} disabled:opacity-60`
-              if (item.state === 'have' || skillsLocked) {
-                return (
-                  <span key={item.skill} className={className}>
-                    {item.skill}
-                  </span>
-                )
-              }
+              const stateText = item.state === 'have' ? 'On CV' : item.state === 'added' ? 'Confirmed by you' : item.state === 'uncertain' ? 'Qualifier needs evidence' : 'Missing from CV'
               return (
-                <button
-                  key={item.skill}
-                  type="button"
-                  disabled={!!loading || refreshing}
-                  onClick={() => void toggleClaimedSkill(item.skill)}
-                  title={item.state === 'added' ? 'Click to remove it from this resume' : 'Click if you know this skill'}
-                  className={`${className} ui-skill-control`}
-                >
-                  {item.skill}
-                </button>
+                <li key={item.skill} className="rounded-lg border border-brand-line p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.state === 'missing' && !skillsLocked ? (
+                      <button type="button" disabled={!!loading || refreshing} onClick={() => void toggleClaimedSkill(item.skill)} className={`${className} ui-skill-control`}>{item.skill}</button>
+                    ) : item.state === 'added' && !skillsLocked ? (
+                      <button type="button" disabled={!!loading || refreshing} onClick={() => void toggleClaimedSkill(item.skill)} className={`${className} ui-skill-control`} title="Click to remove this confirmation">{item.skill}</button>
+                    ) : <span className={className}>{item.skill}</span>}
+                    {item.logic && item.components && item.components.length > 1 && <span className="ui-meta rounded bg-[#f4faf8] px-2 py-1">{item.logic.toUpperCase()}: {item.components.join(item.logic === 'all' ? ' + ' : ' / ')}</span>}
+                    <span className="ui-meta text-brand-muted">{stateText} · {item.importance ?? 'unclear'}</span>
+                  </div>
+                  {item.sourceQuote && <p className="mt-2 ui-helper text-brand-muted legacy-size-text_sm">“{item.sourceQuote}”</p>}
+                  {item.constraints?.length ? <p className="mt-1 ui-meta text-brand-muted">Conditions: {item.constraints.join(' · ')}</p> : null}
+                </li>
               )
             })}
-          </div>
+          </ul>
           <ul className="mt-3 space-y-1 ui-body text-brand-ink legacy-size-text_sm">
             {gapReport.suggestions
               .filter((s) => !(skillsLocked && s.startsWith('Warm chips')))

@@ -32,12 +32,13 @@ export function getSavedJobIndicators(
   const cv = library.cvs[cvTrack]
   if (!cv) return { resumeReady, matchPercent: null }
 
-  const jobText = `${job.role}\n${job.jobDescription}`
+  if (!job.requirementAnalysis || job.requirementAnalysis.status !== 'complete') return { resumeReady, matchPercent: null }
   const gap = buildGapReport(
-    jobText,
+    job.jobDescription,
     job.extractedSkills,
     masterCvSearchText(cv),
-    job.claimedSkills
+    job.claimedSkills,
+    job.requirementAnalysis
   )
 
   return {

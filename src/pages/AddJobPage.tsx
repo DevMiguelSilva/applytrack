@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { incompleteJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { type CvTrack } from '../types/cv'
 import {
   createEmptyJob,
@@ -50,7 +51,7 @@ export function AddJobPage() {
     setParsing(true)
     setError(null)
     try {
-      const parsed = await parseJobPosting(pasteText)
+      const parsed = await parseJobPosting(pasteText.trim())
       setForm((prev) => ({
         ...prev,
         company: parsed.company || prev.company,
@@ -65,6 +66,7 @@ export function AddJobPage() {
           parsed.skills ?? []
         ),
         extractedRequirements: parsed.requirements ?? [],
+        requirementAnalysis: parsed.requirementAnalysis,
       }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse posting')
@@ -81,19 +83,24 @@ export function AddJobPage() {
     }
     try {
       const fullJd = form.jobDescription.trim() || pasteText.trim()
+      const requirementAnalysis = form.requirementAnalysis ?? (fullJd ? incompleteJobRequirementAnalysis(fullJd, 'This job description has not been analyzed yet.') : null)
       const track = form.cvTrack ?? activeTrack
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template before saving.')
       const described = `${form.role}\n${fullJd}`
       const extractedSkills = withRequirementSignals(described, form.extractedSkills)
-      const match = scoreMasterCvAgainstJob(described, selectedCv, extractedSkills)
+      const analysis = requirementAnalysis
+      const match = analysis?.status === 'complete'
+        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, analysis)
+        : null
       await addJob({
         ...form,
         status: 'saved',
         jobDescription: fullJd,
         extractedSkills,
+        requirementAnalysis,
         cvTrack: track,
-        matchScore: match.score,
+        matchScore: match?.score ?? null,
         jdComplete: Boolean(fullJd),
       })
       navigate(`/job/${form.id}`)
@@ -120,8 +127,9 @@ export function AddJobPage() {
             onChange={(e) => {
               const value = e.target.value
               setPasteText(value)
-              setForm((prev) => ({ ...prev, jobDescription: value }))
+              setForm((prev) => ({ ...prev, jobDescription: value, extractedSkills: [], extractedRequirements: [], requirementAnalysis: value.trim() ? incompleteJobRequirementAnalysis(value.trim(), 'This edited job description has not been analyzed yet.') : null, matchScore: null }))
             }}
+            disabled={parsing}
             rows={8}
             placeholder="Paste the complete job posting here…"
             className={fieldControl}

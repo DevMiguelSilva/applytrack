@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import ts from 'typescript'
 
-async function source(path) {
-  const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+async function source(path, replacements = []) {
+  let text = readFileSync(new URL(path, import.meta.url), 'utf8')
+  for (const [from, to] of replacements) text = text.replaceAll(from, to)
+  const code = ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
 }
 const { BackgroundTasks } = await source('../src/lib/backgroundTasks.ts')
@@ -106,14 +108,19 @@ test('score patch cannot overwrite notes, interviews, description, status, ident
   assert.deepEqual(changedJobColumns(row, { ...row, match_score: 90 }), { match_score: 90 })
 })
 
-const { captureTailoringInput } = await source('../src/lib/tailoringInputs.ts')
+const requirementsText = readFileSync(new URL('../shared/jobRequirements.ts', import.meta.url), 'utf8')
+const requirementsCode = ts.transpileModule(requirementsText, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+const requirementsUrl = `data:text/javascript;base64,${Buffer.from(requirementsCode).toString('base64')}`
+const { captureTailoringInput } = await source('../src/lib/tailoringInputs.ts', [["'../../shared/jobRequirements'", `'${requirementsUrl}'`]])
+const { jobDescriptionHash } = await import(requirementsUrl)
 test('captured inputs are immutable, allow unrelated edits, and reject deleted/submitted/missing CV jobs', () => {
-  const job = { id: 'a', status: 'saved', cvTrack: null, company: 'A', role: 'Developer', jobDescription: 'SQL', claimedSkills: ['SQL'], notes: 'Before' }
+  const job = { id: 'a', status: 'saved', cvTrack: null, company: 'A', role: 'Developer', jobDescription: 'SQL', requirementAnalysis: { schemaVersion: 1, sourceHash: jobDescriptionHash('SQL'), sourceLength: 3, status: 'complete', modelId: 'fixture', analyzedAt: '2026-10-30T00:00:00Z', sections: [{ id: 's1', disposition: 'requirements' }], requirements: [{ id: 'r1', label: 'SQL', components: ['SQL'], logic: 'all', sourceSectionId: 's1', sourceQuote: 'SQL', category: 'technical', importance: 'required', constraints: [] }] }, claimedSkills: ['SQL'], notes: 'Before' }
   const library = { activeTrack: 'cv', cvs: { cv: { summary: 'Original' }, other: { summary: 'Other' } } }
   const captured = captureTailoringInput(job, library)
   assert.equal(captured.fingerprint, captureTailoringInput({ ...job, notes: 'After', matchScore: 90, interviews: ['New'] }, library).fingerprint)
   for (const edit of [{ jobDescription: 'New JD' }, { claimedSkills: [] }, { cvTrack: 'other' }]) {
-    assert.notEqual(captured.fingerprint, captureTailoringInput({ ...job, ...edit }, library).fingerprint)
+    const changed = captureTailoringInput({ ...job, ...edit }, library)
+    assert.ok(!changed || captured.fingerprint !== changed.fingerprint)
   }
   assert.equal(captureTailoringInput({ ...job, status: 'applied' }, library), null)
   assert.equal(captureTailoringInput({ ...job, deletedAt: 'today' }, library), null)

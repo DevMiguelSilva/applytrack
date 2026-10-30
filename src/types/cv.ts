@@ -175,11 +175,16 @@ export interface SharedCvDetails {
 }
 
 /** have = already on the master CV. added = checked for this job. missing = not included. */
-export type GapSkillState = 'have' | 'added' | 'missing'
+export type GapSkillState = 'have' | 'added' | 'missing' | 'uncertain'
 
 export interface GapSkill {
   skill: string
   state: GapSkillState
+  sourceQuote?: string
+  importance?: 'required' | 'preferred' | 'unclear'
+  constraints?: string[]
+  logic?: 'all' | 'any'
+  components?: string[]
 }
 
 export interface GapReport {
@@ -191,6 +196,11 @@ export interface GapReport {
   /** JD order. Claiming a skill changes `state` only, never the position. */
   skills: GapSkill[]
   suggestions: string[]
+  analysisStatus?: 'complete' | 'incomplete' | 'legacy'
+  statusMessage?: string
+  requiredCovered?: number
+  requiredTotal?: number
+  sourceHash?: string
 }
 
 export interface TailoredDocument {
@@ -531,4 +541,8 @@ export const EMPTY_GAP_REPORT: GapReport = {
   missingKeywords: [],
   skills: [],
   suggestions: [],
+  analysisStatus: 'legacy',
+  statusMessage: 'Legacy analysis — reanalyze this job description.',
+  requiredCovered: 0,
+  requiredTotal: 0,
 }
