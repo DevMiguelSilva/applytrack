@@ -304,9 +304,34 @@ test('job parse endpoint validates a mocked complete extraction and fails visibl
   assert.match(capturedOptions.systemInstruction, /standalone terms such as “channels”, “language”, “architect”/)
   assert.deepEqual(result.body.result.skills, ['React', 'TypeScript', 'Azure'])
 
+  let repairAttempts = 0
+  let repairPrompt = ''
+  const repaired = await handleGemini({ action: 'parse', description }, {}, undefined, async (prompt) => {
+    repairAttempts++
+    if (repairAttempts === 1) return JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] })
+    repairPrompt = prompt
+    return JSON.stringify(output)
+  })
+  assert.equal(repaired.status, 200)
+  assert.equal(repairAttempts, 2)
+  assert.match(repairPrompt, /failed source validation/)
+  assert.match(repairPrompt, /short, exact, contiguous sourceQuote copied verbatim/)
+  assert.deepEqual(repaired.body.result.requirementAnalysis.requirements, output.requirements)
+
   const invalid = await handleGemini({ action: 'parse', description }, {}, undefined, async () => JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] }))
   assert.equal(invalid.status, 502)
-  assert.match(invalid.body.error, /source evidence/)
+  assert.match(invalid.body.error, /after one repair attempt/)
+  assert.doesNotMatch(invalid.body.error, /Fabricated requirement|Required: React/)
+
+  let interruptedRepairCalls = 0
+  const interruptedRepair = await handleGemini({ action: 'parse', description }, {}, undefined, async () => {
+    interruptedRepairCalls++
+    if (interruptedRepairCalls === 1) return JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] })
+    throw new Error('provider detail should stay hidden')
+  })
+  assert.equal(interruptedRepair.status, 503)
+  assert.match(interruptedRepair.body.error, /verification retry could not finish/)
+  assert.doesNotMatch(interruptedRepair.body.error, /provider detail|Fabricated requirement/)
 
   const badJson = await handleGemini({ action: 'parse', description }, {}, undefined, async () => '{not json')
   assert.equal(badJson.status, 502)

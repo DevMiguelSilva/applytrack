@@ -137,35 +137,76 @@ ${input.resumeText.slice(0, 20000)}`
         return fail(413, 'This job description is too long or structurally complex to analyze completely. Shorten or split the posting and try again.')
       }
       const prompt = buildJobRequirementPrompt(sections)
-      let text: string
-      try {
-        text = await parse(prompt, env, { maxOutputTokens: 8192, retries: 1, timeoutMs: 30000, jsonMode: true, systemInstruction: JOB_REQUIREMENT_SYSTEM_INSTRUCTION })
-      } catch (error) {
-        return fail(error instanceof Error && /rate limit/i.test(error.message) ? 429 : 503, 'Could not analyze the complete job description right now. Please try again.')
+      let parsed: Record<string, unknown> | undefined
+      let analysis: {
+        schemaVersion: 1
+        sourceHash: string
+        sourceLength: number
+        status: 'complete' | 'incomplete'
+        statusReason?: string
+        modelId: string
+        analyzedAt: string
+        sections: unknown
+        requirements: unknown[]
+      } | undefined
+      let validationIssue: 'json' | 'structure' | 'coverage' | 'source' = 'json'
+      let repairUnavailable = false
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const repairPrompt = attempt === 0 ? prompt : `${prompt}\n\nYour previous response failed ${validationIssue} validation. Return a corrected complete JSON object. Use every supplied section ID exactly once; ensure every requirement points to a supplied section and has a short, exact, contiguous sourceQuote copied verbatim from that section. Do not normalize punctuation, paraphrase quotes, invent evidence, omit sections, or return commentary. If any section cannot be classified reliably, mark it uncertain instead of claiming complete analysis.`
+        let text: string
+        try {
+          text = await parse(repairPrompt, env, {
+            maxOutputTokens: 8192,
+            retries: attempt === 0 ? 1 : 0,
+            timeoutMs: 30000,
+            jsonMode: true,
+            systemInstruction: JOB_REQUIREMENT_SYSTEM_INSTRUCTION,
+          })
+        } catch (error) {
+          if (attempt === 0) return fail(error instanceof Error && /rate limit/i.test(error.message) ? 429 : 503, 'Could not analyze the complete job description right now. Please try again.')
+          repairUnavailable = true
+          break
+        }
+        let responseParsed: Record<string, unknown>
+        try {
+          responseParsed = extractJsonObject<Record<string, unknown>>(text)
+        } catch {
+          validationIssue = 'json'
+          continue
+        }
+        parsed = responseParsed
+        const requirements = responseParsed.requirements
+        const accounted = Array.isArray(responseParsed.sections) && responseParsed.sections.length === sections.length &&
+          new Set(responseParsed.sections.map((section) => (section as { id?: unknown })?.id)).size === sections.length &&
+          sections.every(({ id }) => Array.isArray(responseParsed.sections) && (responseParsed.sections as { id?: unknown }[]).some((section) => section?.id === id))
+        const safeRequirements = Array.isArray(requirements) ? requirements : []
+        analysis = {
+          schemaVersion: 1,
+          sourceHash: jobDescriptionHash(description),
+          sourceLength: description.length,
+          status: accounted && safeRequirements.length > 0 && safeRequirements.length <= 240 && Array.isArray(responseParsed.sections) && !responseParsed.sections.some((section) => (section as { disposition?: unknown }).disposition === 'uncertain') ? 'complete' : 'incomplete',
+          statusReason: !accounted ? 'Some source sections were not accounted for.' : safeRequirements.length === 0 ? 'No candidate requirements were extracted.' : undefined,
+          modelId: env.GEMINI_MODEL_LITE || 'gemini-3.5-flash-lite',
+          analyzedAt: new Date().toISOString(),
+          sections: responseParsed.sections,
+          requirements: safeRequirements,
+        }
+        if (validJobRequirementAnalysis(analysis, description)) break
+        validationIssue = !validJobRequirementAnalysis(analysis) ? 'structure'
+          : analysis.status !== 'complete' ? 'coverage'
+            : 'source'
       }
-      let parsed: Record<string, unknown>
-      try {
-        parsed = extractJsonObject<Record<string, unknown>>(text)
-      } catch {
-        return fail(502, 'The job analysis response was not valid JSON. Please retry.')
+      if (!parsed || !analysis || !validJobRequirementAnalysis(analysis, description)) {
+        const validationMessage = validationIssue === 'source'
+          ? 'The AI could not verify exact source quotes against the posting after one repair attempt.'
+          : validationIssue === 'coverage'
+            ? 'The AI could not account for every posting section after one repair attempt.'
+            : validationIssue === 'structure'
+              ? 'The AI returned an invalid requirement structure after one repair attempt.'
+              : 'The AI response was not valid JSON after one repair attempt.'
+        if (repairUnavailable) return fail(503, 'The verification retry could not finish because the analysis service was unavailable. Please retry in a moment.')
+        return fail(502, `${validationMessage} Please retry; if this continues with a long posting, split it into smaller sections.`)
       }
-      const requirements = parsed.requirements
-      const accounted = Array.isArray(parsed.sections) && parsed.sections.length === sections.length &&
-        new Set(parsed.sections.map((section) => (section as { id?: unknown })?.id)).size === sections.length &&
-        sections.every(({ id }) => parsed.sections && (parsed.sections as { id?: unknown }[]).some((section) => section?.id === id))
-      const safeRequirements = Array.isArray(requirements) ? requirements : []
-      const analysis = {
-        schemaVersion: 1,
-        sourceHash: jobDescriptionHash(description),
-        sourceLength: description.length,
-        status: accounted && safeRequirements.length > 0 && safeRequirements.length <= 240 && Array.isArray(parsed.sections) && !parsed.sections.some((section) => (section as { disposition?: unknown }).disposition === 'uncertain') ? 'complete' : 'incomplete',
-        statusReason: !accounted ? 'Some source sections were not accounted for.' : safeRequirements.length === 0 ? 'No candidate requirements were extracted.' : undefined,
-        modelId: env.GEMINI_MODEL_LITE || 'gemini-3.5-flash-lite',
-        analyzedAt: new Date().toISOString(),
-        sections: parsed.sections,
-        requirements: safeRequirements,
-      }
-      if (!validJobRequirementAnalysis(analysis, description)) return fail(502, 'The job analysis was incomplete or did not contain verifiable source evidence. Please retry.')
       const skills = postingSkillsFromRequirements(analysis.requirements, typeof parsed.role === 'string' ? parsed.role : '')
       return ok({ result: {
         company: typeof parsed.company === 'string' ? parsed.company : '',
