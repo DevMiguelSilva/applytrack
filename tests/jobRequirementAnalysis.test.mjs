@@ -200,8 +200,8 @@ test('posting skill chips keep specific technical skills and omit broad labels a
     'Copilot Studio', 'Azure AI Language', 'TypeScript',
   ])
   assert.deepEqual(filterPostingSkillLabels([
-    'Copilot Studio', 'Custom actions and tools', 'channels', 'Language', 'English', 'Architect', 'TypeScript',
-  ], 'Workplace and Power Platform Architect', ['English']), ['Copilot Studio', 'TypeScript'])
+    'Copilot Studio', 'Custom actions and tools', 'channels', 'Language', 'English', 'Architect', 'TypeScript', 'Software Engineer',
+  ], 'Software Engineer', ['English']), ['Copilot Studio', 'TypeScript'])
 })
 
 test('requirement scoring handles count, ALL, ANY, qualifiers and confirmed skills conservatively', () => {
@@ -233,13 +233,17 @@ test('requirement scoring handles count, ALL, ANY, qualifiers and confirmed skil
 })
 
 test('Gap Check displays and counts only filtered technical posting skills', () => {
+  const jobDetail = readFileSync(new URL('../src/pages/JobDetailPage.tsx', import.meta.url), 'utf8')
+  const tailorPanel = readFileSync(new URL('../src/components/TailorPanel.tsx', import.meta.url), 'utf8')
+  assert.match(jobDetail, /filterPostingSkillLabels\(job\.extractedSkills, job\.role, languageTerms\)/)
+  assert.match(tailorPanel, /job\.requirementAnalysis,\s*job\.role/)
   const text = 'Required: React.\n\nBachelor degree required.\n\nFluent English required.'
   const posting = analysis(text, [
     { label: 'React', quote: 'Required: React.', components: ['React'], category: 'technical' },
     { label: 'Bachelor degree', quote: 'Bachelor degree required.', components: ['Bachelor degree'], category: 'education' },
     { label: 'English', quote: 'Fluent English required.', components: ['English'], category: 'language' },
   ])
-  const report = buildGapReport(text, ['React', 'Channels', 'English'], 'React', [], posting)
+  const report = buildGapReport(text, ['React', 'Channels', 'English', 'Software Engineer'], 'React', [], posting, 'Software Engineer')
   assert.deepEqual(report.skills.map(({ skill }) => skill), ['React'])
   assert.equal(report.requiredTotal, 3)
   assert.equal(report.requiredCovered, 1)

@@ -37,12 +37,14 @@ export function postingSkillsFromRequirements(requirements: JobRequirement[], ro
 export function filterPostingSkillLabels(labels: string[], role = '', languageTerms: string[] = []): string[] {
   const roleKey = skillKey(role)
   const languageKeys = new Set(languageTerms.map(skillKey))
+  const roleSuffix = /(?:^|\s)(?:architect|engineer|developer|designer|manager|consultant|specialist|analyst|lead|director|administrator|coordinator|scientist|technician)$/
   const seen = new Set<string>()
   const skills: string[] = []
   for (const raw of labels) {
     const label = raw.trim()
     const key = skillKey(label)
-    if (!key || genericSkillLabels.has(key) || key === roleKey || languageKeys.has(key) || seen.has(key)) continue
+    const isRoleLabel = key === roleKey || (roleSuffix.test(key) && roleKey.includes(key))
+    if (!key || genericSkillLabels.has(key) || isRoleLabel || languageKeys.has(key) || seen.has(key)) continue
     seen.add(key)
     skills.push(label)
   }

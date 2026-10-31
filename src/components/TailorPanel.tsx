@@ -214,8 +214,9 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
       job.extractedSkills,
       masterCvSearchText(masterCv),
       claimed,
-      job.requirementAnalysis
-    ), [job.jobDescription, job.extractedSkills, job.requirementAnalysis, masterCv])
+      job.requirementAnalysis,
+      job.role
+    ), [job.jobDescription, job.extractedSkills, job.requirementAnalysis, job.role, masterCv])
 
   useEffect(() => {
     setGapReport(computeGap(claimedSkills))

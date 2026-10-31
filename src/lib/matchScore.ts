@@ -350,10 +350,11 @@ export function scoreMasterCvAgainstJob(
   jobText: string,
   cv: MasterCv,
   extractedSkills: string[] = [],
-  analysis?: JobRequirementAnalysis | null
+  analysis?: JobRequirementAnalysis | null,
+  role = ''
 ): MatchResult {
   if (analysis !== undefined) {
-    const report = buildRequirementGapReport(jobText, analysis, masterCvSearchText(cv))
+    const report = buildRequirementGapReport(jobText, analysis, masterCvSearchText(cv), [], extractedSkills, role)
     return {
       score: report.analysisStatus === 'complete' ? report.coveragePercent : 0,
       matched: report.matchedKeywords,
@@ -449,10 +450,11 @@ export function buildGapReport(
   extractedSkills: string[],
   cvTextOrSkills: string | string[],
   claimedSkills: string[] = [],
-  analysis: JobRequirementAnalysis | null = null
+  analysis: JobRequirementAnalysis | null = null,
+  role = ''
 ): GapReport {
   const cvText = Array.isArray(cvTextOrSkills) ? cvTextOrSkills.join('\n') : cvTextOrSkills
-  if (analysis !== null) return buildRequirementGapReport(jobDescription, analysis, cvText, claimedSkills, extractedSkills)
+  if (analysis !== null) return buildRequirementGapReport(jobDescription, analysis, cvText, claimedSkills, extractedSkills, role)
   const result = scoreJdCoverage(jobDescription, cvText, extractedSkills, [])
 
   if (result.targets.length === 0) {
@@ -527,7 +529,8 @@ export function buildRequirementGapReport(
   analysis: JobRequirementAnalysis | null,
   cvText: string,
   claimedSkills: string[] = [],
-  extractedSkills: string[] = []
+  extractedSkills: string[] = [],
+  role = ''
 ): ReturnType<typeof buildGapReport> {
   const status = analysis === null ? 'legacy' : validJobRequirementAnalysis(analysis, jobDescription) ? analysis.status : 'incomplete'
   const valid = analysis !== null && validJobRequirementAnalysis(analysis, jobDescription) && analysis.status === 'complete'
@@ -545,7 +548,7 @@ export function buildRequirementGapReport(
   const languageTerms = analysis.requirements.filter((requirement) => requirement.category === 'language').flatMap((requirement) => requirement.components)
   const keySkills = filterPostingSkillLabels(uniqueSkills(extractedSkills.length
     ? extractedSkills
-    : technicalRequirements.flatMap((requirement) => requirement.components)), '', languageTerms)
+    : technicalRequirements.flatMap((requirement) => requirement.components)), role, languageTerms)
   let requiredTotal = 0
   let requiredCovered = 0
   const matchedKeywords: string[] = []

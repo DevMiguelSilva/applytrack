@@ -38,7 +38,8 @@ export function getSavedJobIndicators(
     job.extractedSkills,
     masterCvSearchText(cv),
     job.claimedSkills,
-    job.requirementAnalysis
+    job.requirementAnalysis,
+    job.role
   )
 
   return {

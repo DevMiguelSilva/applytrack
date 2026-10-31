@@ -87,7 +87,7 @@ export function AddJobPage() {
       const extractedSkills = form.extractedSkills
       const analysis = requirementAnalysis
       const match = analysis?.status === 'complete'
-        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, analysis)
+        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, analysis, form.role)
         : null
       await addJob({
         ...form,

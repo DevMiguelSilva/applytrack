@@ -142,7 +142,7 @@ export function JobDetailPage() {
     if (job.status !== 'saved' || !jobHasLiveSource(library, job)) return getForJob(job.id)?.matchScore ?? job.matchScore
     const selectedCv = getCv(job.cvTrack ?? activeTrack)
     if (!selectedCv) return null
-    return scoreMasterCvAgainstJob(job.jobDescription, selectedCv, job.extractedSkills, analysis).score
+    return scoreMasterCvAgainstJob(job.jobDescription, selectedCv, job.extractedSkills, analysis, job.role).score
   }, [job, getCv, activeTrack, getForJob, library])
 
   useEffect(() => {
@@ -288,7 +288,7 @@ export function JobDetailPage() {
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template for this job.')
       const match = requirementAnalysis?.status === 'complete'
-        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, requirementAnalysis)
+        ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, requirementAnalysis, role)
         : null
 
       const valid = () => {
