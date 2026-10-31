@@ -13,6 +13,7 @@ import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { jobDescriptionDraftForEditor } from '../lib/jobDescriptionDraft'
 import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
 export function JobDetailPage() {
@@ -212,7 +213,7 @@ export function JobDetailPage() {
   }
 
   const openJdEditor = () => {
-    setJdDraft(job.jobDescription)
+    setJdDraft(jobDescriptionDraftForEditor(job.jobDescription, job.jdComplete))
     setJdError(null)
     setEditingJd(true)
     setShowFullJd(true)
