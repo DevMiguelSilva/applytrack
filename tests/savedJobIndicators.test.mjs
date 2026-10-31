@@ -12,9 +12,10 @@ function moduleUrl(path, replacements = {}) {
 
 const cvUrl = moduleUrl('../src/types/cv.ts')
 const requirementsUrl = moduleUrl('../shared/jobRequirements.ts')
+const postingSkillsUrl = moduleUrl('../shared/postingSkills.ts')
 const { jobDescriptionHash, validJobRequirementAnalysis } = await import(requirementsUrl)
 const jobUrl = moduleUrl('../src/types/job.ts')
-const matchUrl = moduleUrl('../src/lib/matchScore.ts', { "'../types/cv'": `'${cvUrl}'`, "'../../shared/jobRequirements'": `'${requirementsUrl}'` })
+const matchUrl = moduleUrl('../src/lib/matchScore.ts', { "'../types/cv'": `'${cvUrl}'`, "'../../shared/jobRequirements'": `'${requirementsUrl}'`, "'../../shared/postingSkills'": `'${postingSkillsUrl}'` })
 const { createDefaultLibrary, createEmptyMasterCv } = await import(cvUrl)
 const { createEmptyJob } = await import(jobUrl)
 const { getSavedJobIndicators } = await import(moduleUrl('../src/lib/savedJobIndicators.ts', {

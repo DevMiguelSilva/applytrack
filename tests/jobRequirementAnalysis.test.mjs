@@ -13,6 +13,9 @@ function source(path, replacements = {}) {
 
 const requirementUrl = source('../shared/jobRequirements.ts')
 const requirementPromptUrl = source('../shared/jobRequirementPrompt.ts')
+const postingSkillsUrl = source('../shared/postingSkills.ts')
+const { postingSkillsFromRequirements } = await import(postingSkillsUrl)
+const { filterPostingSkillLabels } = await import(postingSkillsUrl)
 const { jobRequirementEvaluation } = await import(new URL('../evaluation/job-requirements-synthetic.mjs', import.meta.url))
 const { scoreRequirementExtraction } = await import('../scripts/requirementBenchmarkMetrics.mjs')
 const clientStubUrl = `data:text/javascript;base64,${Buffer.from('export let callCount = 0; let reply; export function setReply(value) { reply = value }; export async function callGemini() { callCount++; return structuredClone(reply) }').toString('base64')}`
@@ -26,9 +29,10 @@ const cvUrl = source('../src/types/cv.ts')
 const matchUrl = source('../src/lib/matchScore.ts', {
   "'../types/cv'": `'${cvUrl}'`,
   "'../../shared/jobRequirements'": `'${requirementUrl}'`,
+  "'../../shared/postingSkills'": `'${postingSkillsUrl}'`,
 })
 const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis, reusableJobRequirementAnalysis } = await import(requirementUrl)
-const { buildRequirementGapReport } = await import(matchUrl)
+const { buildGapReport, buildRequirementGapReport } = await import(matchUrl)
 
 test('synthetic extraction evaluation has a held-out split and exact source evidence', () => {
   assert.equal(jobRequirementEvaluation.length, 30)
@@ -65,6 +69,7 @@ test('rescore keeps the saved extracted skill array unchanged for the same descr
   assert.match(jobDetail, /extractedSkills: keepStoredSkills \? job\.extractedSkills/)
   assert.match(jobDetail, /onClick=\{\(\) => void saveJd\(job\.jobDescription\)\}/)
   assert.match(jobDetail, /onClick=\{\(\) => void saveJd\(jdDraft, true\)\}/)
+  assert.match(jobDetail, /parseJobPosting\(fullJd, \{ force: forceReanalysis \}\)/)
 })
 
 test('same complete posting reuses one validated parse result during the app session', async () => {
@@ -86,6 +91,10 @@ test('same complete posting reuses one validated parse result during the app ses
   clientStub.setReply({ ...result, requirementAnalysis: analysis(changed, [{ label: 'Azure', quote: 'Preferred: Azure.' }]) })
   await parseJobPosting(changed)
   assert.equal(clientStub.callCount, 2)
+
+  clientStub.setReply(result)
+  await parseJobPosting(text, { force: true })
+  assert.equal(clientStub.callCount, 3)
 })
 
 test('incomplete analysis is not cached so the user can retry extraction', async () => {
@@ -96,7 +105,7 @@ test('incomplete analysis is not cached so the user can retry extraction', async
   clientStub.setReply({ company: '', role: 'Engineer', location: '', salary: '', summary: '', skills: ['React'], requirements: ['React'], requirementAnalysis: incomplete })
   await parseJobPosting(text)
   await parseJobPosting(text)
-  assert.equal(clientStub.callCount, 4)
+  assert.equal(clientStub.callCount, 5)
 })
 
 test('Gemini parse request uses fixed system instructions and does not rely on sampling controls', async () => {
@@ -181,6 +190,20 @@ test('source-backed analysis validation rejects stale descriptions and fabricate
   assert.equal(validJobRequirementAnalysis({ ...valid, requirements: [{ ...valid.requirements[0], sourceSectionId: 'missing' }] }, text), false)
 })
 
+test('posting skill chips keep specific technical skills and omit broad labels and language requirements', () => {
+  const requirements = [
+    { category: 'technical', components: ['Copilot Studio', 'Custom actions and tools', 'channels', 'Language', 'Azure AI Language', 'TypeScript'] },
+    { category: 'language', components: ['English'] },
+    { category: 'experience', components: ['Architect'] },
+  ]
+  assert.deepEqual(postingSkillsFromRequirements(requirements, 'Workplace and Power Platform Architect'), [
+    'Copilot Studio', 'Azure AI Language', 'TypeScript',
+  ])
+  assert.deepEqual(filterPostingSkillLabels([
+    'Copilot Studio', 'Custom actions and tools', 'channels', 'Language', 'English', 'Architect', 'TypeScript',
+  ], 'Workplace and Power Platform Architect', ['English']), ['Copilot Studio', 'TypeScript'])
+})
+
 test('requirement scoring handles count, ALL, ANY, qualifiers and confirmed skills conservatively', () => {
   const ten = Array.from({ length: 10 }, (_, i) => ({ label: `Tool${i + 1}`, quote: `Tool${i + 1}` }))
   const tenText = ten.map(({ quote }) => quote).join('\n\n')
@@ -209,6 +232,20 @@ test('requirement scoring handles count, ALL, ANY, qualifiers and confirmed skil
   assert.match(stale.statusMessage, /out of date/)
 })
 
+test('Gap Check displays and counts only filtered technical posting skills', () => {
+  const text = 'Required: React.\n\nBachelor degree required.\n\nFluent English required.'
+  const posting = analysis(text, [
+    { label: 'React', quote: 'Required: React.', components: ['React'], category: 'technical' },
+    { label: 'Bachelor degree', quote: 'Bachelor degree required.', components: ['Bachelor degree'], category: 'education' },
+    { label: 'English', quote: 'Fluent English required.', components: ['English'], category: 'language' },
+  ])
+  const report = buildGapReport(text, ['React', 'Channels', 'English'], 'React', [], posting)
+  assert.deepEqual(report.skills.map(({ skill }) => skill), ['React'])
+  assert.equal(report.requiredTotal, 3)
+  assert.equal(report.requiredCovered, 1)
+  assert.equal(report.coveragePercent, 33)
+})
+
 test('job parse endpoint validates a mocked complete extraction and fails visibly on bad source evidence', async () => {
   const apiError = source('../shared/adzunaErrors.ts')
   const skillContext = source('../shared/skillContext.ts')
@@ -219,6 +256,7 @@ test('job parse endpoint validates a mocked complete extraction and fails visibl
     "'../../shared/skillContext.js'": `'${skillContext}'`,
     "'../../shared/jobRequirements.js'": `'${requirementUrl}'`,
     "'../../shared/jobRequirementPrompt.js'": `'${requirementPromptUrl}'`,
+    "'../../shared/postingSkills.js'": `'${postingSkillsUrl}'`,
     "'./adzuna.js'": `'${adzuna}'`,
     "'./gemini.js'": `'${gemini}'`,
   })
@@ -245,6 +283,7 @@ test('job parse endpoint validates a mocked complete extraction and fails visibl
   assert.match(capturedOptions.systemInstruction, /"requirements":\[/)
   assert.match(capturedPrompt, /\[s1\] Required: React and TypeScript\./)
   assert.match(capturedOptions.systemInstruction, /Mark every supplied section exactly once/)
+  assert.match(capturedOptions.systemInstruction, /standalone terms such as “channels”, “language”, “architect”/)
   assert.deepEqual(result.body.result.skills, ['React', 'TypeScript', 'Azure'])
 
   const invalid = await handleGemini({ action: 'parse', description }, {}, undefined, async () => JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] }))

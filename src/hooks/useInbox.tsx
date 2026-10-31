@@ -22,7 +22,6 @@ import {
   dualTrackReasonLine,
   createCvMatcher,
   scoreDualTracks,
-  withRequirementSignals,
   type MatchResult,
   type DualTrackMatch,
 } from '../lib/matchScore'
@@ -413,7 +412,6 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       if (!search && item.matchedTrack && !latest.library.cvs[item.matchedTrack]) throw new Error('The source CV was deleted. Choose a CV before approving this job.')
       const currentMatch = pickMatch(jobText, search?.track ?? (item.matchedTrack && latest.library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), latest.library.cvs, latest.library.names)
       const track = currentMatch.track
-      extractedSkills = withRequirementSignals(jobText, extractedSkills)
       requirementAnalysis = requirementAnalysis
         ? { ...requirementAnalysis, status: 'incomplete', statusReason: 'The Inbox listing is a preview; paste the complete job description to score its requirements.' }
         : incompleteJobRequirementAnalysis(item.description, 'The Inbox listing is a preview and extraction did not complete.')

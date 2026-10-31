@@ -5,7 +5,7 @@ import { SectionHeader } from '../components/SectionHeader'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
-import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { incompleteJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { type CvTrack } from '../types/cv'
 import {
@@ -61,10 +61,7 @@ export function AddJobPage() {
         // Keep the original pasted posting verbatim — never replace with summary
         jobDescription: pasteText.trim(),
         jdSummary: parsed.summary || prev.jdSummary,
-        extractedSkills: withRequirementSignals(
-          `${parsed.role || prev.role}\n${pasteText}`,
-          parsed.skills ?? []
-        ),
+        extractedSkills: parsed.skills ?? [],
         extractedRequirements: parsed.requirements ?? [],
         requirementAnalysis: parsed.requirementAnalysis,
       }))
@@ -87,8 +84,7 @@ export function AddJobPage() {
       const track = form.cvTrack ?? activeTrack
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template before saving.')
-      const described = `${form.role}\n${fullJd}`
-      const extractedSkills = withRequirementSignals(described, form.extractedSkills)
+      const extractedSkills = form.extractedSkills
       const analysis = requirementAnalysis
       const match = analysis?.status === 'complete'
         ? scoreMasterCvAgainstJob(fullJd, selectedCv, extractedSkills, analysis)

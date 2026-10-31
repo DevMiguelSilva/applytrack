@@ -27,13 +27,15 @@ function cloneParsedPosting(posting: ParsedJobPosting): ParsedJobPosting {
   }
 }
 
-export async function parseJobPosting(description: string): Promise<ParsedJobPosting> {
-  const cached = jobParseCache.get(description)
-  if (cached && validJobRequirementAnalysis(cached.requirementAnalysis, description) && cached.requirementAnalysis.status === 'complete') {
-    return cloneParsedPosting(cached)
+export async function parseJobPosting(description: string, options: { force?: boolean } = {}): Promise<ParsedJobPosting> {
+  if (!options.force) {
+    const cached = jobParseCache.get(description)
+    if (cached && validJobRequirementAnalysis(cached.requirementAnalysis, description) && cached.requirementAnalysis.status === 'complete') {
+      return cloneParsedPosting(cached)
+    }
+    const pending = pendingJobParses.get(description)
+    if (pending) return cloneParsedPosting(await pending)
   }
-  const pending = pendingJobParses.get(description)
-  if (pending) return cloneParsedPosting(await pending)
 
   const request = callGemini<ParsedJobPosting>({ action: 'parse', description })
   const sharedRequest = request.then((parsed) => {

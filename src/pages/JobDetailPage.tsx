@@ -12,7 +12,8 @@ import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
-import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { scoreMasterCvAgainstJob } from '../lib/matchScore'
+import { filterPostingSkillLabels } from '../../shared/postingSkills'
 import { incompleteJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
@@ -200,6 +201,12 @@ export function JobDetailPage() {
   const hasUrl = Boolean(job.jobUrl.trim())
   const jdIncomplete = !job.jdComplete
   const requirementAnalysisCurrent = Boolean(job.requirementAnalysis && validJobRequirementAnalysis(job.requirementAnalysis, job.jobDescription))
+  const languageTerms = requirementAnalysisCurrent && job.requirementAnalysis
+    ? job.requirementAnalysis.requirements
+      .filter((requirement) => requirement.category === 'language')
+      .flatMap((requirement) => requirement.components)
+    : []
+  const postingSkills = filterPostingSkillLabels(job.extractedSkills, job.role, languageTerms)
 
   const copyFullJd = async () => {
     const text = job.jobDescription.trim()
@@ -248,7 +255,7 @@ export function JobDetailPage() {
 
       if (reanalyze) {
         try {
-          const parsed = await parseJobPosting(fullJd)
+          const parsed = await parseJobPosting(fullJd, { force: forceReanalysis })
           jdSummary = parsed.summary || jdSummary
           if (!keepStoredSkills) {
             if (parsed.skills?.length) extractedSkills = parsed.skills
@@ -276,9 +283,8 @@ export function JobDetailPage() {
       }
 
       const track = job.cvTrack ?? activeTrack
-      const described = `${role}\n${fullJd}`
       // A same-description rescore must preserve the accepted extraction verbatim.
-      if (!keepStoredSkills) extractedSkills = withRequirementSignals(described, extractedSkills)
+      // Role and spoken-language signals still contribute to scoring separately.
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template for this job.')
       const match = requirementAnalysis?.status === 'complete'
@@ -578,11 +584,11 @@ export function JobDetailPage() {
               </div>
             </div>
           )}
-          {job.extractedSkills.length > 0 && (
+          {postingSkills.length > 0 && (
             <div>
               <h3 className="mb-2 ui-label legacy-size-text_sm">Skills from the posting</h3>
               <div className="flex flex-wrap gap-2">
-                {job.extractedSkills.map((skill) => (
+                {postingSkills.map((skill) => (
                   <span
                     key={skill}
                     className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"

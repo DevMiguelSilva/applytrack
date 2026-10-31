@@ -1,4 +1,5 @@
 import type { CvTrack, GapReport, MasterCv } from '../types/cv'
+import { filterPostingSkillLabels } from '../../shared/postingSkills'
 import { CV_TRACK_LABELS, masterCvSearchText, masterCvSkillList } from '../types/cv'
 import type { JobRequirementAnalysis } from '../../shared/jobRequirements'
 import { validJobRequirementAnalysis } from '../../shared/jobRequirements'
@@ -451,7 +452,7 @@ export function buildGapReport(
   analysis: JobRequirementAnalysis | null = null
 ): GapReport {
   const cvText = Array.isArray(cvTextOrSkills) ? cvTextOrSkills.join('\n') : cvTextOrSkills
-  if (analysis !== null) return buildRequirementGapReport(jobDescription, analysis, cvText, claimedSkills)
+  if (analysis !== null) return buildRequirementGapReport(jobDescription, analysis, cvText, claimedSkills, extractedSkills)
   const result = scoreJdCoverage(jobDescription, cvText, extractedSkills, [])
 
   if (result.targets.length === 0) {
@@ -525,7 +526,8 @@ export function buildRequirementGapReport(
   jobDescription: string,
   analysis: JobRequirementAnalysis | null,
   cvText: string,
-  claimedSkills: string[] = []
+  claimedSkills: string[] = [],
+  extractedSkills: string[] = []
 ): ReturnType<typeof buildGapReport> {
   const status = analysis === null ? 'legacy' : validJobRequirementAnalysis(analysis, jobDescription) ? analysis.status : 'incomplete'
   const valid = analysis !== null && validJobRequirementAnalysis(analysis, jobDescription) && analysis.status === 'complete'
@@ -538,12 +540,18 @@ export function buildRequirementGapReport(
   const normalizedCv = normalize(cvText)
   const skillEvidence = (term: string) => textHasSkill(normalizedCv, term)
   const claimedEvidence = (term: string) => claimedSkills.some((claimed) => textHasSkill(claimed, term) || textHasSkill(term, claimed))
+  const key = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim()
+  const technicalRequirements = analysis.requirements.filter((requirement) => requirement.category === 'technical')
+  const languageTerms = analysis.requirements.filter((requirement) => requirement.category === 'language').flatMap((requirement) => requirement.components)
+  const keySkills = filterPostingSkillLabels(uniqueSkills(extractedSkills.length
+    ? extractedSkills
+    : technicalRequirements.flatMap((requirement) => requirement.components)), '', languageTerms)
   let requiredTotal = 0
   let requiredCovered = 0
   const matchedKeywords: string[] = []
   const claimedKeywords: string[] = []
   const missingKeywords: string[] = []
-  const skills = analysis.requirements.map((requirement) => {
+  for (const requirement of analysis.requirements) {
     const components = requirement.components.length ? requirement.components : [requirement.label]
     const componentStates = components.map((component) => ({ cv: skillEvidence(component), claimed: claimedEvidence(component) }))
     const requirementLogicSatisfied = requirement.logic === 'any'
@@ -551,26 +559,34 @@ export function buildRequirementGapReport(
       : componentStates.every(({ cv, claimed }) => cv || claimed)
     const qualifiersMet = requirement.constraints.every((constraint) => constraintHasEvidence(normalizedCv, constraint, components))
     const fullyMet = requirementLogicSatisfied && qualifiersMet
-    const hasCvEvidence = requirement.logic === 'any'
-      ? componentStates.some(({ cv }) => cv)
-      : componentStates.every(({ cv }) => cv)
-    const hasClaimedEvidence = componentStates.some(({ claimed }) => claimed)
-    const state = !qualifiersMet && requirementLogicSatisfied ? 'uncertain' : fullyMet && hasCvEvidence ? 'have' : fullyMet && hasClaimedEvidence ? 'added' : 'missing'
     if (requirement.importance !== 'preferred') {
       requiredTotal++
       if (fullyMet) requiredCovered++
     }
-    if (state === 'have') matchedKeywords.push(requirement.label)
-    else if (state === 'added') claimedKeywords.push(requirement.label)
-    else missingKeywords.push(requirement.label)
-    return { skill: requirement.label, state, sourceQuote: requirement.sourceQuote, importance: requirement.importance, constraints: requirement.constraints, logic: requirement.logic, components } as const
+  }
+  const skills = keySkills.map((skill) => {
+    const requirement = technicalRequirements.find((item) => item.components.some((component) => key(component) === key(skill)))
+    const components = requirement?.components ?? [skill]
+    const hasCvEvidence = skillEvidence(skill)
+    const hasClaimedEvidence = claimedEvidence(skill)
+    const constraints = requirement?.constraints ?? []
+    const qualifiersMet = constraints.every((constraint) => constraintHasEvidence(normalizedCv, constraint, [skill]))
+    const state = hasCvEvidence && !qualifiersMet ? 'uncertain' : hasCvEvidence ? 'have' : hasClaimedEvidence ? 'added' : 'missing'
+    if (state === 'have') matchedKeywords.push(skill)
+    else if (state === 'added') claimedKeywords.push(skill)
+    else missingKeywords.push(skill)
+    return {
+      skill, state, sourceQuote: requirement?.sourceQuote,
+      importance: requirement?.importance, constraints,
+      logic: requirement?.logic, components,
+    } as const
   })
   const coveragePercent = requiredTotal ? Math.round(requiredCovered / requiredTotal * 100) : 0
   return {
     coveragePercent, matchedKeywords, claimedKeywords, missingKeywords, skills,
     suggestions: [
       `${requiredCovered} of ${requiredTotal} required or unclear requirements are evidenced in the CV or confirmed skills.`,
-      ...(skills.some(({ state }) => state === 'uncertain') ? ['Some requirements need evidence for their stated qualifiers.'] : []),
+      ...(skills.some(({ state }) => state === 'uncertain') ? ['Some key skills need evidence for their stated experience or qualifications.'] : []),
     ], analysisStatus: 'complete', requiredCovered, requiredTotal, sourceHash: analysis.sourceHash,
   }
 }

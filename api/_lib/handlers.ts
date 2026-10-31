@@ -3,6 +3,7 @@ import { AdzunaError } from '../../shared/adzunaErrors.js'
 import { validSkillJobContext } from '../../shared/skillContext.js'
 import { jobDescriptionHash, MAX_ANALYZED_JOB_DESCRIPTION, splitJobDescription, validJobRequirementAnalysis } from '../../shared/jobRequirements.js'
 import { buildJobRequirementPrompt, JOB_REQUIREMENT_SYSTEM_INSTRUCTION } from '../../shared/jobRequirementPrompt.js'
+import { postingSkillsFromRequirements } from '../../shared/postingSkills.js'
 import { searchAdzuna } from './adzuna.js'
 import type { ServerEnv } from './env.js'
 import {
@@ -165,17 +166,7 @@ ${input.resumeText.slice(0, 20000)}`
         requirements: safeRequirements,
       }
       if (!validJobRequirementAnalysis(analysis, description)) return fail(502, 'The job analysis was incomplete or did not contain verifiable source evidence. Please retry.')
-      const skillKeys = new Set<string>()
-      const skills = analysis.requirements
-        .filter((item) => item.category === 'technical' || item.category === 'language')
-        .flatMap((item) => item.components)
-        .map((skill) => skill.trim())
-        .filter((skill) => {
-          const key = skill.toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim()
-          if (!key || skillKeys.has(key)) return false
-          skillKeys.add(key)
-          return true
-        })
+      const skills = postingSkillsFromRequirements(analysis.requirements, typeof parsed.role === 'string' ? parsed.role : '')
       return ok({ result: {
         company: typeof parsed.company === 'string' ? parsed.company : '',
         role: typeof parsed.role === 'string' ? parsed.role : '',
