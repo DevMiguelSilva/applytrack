@@ -2,6 +2,7 @@ import type { CvTrack, GapReport, MasterCv } from '../types/cv'
 import { CV_TRACK_LABELS, masterCvSearchText, masterCvSkillList } from '../types/cv'
 import type { JobRequirementAnalysis } from '../../shared/jobRequirements'
 import { validJobRequirementAnalysis } from '../../shared/jobRequirements'
+import { requirementSkillLabel } from './jobSkills'
 
 export interface MatchResult {
   score: number
@@ -560,10 +561,11 @@ export function buildRequirementGapReport(
       requiredTotal++
       if (fullyMet) requiredCovered++
     }
-    if (state === 'have') matchedKeywords.push(requirement.label)
-    else if (state === 'added') claimedKeywords.push(requirement.label)
-    else missingKeywords.push(requirement.label)
-    return { skill: requirement.label, state, sourceQuote: requirement.sourceQuote, importance: requirement.importance, constraints: requirement.constraints, logic: requirement.logic, components } as const
+    const skill = requirementSkillLabel(requirement)
+    if (state === 'have') matchedKeywords.push(skill)
+    else if (state === 'added') claimedKeywords.push(skill)
+    else missingKeywords.push(skill)
+    return { skill, state, sourceQuote: requirement.sourceQuote, importance: requirement.importance, constraints: requirement.constraints, logic: requirement.logic, components } as const
   })
   const coveragePercent = requiredTotal ? Math.round(requiredCovered / requiredTotal * 100) : 0
   return {

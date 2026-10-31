@@ -7,6 +7,8 @@ import { parseJobPosting } from '../api/gemini'
 import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { TailorPanel } from '../components/TailorPanel'
+import { PostingSkillPicker } from '../components/PostingSkillPicker'
+import { postingSkillNames } from '../lib/jobSkills'
 import { useAuth } from '../hooks/useAuth'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
@@ -220,7 +222,7 @@ export function JobDetailPage() {
     setShowFullJd(true)
   }
 
-  const saveJd = async (fullJdRaw: string) => {
+  const saveJd = async (fullJdRaw: string, forceReanalysis = false) => {
     if (job.status !== 'saved' || job.deletedAt || !jobHasLiveSource(library, job)) return
     const fullJd = fullJdRaw.trim()
     if (!fullJd) {
@@ -228,7 +230,7 @@ export function JobDetailPage() {
       return
     }
 
-    const reuseAnalysis = reusableJobRequirementAnalysis(fullJd, job.jobDescription, job.requirementAnalysis)
+    const reuseAnalysis = !forceReanalysis && reusableJobRequirementAnalysis(fullJd, job.jobDescription, job.requirementAnalysis)
     setSavingJd(true)
     setJdError(null)
     setParsingJd(!reuseAnalysis)
@@ -246,7 +248,7 @@ export function JobDetailPage() {
 
       if (!reuseAnalysis) {
         try {
-          const parsed = await parseJobPosting(fullJd)
+          const parsed = await parseJobPosting(fullJd, { force: forceReanalysis })
           jdSummary = parsed.summary || jdSummary
           if (parsed.skills?.length) extractedSkills = parsed.skills
           else extractedSkills = []
@@ -543,9 +545,12 @@ export function JobDetailPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className=" ui-section-title legacy-size-text_base">Posting overview</h2>
             {job.status === 'saved' && !job.deletedAt && job.jdComplete && !editingJd && (
-              <button type="button" onClick={openJdEditor} className={quietBtn}>
-                Update
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={savingJd || parsingJd} onClick={() => void saveJd(job.jobDescription, true)} className={quietBtn}>
+                  {parsingJd || savingJd ? 'Reanalyzing…' : 'Reanalyze posting'}
+                </button>
+                <button type="button" onClick={openJdEditor} className={quietBtn}>Update</button>
+              </div>
             )}
           </div>
           {job.jdSummary && (
@@ -570,20 +575,11 @@ export function JobDetailPage() {
               </div>
             </div>
           )}
-          {job.extractedSkills.length > 0 && (
-            <div>
-              <h3 className="mb-2 ui-label legacy-size-text_sm">Skills from the posting</h3>
-              <div className="flex flex-wrap gap-2">
-                {job.extractedSkills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {requirementAnalysisCurrent && postingSkillNames(job.requirementAnalysis, job.extractedSkills).length > 0 && (
+            <PostingSkillPicker
+              skills={postingSkillNames(job.requirementAnalysis, job.extractedSkills)}
+              track={job.cvTrack ?? activeTrack}
+            />
           )}
           {job.extractedRequirements.length > 0 && (
             <div>

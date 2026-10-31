@@ -154,7 +154,7 @@ ${input.resumeText.slice(0, 20000)}`
         sections.every(({ id }) => parsed.sections && (parsed.sections as { id?: unknown }[]).some((section) => section?.id === id))
       const safeRequirements = Array.isArray(requirements) ? requirements : []
       const analysis = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         sourceHash: jobDescriptionHash(description),
         sourceLength: description.length,
         status: accounted && safeRequirements.length > 0 && safeRequirements.length <= 240 && Array.isArray(parsed.sections) && !parsed.sections.some((section) => (section as { disposition?: unknown }).disposition === 'uncertain') ? 'complete' : 'incomplete',

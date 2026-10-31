@@ -14,7 +14,8 @@ const cvUrl = moduleUrl('../src/types/cv.ts')
 const requirementsUrl = moduleUrl('../shared/jobRequirements.ts')
 const { jobDescriptionHash, validJobRequirementAnalysis } = await import(requirementsUrl)
 const jobUrl = moduleUrl('../src/types/job.ts')
-const matchUrl = moduleUrl('../src/lib/matchScore.ts', { "'../types/cv'": `'${cvUrl}'`, "'../../shared/jobRequirements'": `'${requirementsUrl}'` })
+const skillLabelUrl = `data:text/javascript;base64,${Buffer.from('export const requirementSkillLabel = requirement => requirement.label').toString('base64')}`
+const matchUrl = moduleUrl('../src/lib/matchScore.ts', { "'../types/cv'": `'${cvUrl}'`, "'../../shared/jobRequirements'": `'${requirementsUrl}'`, "'./jobSkills'": `'${skillLabelUrl}'` })
 const { createDefaultLibrary, createEmptyMasterCv } = await import(cvUrl)
 const { createEmptyJob } = await import(jobUrl)
 const { getSavedJobIndicators } = await import(moduleUrl('../src/lib/savedJobIndicators.ts', {
@@ -32,7 +33,7 @@ function fixture() {
   const description = 'React and Python experience required.'
   const section = { id: 's1', disposition: 'requirements' }
   const requirementAnalysis = {
-    schemaVersion: 1, sourceHash: jobDescriptionHash(description), sourceLength: description.length,
+    schemaVersion: 2, sourceHash: jobDescriptionHash(description), sourceLength: description.length,
     status: 'complete', modelId: 'fixture', analyzedAt: '2026-10-30T00:00:00Z', sections: [section],
     requirements: ['React', 'Python'].map((label, index) => ({ id: `r${index}`, label, components: [label], logic: 'all', sourceSectionId: 's1', sourceQuote: label, category: 'technical', importance: 'required', constraints: [] })),
   }
