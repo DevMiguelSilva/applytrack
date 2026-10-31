@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { AdzunaError } from '../../shared/adzunaErrors.js'
 import { validSkillJobContext } from '../../shared/skillContext.js'
-import { jobDescriptionHash, MAX_ANALYZED_JOB_DESCRIPTION, splitJobDescription, validJobRequirementAnalysis } from '../../shared/jobRequirements.js'
+import { jobDescriptionHash, jobRequirementAnalysisValidationIssues, MAX_ANALYZED_JOB_DESCRIPTION, splitJobDescription, validJobRequirementAnalysis } from '../../shared/jobRequirements.js'
 import { buildJobRequirementPrompt, JOB_REQUIREMENT_SYSTEM_INSTRUCTION } from '../../shared/jobRequirementPrompt.js'
 import { postingSkillsFromRequirements } from '../../shared/postingSkills.js'
 import { searchAdzuna } from './adzuna.js'
@@ -150,9 +150,12 @@ ${input.resumeText.slice(0, 20000)}`
         requirements: unknown[]
       } | undefined
       let validationIssue: 'json' | 'structure' | 'coverage' | 'source' = 'json'
+      let validationIssueCodes: string[] = []
       let repairUnavailable = false
       for (let attempt = 0; attempt < 2; attempt++) {
-        const repairPrompt = attempt === 0 ? prompt : `${prompt}\n\nYour previous response failed ${validationIssue} validation. Return a corrected complete JSON object. Use every supplied section ID exactly once; ensure every requirement points to a supplied section and has a short, exact, contiguous sourceQuote copied verbatim from that section. Do not normalize punctuation, paraphrase quotes, invent evidence, omit sections, or return commentary. If any section cannot be classified reliably, mark it uncertain instead of claiming complete analysis.`
+        const issueCodes = validationIssueCodes.slice(0, 20).join(', ')
+        const moreIssues = validationIssueCodes.length > 20 ? `, and ${validationIssueCodes.length - 20} more issue codes` : ''
+        const repairPrompt = attempt === 0 ? prompt : `${prompt}\n\nYour previous response failed ${validationIssue} validation${issueCodes ? `. Validator issue codes: ${issueCodes}${moreIssues}` : ''}. These codes identify field paths and rule types only; correct those fields without changing source facts. Return a corrected complete JSON object. Use every supplied section ID exactly once; ensure every requirement points to a supplied section and has a short, exact, contiguous sourceQuote copied verbatim from that section. Do not normalize punctuation, paraphrase quotes, invent evidence, omit sections, or return commentary. If any section cannot be classified reliably, mark it uncertain instead of claiming complete analysis.`
         let text: string
         try {
           text = await parse(repairPrompt, env, {
@@ -172,6 +175,7 @@ ${input.resumeText.slice(0, 20000)}`
           responseParsed = extractJsonObject<Record<string, unknown>>(text)
         } catch {
           validationIssue = 'json'
+          validationIssueCodes = ['response.invalid_json']
           continue
         }
         parsed = responseParsed
@@ -192,9 +196,14 @@ ${input.resumeText.slice(0, 20000)}`
           requirements: safeRequirements,
         }
         if (validJobRequirementAnalysis(analysis, description)) break
-        validationIssue = !validJobRequirementAnalysis(analysis) ? 'structure'
-          : analysis.status !== 'complete' ? 'coverage'
-            : 'source'
+        const structureIssues = jobRequirementAnalysisValidationIssues(analysis)
+        if (structureIssues.length) {
+          validationIssue = 'structure'
+          validationIssueCodes = structureIssues
+        } else {
+          validationIssue = analysis.status !== 'complete' ? 'coverage' : 'source'
+          validationIssueCodes = jobRequirementAnalysisValidationIssues(analysis, description)
+        }
       }
       if (!parsed || !analysis || !validJobRequirementAnalysis(analysis, description)) {
         const validationMessage = validationIssue === 'source'

@@ -31,7 +31,7 @@ const matchUrl = source('../src/lib/matchScore.ts', {
   "'../../shared/jobRequirements'": `'${requirementUrl}'`,
   "'../../shared/postingSkills'": `'${postingSkillsUrl}'`,
 })
-const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis, reusableJobRequirementAnalysis } = await import(requirementUrl)
+const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis, jobRequirementAnalysisValidationIssues, reusableJobRequirementAnalysis } = await import(requirementUrl)
 const { buildGapReport, buildRequirementGapReport } = await import(matchUrl)
 
 test('synthetic extraction evaluation has a held-out split and exact source evidence', () => {
@@ -204,6 +204,15 @@ test('source-backed analysis validation rejects stale descriptions and fabricate
   assert.equal(validJobRequirementAnalysis({ ...valid, requirements: [{ ...valid.requirements[0], sourceSectionId: 'missing' }] }, text), false)
 })
 
+test('analysis validation diagnostics identify structural paths without returning values', () => {
+  const text = 'Required: React experience.'
+  const valid = analysis(text, [{ label: 'React', quote: 'React experience' }])
+  const invalid = { ...valid, requirements: [{ ...valid.requirements[0], category: 'private-model-category' }] }
+  const issueCodes = jobRequirementAnalysisValidationIssues(invalid)
+  assert.ok(issueCodes.includes('requirements[0].category.invalid'))
+  assert.doesNotMatch(issueCodes.join(' '), /private-model-category|React experience/)
+})
+
 test('posting skill chips keep specific technical skills and omit broad labels and language requirements', () => {
   const requirements = [
     { category: 'technical', components: ['Copilot Studio', 'Custom actions and tools', 'channels', 'Language', 'Azure AI Language', 'TypeScript'] },
@@ -317,6 +326,30 @@ test('job parse endpoint validates a mocked complete extraction and fails visibl
   assert.match(repairPrompt, /failed source validation/)
   assert.match(repairPrompt, /short, exact, contiguous sourceQuote copied verbatim/)
   assert.deepEqual(repaired.body.result.requirementAnalysis.requirements, output.requirements)
+
+  let structureRepairAttempts = 0
+  let structureRepairPrompt = ''
+  const structureRepaired = await handleGemini({ action: 'parse', description }, {}, undefined, async (prompt) => {
+    structureRepairAttempts++
+    if (structureRepairAttempts === 1) return JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], category: 'private-model-category' }] })
+    structureRepairPrompt = prompt
+    assert.match(prompt, /requirements\[0\]\.category\.invalid/)
+    assert.doesNotMatch(prompt, /private-model-category/)
+    return JSON.stringify(output)
+  })
+  assert.equal(structureRepaired.status, 200)
+  assert.equal(structureRepairAttempts, 2)
+  assert.match(structureRepairPrompt, /failed structure validation/)
+
+  let persistentStructureAttempts = 0
+  const persistentStructureError = await handleGemini({ action: 'parse', description }, {}, undefined, async () => {
+    persistentStructureAttempts++
+    return JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], category: 'private-model-category' }] })
+  })
+  assert.equal(persistentStructureError.status, 502)
+  assert.equal(persistentStructureAttempts, 2)
+  assert.match(persistentStructureError.body.error, /invalid requirement structure/)
+  assert.doesNotMatch(persistentStructureError.body.error, /private-model-category|Required: React/)
 
   const invalid = await handleGemini({ action: 'parse', description }, {}, undefined, async () => JSON.stringify({ ...output, requirements: [{ ...output.requirements[0], sourceQuote: 'Fabricated requirement' }] }))
   assert.equal(invalid.status, 502)
