@@ -243,6 +243,7 @@ export function JobDetailPage() {
     setParsingJd(reanalyze)
     const sourceDescriptionAtStart = job.jobDescription
     const accountAtStart = accountRef.current
+    let parseFailed = false
     try {
       let jdSummary = job.jdSummary
       let extractedSkills = job.extractedSkills
@@ -268,11 +269,13 @@ export function JobDetailPage() {
           if (parsed.location) location = parsed.location
           if (parsed.salary) salary = parsed.salary
         } catch (err) {
-          setJdError(
-            err instanceof Error
-              ? `${err.message} — saved description and rescored without AI parse.`
-              : 'AI parse failed — saved description and rescored without AI parse.'
-          )
+          parseFailed = true
+          const parseError = err instanceof Error ? err.message : 'AI parse failed.'
+          if (sameDescription) {
+            setJdError(`${parseError} The saved skills and analysis were kept. Retry parsing when the service is available.`)
+            return
+          }
+          setJdError(`${parseError} The description was saved with analysis marked incomplete. Retry parsing to restore matching and tailoring.`)
           extractedSkills = []
           extractedRequirements = []
           jdSummary = ''
@@ -312,8 +315,10 @@ export function JobDetailPage() {
         jdComplete: true,
         needsRescore: false,
       }, valid)
-      setEditingJd(false)
-      setShowFullJd(false)
+      if (!parseFailed) {
+        setEditingJd(false)
+        setShowFullJd(false)
+      }
     } catch (err) {
       setJdError(err instanceof Error ? err.message : 'Failed to update job description')
     } finally {

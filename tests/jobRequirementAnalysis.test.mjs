@@ -72,6 +72,20 @@ test('rescore keeps the saved extracted skill array unchanged for the same descr
   assert.match(jobDetail, /parseJobPosting\(fullJd, \{ force: forceReanalysis \}\)/)
 })
 
+test('failed forced reanalysis of an unchanged description preserves the last good extraction', () => {
+  const jobDetail = readFileSync(new URL('../src/pages/JobDetailPage.tsx', import.meta.url), 'utf8')
+  const parseCall = jobDetail.indexOf('const parsed = await parseJobPosting')
+  const catchStart = jobDetail.indexOf('} catch (err) {', parseCall)
+  const finallyStart = jobDetail.indexOf('} finally {', catchStart)
+  assert.ok(parseCall >= 0 && catchStart > parseCall && finallyStart > catchStart, 'the parse failure path remains explicit')
+  const failurePath = jobDetail.slice(catchStart, finallyStart)
+  assert.match(failurePath, /if \(sameDescription\) \{[\s\S]*?setJdError\([\s\S]*?return\s*}/)
+  assert.ok(failurePath.indexOf('return') < failurePath.indexOf('extractedSkills = []'))
+  assert.match(failurePath, /The saved skills and analysis were kept/)
+  assert.match(failurePath, /description was saved with analysis marked incomplete/)
+  assert.match(jobDetail, /if \(!parseFailed\) \{\s*setEditingJd\(false\)/)
+})
+
 test('same complete posting reuses one validated parse result during the app session', async () => {
   const text = 'Required: React and TypeScript.'
   const result = {
