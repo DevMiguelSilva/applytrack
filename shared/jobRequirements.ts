@@ -20,7 +20,7 @@ export interface JobRequirementSection {
 }
 
 export interface JobRequirementAnalysis {
-  schemaVersion: 2
+  schemaVersion: 1
   sourceHash: string
   sourceLength: number
   status: RequirementAnalysisStatus
@@ -37,7 +37,7 @@ export const MAX_SECTIONS = 240
 
 export function incompleteJobRequirementAnalysis(text: string, reason: string): JobRequirementAnalysis {
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     sourceHash: jobDescriptionHash(text),
     sourceLength: text.length,
     status: 'incomplete',
@@ -72,7 +72,7 @@ const categories = new Set<RequirementCategory>(['technical', 'experience', 'edu
 export function validJobRequirementAnalysis(value: unknown, sourceText?: string): value is JobRequirementAnalysis {
   if (!value || typeof value !== 'object') return false
   const a = value as Partial<JobRequirementAnalysis>
-  if (a.schemaVersion !== 2 || typeof a.sourceHash !== 'string' || typeof a.sourceLength !== 'number' ||
+  if (a.schemaVersion !== 1 || typeof a.sourceHash !== 'string' || typeof a.sourceLength !== 'number' ||
       (a.status !== 'complete' && a.status !== 'incomplete') || typeof a.modelId !== 'string' ||
       typeof a.analyzedAt !== 'string' || !Array.isArray(a.sections) || a.sections.length > MAX_SECTIONS ||
       !Array.isArray(a.requirements) || a.requirements.length > MAX_REQUIREMENTS) return false

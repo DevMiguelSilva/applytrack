@@ -23,17 +23,10 @@ const parseClientUrl = source('../src/api/gemini.ts', {
 const clientStub = await import(clientStubUrl)
 const { parseJobPosting } = await import(parseClientUrl)
 const cvUrl = source('../src/types/cv.ts')
-const skillLabelUrl = source('../src/lib/jobSkills.ts', {
-  "'../../shared/jobRequirements'": `'${requirementUrl}'`,
-})
-const { requirementSkillLabel, postingSkillNames } = await import(skillLabelUrl)
 const matchUrl = source('../src/lib/matchScore.ts', {
   "'../types/cv'": `'${cvUrl}'`,
   "'../../shared/jobRequirements'": `'${requirementUrl}'`,
-  "'./jobSkills'": `'${skillLabelUrl}'`,
 })
-const addSkillsUrl = source('../src/lib/addPostingSkills.ts')
-const { addPostingSkillsToCv } = await import(addSkillsUrl)
 const { jobDescriptionHash, splitJobDescription, validJobRequirementAnalysis, reusableJobRequirementAnalysis } = await import(requirementUrl)
 const { buildRequirementGapReport } = await import(matchUrl)
 
@@ -62,32 +55,16 @@ test('unchanged complete saved analysis can be reused while changed, stale and i
   assert.equal(reusableJobRequirementAnalysis(`${text} TypeScript.`, text, complete), false)
   assert.equal(reusableJobRequirementAnalysis(text, `${text} TypeScript.`, complete), false)
   assert.equal(reusableJobRequirementAnalysis(text, text, { ...complete, status: 'incomplete' }), false)
-  assert.equal(reusableJobRequirementAnalysis(text, text, { ...complete, schemaVersion: 1 }), false)
 })
 
-test('requirement chips show concise component names while retaining group/source details', () => {
-  const item = { category: 'technical', components: ['React', 'TypeScript'], logic: 'all', label: 'Build accessible applications using React and TypeScript', sourceQuote: 'Build accessible applications using React and TypeScript.' }
-  assert.equal(requirementSkillLabel(item), 'React + TypeScript')
-  assert.equal(requirementSkillLabel({ ...item, logic: 'any' }), 'React / TypeScript')
-  assert.equal(item.sourceQuote, 'Build accessible applications using React and TypeScript.')
-  assert.equal(requirementSkillLabel({ ...item, category: 'experience' }), item.label)
-  const current = analysis('React and TypeScript.', [{ label: item.label, quote: 'React and TypeScript.', components: ['Experience with React', 'TypeScript.'], logic: 'all' }])
-  assert.deepEqual(postingSkillNames(current), ['React', 'TypeScript'])
-  assert.deepEqual(postingSkillNames({ ...current, schemaVersion: 1 }, ['Old sentence-like item']), [])
-  assert.deepEqual(postingSkillNames({ ...current, status: 'incomplete' }), [])
-})
-
-test('adding selected posting skills changes only the chosen CV skill list and avoids duplicates', () => {
-  const cv = { skills: [{ id: 'frontend', group: 'Frontend', items: ['React'] }], summary: 'Keep this', experience: [{ id: 'role' }] }
-  const next = addPostingSkillsToCv(cv, [' React ', 'TypeScript', 'typescript', 'Azure'])
-  assert.equal(next.skills[0].id, 'frontend')
-  assert.deepEqual(next.skills[0].items, ['React'])
-  assert.ok(next.skills[1].id)
-  assert.equal(next.skills[1].group, 'Additional')
-  assert.deepEqual(next.skills[1].items, ['TypeScript', 'Azure'])
-  assert.equal(next.summary, 'Keep this')
-  assert.deepEqual(next.experience, cv.experience)
-  assert.deepEqual(cv.skills[0].items, ['React'])
+test('rescore keeps the saved extracted skill array unchanged for the same description', () => {
+  const jobDetail = readFileSync(new URL('../src/pages/JobDetailPage.tsx', import.meta.url), 'utf8')
+  assert.match(jobDetail, /const sameDescription = fullJd === job\.jobDescription/)
+  assert.match(jobDetail, /const reanalyze = !sameDescription \|\| forceReanalysis/)
+  assert.match(jobDetail, /const keepStoredSkills = sameDescription && !forceReanalysis/)
+  assert.match(jobDetail, /extractedSkills: keepStoredSkills \? job\.extractedSkills/)
+  assert.match(jobDetail, /onClick=\{\(\) => void saveJd\(job\.jobDescription\)\}/)
+  assert.match(jobDetail, /onClick=\{\(\) => void saveJd\(jdDraft, true\)\}/)
 })
 
 test('same complete posting reuses one validated parse result during the app session', async () => {
@@ -109,9 +86,6 @@ test('same complete posting reuses one validated parse result during the app ses
   clientStub.setReply({ ...result, requirementAnalysis: analysis(changed, [{ label: 'Azure', quote: 'Preferred: Azure.' }]) })
   await parseJobPosting(changed)
   assert.equal(clientStub.callCount, 2)
-  clientStub.setReply(result)
-  await parseJobPosting(text, { force: true })
-  assert.equal(clientStub.callCount, 3)
 })
 
 test('incomplete analysis is not cached so the user can retry extraction', async () => {
@@ -122,7 +96,7 @@ test('incomplete analysis is not cached so the user can retry extraction', async
   clientStub.setReply({ company: '', role: 'Engineer', location: '', salary: '', summary: '', skills: ['React'], requirements: ['React'], requirementAnalysis: incomplete })
   await parseJobPosting(text)
   await parseJobPosting(text)
-  assert.equal(clientStub.callCount, 5)
+  assert.equal(clientStub.callCount, 4)
 })
 
 test('Gemini parse request uses fixed system instructions and does not rely on sampling controls', async () => {
@@ -183,7 +157,7 @@ test('benchmark group matching preserves ANY versus ALL semantics', () => {
 function analysis(text, requirements) {
   const sections = splitJobDescription(text)
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     sourceHash: jobDescriptionHash(text),
     sourceLength: text.length,
     status: 'complete',

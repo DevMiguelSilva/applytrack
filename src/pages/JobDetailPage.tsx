@@ -7,15 +7,13 @@ import { parseJobPosting } from '../api/gemini'
 import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { TailorPanel } from '../components/TailorPanel'
-import { PostingSkillPicker } from '../components/PostingSkillPicker'
-import { postingSkillNames } from '../lib/jobSkills'
 import { useAuth } from '../hooks/useAuth'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
-import { incompleteJobRequirementAnalysis, reusableJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
+import { incompleteJobRequirementAnalysis, validJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
 export function JobDetailPage() {
@@ -230,10 +228,12 @@ export function JobDetailPage() {
       return
     }
 
-    const reuseAnalysis = !forceReanalysis && reusableJobRequirementAnalysis(fullJd, job.jobDescription, job.requirementAnalysis)
+    const sameDescription = fullJd === job.jobDescription
+    const reanalyze = !sameDescription || forceReanalysis
+    const keepStoredSkills = sameDescription && !forceReanalysis
     setSavingJd(true)
     setJdError(null)
-    setParsingJd(!reuseAnalysis)
+    setParsingJd(reanalyze)
     const sourceDescriptionAtStart = job.jobDescription
     const accountAtStart = accountRef.current
     try {
@@ -246,12 +246,14 @@ export function JobDetailPage() {
       let location = job.location
       let salary = job.salary
 
-      if (!reuseAnalysis) {
+      if (reanalyze) {
         try {
-          const parsed = await parseJobPosting(fullJd, { force: forceReanalysis })
+          const parsed = await parseJobPosting(fullJd)
           jdSummary = parsed.summary || jdSummary
-          if (parsed.skills?.length) extractedSkills = parsed.skills
-          else extractedSkills = []
+          if (!keepStoredSkills) {
+            if (parsed.skills?.length) extractedSkills = parsed.skills
+            else extractedSkills = []
+          }
           if (parsed.requirements?.length) extractedRequirements = parsed.requirements
           requirementAnalysis = parsed.requirementAnalysis
           if (parsed.company) company = parsed.company
@@ -275,7 +277,8 @@ export function JobDetailPage() {
 
       const track = job.cvTrack ?? activeTrack
       const described = `${role}\n${fullJd}`
-      extractedSkills = withRequirementSignals(described, extractedSkills)
+      // A same-description rescore must preserve the accepted extraction verbatim.
+      if (!keepStoredSkills) extractedSkills = withRequirementSignals(described, extractedSkills)
       const selectedCv = getCv(track)
       if (!selectedCv) throw new Error('Choose an existing CV template for this job.')
       const match = requirementAnalysis?.status === 'complete'
@@ -284,12 +287,15 @@ export function JobDetailPage() {
 
       const valid = () => {
         const current = getJob(job.id)
-        return accountRef.current === accountAtStart && current?.jobDescription === sourceDescriptionAtStart && current.status === 'saved' && !current.deletedAt
+        const storedSkillsUnchanged = Boolean(current && current.extractedSkills.length === job.extractedSkills.length &&
+          current.extractedSkills.every((skill, index) => skill === job.extractedSkills[index]))
+        return accountRef.current === accountAtStart && current?.jobDescription === sourceDescriptionAtStart && current.status === 'saved' && !current.deletedAt &&
+          (!keepStoredSkills || storedSkillsUnchanged)
       }
       await updateJob(job.id, {
         jobDescription: fullJd,
         jdSummary,
-        extractedSkills: extractedSkills.length ? extractedSkills : match?.targets ?? [],
+        extractedSkills: keepStoredSkills ? job.extractedSkills : extractedSkills.length ? extractedSkills : match?.targets ?? [],
         extractedRequirements,
         requirementAnalysis,
         company,
@@ -514,7 +520,7 @@ export function JobDetailPage() {
                   type="button"
                   data-role="primary"
                   disabled={savingJd || parsingJd}
-                  onClick={() => void saveJd(jdDraft)}
+                  onClick={() => void saveJd(jdDraft, true)}
                   className="ui-button ui-primary m-action"
                 >
                   {parsingJd ? 'Parsing…' : savingJd ? 'Saving…' : 'Parse, save & rescore'}
@@ -545,12 +551,9 @@ export function JobDetailPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className=" ui-section-title legacy-size-text_base">Posting overview</h2>
             {job.status === 'saved' && !job.deletedAt && job.jdComplete && !editingJd && (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={savingJd || parsingJd} onClick={() => void saveJd(job.jobDescription, true)} className={quietBtn}>
-                  {parsingJd || savingJd ? 'Reanalyzing…' : 'Reanalyze posting'}
-                </button>
-                <button type="button" onClick={openJdEditor} className={quietBtn}>Update</button>
-              </div>
+              <button type="button" onClick={openJdEditor} className={quietBtn}>
+                Update
+              </button>
             )}
           </div>
           {job.jdSummary && (
@@ -575,11 +578,20 @@ export function JobDetailPage() {
               </div>
             </div>
           )}
-          {requirementAnalysisCurrent && postingSkillNames(job.requirementAnalysis, job.extractedSkills).length > 0 && (
-            <PostingSkillPicker
-              skills={postingSkillNames(job.requirementAnalysis, job.extractedSkills)}
-              track={job.cvTrack ?? activeTrack}
-            />
+          {job.extractedSkills.length > 0 && (
+            <div>
+              <h3 className="mb-2 ui-label legacy-size-text_sm">Skills from the posting</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.extractedSkills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-meta text-brand-ink legacy-size-text_sm"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
           {job.extractedRequirements.length > 0 && (
             <div>

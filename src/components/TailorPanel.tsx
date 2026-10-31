@@ -26,8 +26,6 @@ import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { useAuth } from '../hooks/useAuth'
 import { createJobReviewPanelState, retainJobReviewSnapshot, shouldOpenGapForExplanation, updateJobReviewPanel, type JobReviewPanelId, type ScopedJobReviewSnapshot } from '../lib/jobReviewPanels'
 import { LoadingSpinner } from './LoadingSpinner'
-import { PostingSkillPicker } from './PostingSkillPicker'
-import { postingSkillNames } from '../lib/jobSkills'
 
 interface TailorPanelProps {
   job: JobApplication
@@ -168,7 +166,6 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
   setPanelOpen: (id: JobReviewPanelId, open: boolean) => void
 }) {
   const { updateJob } = useJobs()
-  const { library } = useMasterCv()
   const { tasks, start, retrySave } = useTailoring()
   const skillExplanations = useSkillExplanations()
   const task = tasks[job.id]
@@ -542,14 +539,6 @@ function TailorPanelContent({ job, masterCv, document, templateLabel, canGenerat
               )
             })}
           </div>
-          {analysisCurrent && (
-            <PostingSkillPicker
-              skills={postingSkillNames(job.requirementAnalysis)}
-              track={job.cvTrack ?? library.activeTrack}
-              heading="Add posting skills to this CV"
-              disabled={!canGenerate || job.status !== 'saved' || Boolean(job.deletedAt)}
-            />
-          )}
           <ul className="mt-3 space-y-1 ui-body text-brand-ink legacy-size-text_sm">
             {gapReport.suggestions
               .filter((s) => !(skillsLocked && s.startsWith('Warm chips')))

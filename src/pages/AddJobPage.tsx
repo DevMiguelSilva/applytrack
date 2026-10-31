@@ -8,8 +8,6 @@ import { useMasterCv } from '../hooks/useMasterCv'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
 import { incompleteJobRequirementAnalysis } from '../../shared/jobRequirements'
 import { type CvTrack } from '../types/cv'
-import { PostingSkillPicker } from '../components/PostingSkillPicker'
-import { postingSkillNames } from '../lib/jobSkills'
 import {
   createEmptyJob,
   guessJobSourceFromUrl,
@@ -116,9 +114,6 @@ export function AddJobPage() {
   )
     ? (form.source as PortalJobSource)
     : 'indeed'
-  const displayedSkills = form.requirementAnalysis?.status === 'complete'
-    ? postingSkillNames(form.requirementAnalysis, form.extractedSkills)
-    : []
 
   return (
     <div className="ui-page add-job-page mx-auto min-w-0 w-full">
@@ -276,8 +271,17 @@ export function AddJobPage() {
             />
           </label>
 
-          {displayedSkills.length > 0 && (
-            <PostingSkillPicker skills={displayedSkills} track={form.cvTrack ?? activeTrack} heading="Extracted skills" />
+          {form.extractedSkills.length > 0 && (
+            <div>
+              <span className={fieldLabel}>Extracted skills</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {form.extractedSkills.map((skill) => (
+                  <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 ui-body text-brand-ink legacy-size-text_sm">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="ui-form-actions">

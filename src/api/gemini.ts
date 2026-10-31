@@ -27,8 +27,8 @@ function cloneParsedPosting(posting: ParsedJobPosting): ParsedJobPosting {
   }
 }
 
-export async function parseJobPosting(description: string, options: { force?: boolean } = {}): Promise<ParsedJobPosting> {
-  const cached = options.force ? undefined : jobParseCache.get(description)
+export async function parseJobPosting(description: string): Promise<ParsedJobPosting> {
+  const cached = jobParseCache.get(description)
   if (cached && validJobRequirementAnalysis(cached.requirementAnalysis, description) && cached.requirementAnalysis.status === 'complete') {
     return cloneParsedPosting(cached)
   }
