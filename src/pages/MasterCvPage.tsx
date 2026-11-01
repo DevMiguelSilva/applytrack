@@ -10,6 +10,7 @@ import { templateReferences } from '../lib/cvLibrary'
 import { performCvEditorSave } from '../lib/cvEditorSave'
 import { moveCvItem } from '../lib/cvItemOrder'
 import { cvItemRevisionMatches, cvItemSignature, cvItems, isUntouchedEmptyCvItem, removeCvItemById, type CvItem, type CvItemKind, type CvItemProvenance, type CvItemRemoval } from '../lib/cvItemDeletion'
+import { prependCvExperience, updateCvExperienceById } from '../lib/cvExperience'
 import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
 import { useMasterCv } from '../hooks/useMasterCv'
@@ -803,7 +804,7 @@ function ExperienceEditor({
                 bullets: [{ id: crypto.randomUUID(), text: '', tags: [] }],
               }
             onAdd(item)
-            onChange([...experience, item])
+            onChange(prependCvExperience(experience, item))
           }}
         >
           + Add role
@@ -828,9 +829,7 @@ function ExperienceEditor({
               value={exp.title}
               placeholder="Title"
               onChange={(e) => {
-                const next = [...experience]
-                next[index] = { ...exp, title: e.target.value }
-                onChange(next)
+                onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, title: e.target.value })))
               }}
               className="min-w-0 ui-field"
             /></label>
@@ -838,9 +837,7 @@ function ExperienceEditor({
               value={exp.company}
               placeholder="Company"
               onChange={(e) => {
-                const next = [...experience]
-                next[index] = { ...exp, company: e.target.value }
-                onChange(next)
+                onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, company: e.target.value })))
               }}
               className="min-w-0 ui-field"
             /></label>
@@ -848,31 +845,23 @@ function ExperienceEditor({
               value={exp.location}
               placeholder="Location"
               onChange={(e) => {
-                const next = [...experience]
-                next[index] = { ...exp, location: e.target.value }
-                onChange(next)
+                onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, location: e.target.value })))
               }}
               className="min-w-0 ui-field"
             /></label>
             <div className="cv-experience-dates cv-full-row">
               <MonthField label="Start month" value={exp.start} onChange={(value) => {
-                  const next = [...experience]
-                  next[index] = { ...exp, start: value }
-                  onChange(next)
+                  onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, start: value })))
                 }} />
               <MonthField label="End month" value={exp.end} disabled={exp.current} onChange={(value) => {
-                  const next = [...experience]
-                  next[index] = { ...exp, end: value }
-                  onChange(next)
+                  onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, end: value })))
                 }} />
               <label className="ui-label ui-check-label legacy-size-text_sm">
                 <input
                   type="checkbox" className="ui-checkbox"
                   checked={exp.current}
                   onChange={(e) => {
-                    const next = [...experience]
-                    next[index] = { ...exp, current: e.target.checked }
-                    onChange(next)
+                    onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, current: e.target.checked })))
                   }}
                 />
                 Current role
@@ -882,18 +871,16 @@ function ExperienceEditor({
           <label className="cv-entry-field cv-full-row"><span>Highlights <em>(one per line)</em></span><textarea
             value={exp.bullets.map((b) => b.text).join('\n')}
             onChange={(e) => {
-              const next = [...experience]
-              next[index] = {
-                ...exp,
+              onChange(updateCvExperienceById(experience, exp.id, (item) => ({
+                ...item,
                 bullets: e.target.value
                   .split('\n')
                   .map((text, bulletIndex) => ({
-                    id: exp.bullets[bulletIndex]?.id ?? crypto.randomUUID(),
+                    id: item.bullets[bulletIndex]?.id ?? crypto.randomUUID(),
                     text,
-                    tags: exp.bullets[bulletIndex]?.tags ?? [],
+                    tags: item.bullets[bulletIndex]?.tags ?? [],
                   })),
-              }
-              onChange(next)
+              })))
             }}
             rows={4}
             placeholder="One bullet per line"
