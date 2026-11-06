@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { AppLogo } from '../components/AppLogo'
 import { useAuth } from '../hooks/useAuth'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { boardLook } from '../components/BoardLook'
@@ -39,31 +38,49 @@ export function AuthPage() {
 
   if (!isSupabaseConfigured) {
     return (
-      <div className="mx-auto max-w-md py-6 sm:py-10">
-        <div className={`ui-panel text-center`}>
-          <div className="mb-4 flex justify-center"><AppLogo tone="brand" /></div>
-          <p className={`mb-2 ${boardLook.label}`}>ApplyTrack</p>
-          <h1 className="ui-title legacy-size-text__1_75rem_">Your workspace is ready</h1>
-          <p className={`mt-3 ${boardLook.body}`}>Track your applications on this device. Your changes are saved locally.</p>
-          <a href="/" className={`mt-6 ${boardLook.button} ${focusClass}`}>Continue to Board</a>
-        </div>
+      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-5 py-4 sm:gap-6 sm:py-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+        <section className="auth-welcome-panel flex flex-col justify-between gap-8 rounded-3xl border border-brand-line bg-brand-mist p-6 sm:p-9 lg:p-11">
+          <div>
+            <p className="ui-label font-semibold uppercase tracking-[0.12em]">Your job search, organized</p>
+            <h1 className="mt-4 font-display text-3xl font-bold leading-tight text-brand-ink sm:text-4xl">Make every next step easier.</h1>
+            <p className="mt-4 max-w-lg ui-description">Keep applications, interviews, and the CVs you share together in one clear workspace.</p>
+          </div>
+          <ul className="grid gap-3 text-sm font-medium text-brand-ink sm:grid-cols-3 lg:grid-cols-1">
+            <li className="rounded-2xl border border-white/80 bg-white/75 p-4">See every opportunity and its next step.</li>
+            <li className="rounded-2xl border border-white/80 bg-white/75 p-4">Keep tailored documents with each application.</li>
+            <li className="rounded-2xl border border-white/80 bg-white/75 p-4">Pick up your search when you are ready.</li>
+          </ul>
+        </section>
+        <section className="ui-panel flex flex-col justify-center p-6 sm:p-9 lg:p-11" aria-labelledby="local-workspace-title">
+          <p className="ui-label font-semibold uppercase tracking-[0.12em]">Local workspace</p>
+          <h2 id="local-workspace-title" className="mt-3 ui-title legacy-size-text__1_75rem_">Your workspace is ready</h2>
+          <p className="mt-3 ui-description">Track your applications on this device. Your changes are saved locally.</p>
+          <a href="/" className={`mt-7 w-full sm:w-auto ${boardLook.button} ${focusClass}`}>Continue to Board</a>
+        </section>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-md py-6 font-sans text-brand-ink sm:py-10">
-      <div className={`ui-panel`}>
+    <div className="mx-auto grid w-full max-w-5xl min-w-0 grid-cols-1 gap-5 py-4 font-sans text-brand-ink sm:gap-6 sm:py-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+      <section className="auth-welcome-panel flex flex-col justify-between gap-8 rounded-3xl border border-brand-line bg-brand-mist p-6 sm:p-9 lg:p-11">
         <div>
-          <div className="mb-6 flex items-center gap-3">
-            <AppLogo tone="brand" />
-            <div>
-              <p className={`mb-1 ${boardLook.label}`}>ApplyTrack</p>
-              <h1 className={boardLook.headline}>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h1>
-              <p className="mt-2 ui-description legacy-size-text_sm">{mode === 'signin' ? 'Sign in to sync across devices' : 'Keep your job search in sync across devices'}</p>
-            </div>
+          <p className="ui-label font-semibold uppercase tracking-[0.12em]">Your job search, organized</p>
+          <h1 className="mt-4 font-display text-3xl font-bold leading-tight text-brand-ink sm:text-4xl">Make every next step easier.</h1>
+          <p className="mt-4 max-w-lg ui-description">Keep applications, interviews, and the CVs you share together in one clear workspace.</p>
+        </div>
+        <ul className="grid gap-3 text-sm font-medium text-brand-ink sm:grid-cols-3 lg:grid-cols-1">
+          <li className="rounded-2xl border border-white/80 bg-white/75 p-4">See every opportunity and its next step.</li>
+          <li className="rounded-2xl border border-white/80 bg-white/75 p-4">Keep tailored documents with each application.</li>
+          <li className="rounded-2xl border border-white/80 bg-white/75 p-4">Pick up your search when you are ready.</li>
+        </ul>
+      </section>
+      <section className="ui-panel flex flex-col justify-center p-6 sm:p-9 lg:p-11" aria-labelledby="auth-form-title">
+          <div className="mb-6">
+            <p className="ui-label font-semibold uppercase tracking-[0.12em]">ApplyTrack account</p>
+            <h2 id="auth-form-title" className={`mt-3 ${boardLook.headline}`}>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h2>
+            <p className="mt-2 ui-description legacy-size-text_sm">{mode === 'signin' ? 'Sign in to sync across devices' : 'Keep your job search in sync across devices'}</p>
           </div>
-
           <div className="flex gap-1 rounded-xl bg-brand-mist p-1" role="group" aria-label="Account access">
             <button
               type="button"
@@ -130,8 +147,7 @@ export function AuthPage() {
               {loading ? (mode === 'signin' ? 'Signing in…' : 'Creating account…') : mode === 'signin' ? 'Sign in' : 'Create account'}
             </button>
           </form>
-        </div>
-      </div>
+      </section>
     </div>
   )
 }
