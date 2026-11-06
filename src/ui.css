@@ -247,6 +247,8 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 .cv-full-row, .cv-experience-location { min-width: 0; }
 .cv-links-field { margin-top: 10px; }
 .cv-entry-card { min-width: 0; padding: 14px; border: 1px solid #e2ebe7; border-radius: 14px; background: linear-gradient(115deg, #f7fbf9 0%, #fff 76%); }
+.cv-entry-card + .cv-entry-card { margin-top: 16px; }
+.cv-entry-actions, .cv-order-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .cv-entry-label { padding-top: 2px; color: #547066; font: 700 11px/16px Inter, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .cv-entry-field { display: block; min-width: 0; color: var(--ui-muted); font: 500 14px/20px Inter, system-ui, sans-serif; }
 .cv-entry-field > span { display: block; margin-bottom: 4px; }

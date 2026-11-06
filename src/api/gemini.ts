@@ -1,6 +1,7 @@
 import type { MasterCv } from '../types/cv'
 import type { JobApplication, ParsedJobPosting, UserProfile } from '../types/job'
 import { callGemini } from './client'
+import type { SkillJobContext } from '../../shared/skillContext'
 
 export async function parseJobPosting(description: string): Promise<ParsedJobPosting> {
   return callGemini<ParsedJobPosting>({ action: 'parse', description })
@@ -38,9 +39,9 @@ export async function tailorMasterCv(
   })
 }
 
-/** Plain definition of one term. High-quota models, separate from resume tailoring. */
-export async function explainSkill(skill: string): Promise<string> {
-  return callGemini<string>({ action: 'explainSkill', skill })
+/** High-quota models, separate from resume tailoring. */
+export async function explainSkill(skill: string, context: SkillJobContext): Promise<string> {
+  return callGemini<string>({ action: 'explainSkill', skill, context })
 }
 
 export async function parseResumeText(

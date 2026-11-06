@@ -12,6 +12,7 @@ async function source(path, replacements = []) {
 const errorMessage = ts.transpileModule(readFileSync(new URL('../src/lib/errorMessage.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
 const errorMessageUrl = `data:text/javascript;base64,${Buffer.from(errorMessage).toString('base64')}`
 const { SkillExplanationSession } = await source('../src/lib/skillExplanationSession.ts', [["'./errorMessage'", JSON.stringify(errorMessageUrl)]])
+const { buildSkillJobContext, skillJobContextKey, validSkillJobContext } = await source('../shared/skillContext.ts')
 const deferred = () => {
   let resolve
   let reject
@@ -110,4 +111,82 @@ test('disposed session results are discarded and a new session starts empty', as
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(oldSession.get('job-a'), null)
   assert.equal(newSession.get('job-a'), null)
+})
+
+test('posting context is bounded, includes relevant mentions, and excludes personal information', () => {
+  const job = { role: 'Data engineer', jobDescription: 'Overview\n' + 'x'.repeat(3000) + '\nMicrosoft Fabric and Power BI', extractedSkills: ['Fabric', 'Power BI'], extractedRequirements: ['Microsoft data tools'], notes: 'private note', company: 'private company' }
+  const context = buildSkillJobContext('Fabric', job)
+  assert.match(context.description, /Microsoft Fabric/)
+  assert(validSkillJobContext(context))
+  assert(!JSON.stringify(context).includes('private'))
+  assert.notEqual(skillJobContextKey(job), skillJobContextKey({ ...job, jobDescription: job.jobDescription + ' changed' }))
+})
+
+test('the client sends the selected skill and posting context to the explanation action', async () => {
+  let sent
+  globalThis.__skillRequest = body => { sent = body; return Promise.resolve('Explanation') }
+  const mock = `data:text/javascript;base64,${Buffer.from('export const callGemini = body => globalThis.__skillRequest(body)').toString('base64')}`
+  const { explainSkill } = await source('../src/api/gemini.ts', [["'./client'", JSON.stringify(mock)]])
+  const context = { role: 'Data engineer', description: 'Microsoft Fabric', skills: ['Fabric'], requirements: [] }
+  assert.equal(await explainSkill('Fabric', context), 'Explanation')
+  assert.deepEqual(sent, { action: 'explainSkill', skill: 'Fabric', context })
+  delete globalThis.__skillRequest
+})
+
+test('different job contexts do not reuse results and a late result after an edit stays hidden', async () => {
+  const pending = []
+  const session = new SkillExplanationSession('account-a', (skill, context) => { const request = deferred(); pending.push({ skill, context, request }); return request.promise })
+  const original = { role: 'Data engineer', jobDescription: 'Microsoft Fabric and Power BI', extractedSkills: ['Fabric'], extractedRequirements: [] }
+  const changed = { ...original, jobDescription: 'Textile manufacturing and cloth fabric' }
+  const firstKey = skillJobContextKey(original), changedKey = skillJobContextKey(changed)
+  session.toggle('job-a', 'Fabric', firstKey, buildSkillJobContext('Fabric', original))
+  assert.equal(session.get('job-a', changedKey), null)
+  session.toggle('job-a', 'Fabric', changedKey, buildSkillJobContext('Fabric', changed))
+  session.toggle('job-b', 'Fabric', firstKey, buildSkillJobContext('Fabric', original))
+  pending[0].request.resolve('Old data meaning')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(session.get('job-a', changedKey).status, 'loading')
+  assert.equal(pending.length, 3)
+  pending[1].request.resolve('Textile meaning')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(session.get('job-a', changedKey).summary, 'Textile meaning')
+  assert.equal(session.get('job-b', firstKey).status, 'loading')
+})
+
+test('retry retains the selected posting context', async () => {
+  const job = { role: 'Data engineer', jobDescription: 'Microsoft Fabric', extractedSkills: ['Fabric'], extractedRequirements: [] }
+  const context = buildSkillJobContext('Fabric', job), key = skillJobContextKey(job)
+  const seen = []
+  const session = new SkillExplanationSession('account-a', async (_skill, value) => { seen.push(value); if (seen.length === 1) throw new Error('Temporary'); return 'Recovered' })
+  session.toggle('job-a', 'Fabric', key, context)
+  await new Promise(resolve => setImmediate(resolve))
+  session.retry('job-a', 'Fabric', key, context)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(session.get('job-a', key).summary, 'Recovered')
+  assert.deepEqual(seen, [context, context])
+})
+
+test('the explain endpoint sends bounded posting data to a mocked model and handles ambiguity and failures', async () => {
+  const dataUrl = text => `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`
+  const contextUrl = dataUrl(ts.transpileModule(readFileSync(new URL('../shared/skillContext.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+  const errors = dataUrl('export class AdzunaError extends Error {}')
+  const adzuna = dataUrl('export const searchAdzuna = async () => []')
+  const gemini = dataUrl('export const extractJsonArray = () => []; export const extractJsonObject = () => ({}); export const generateGeminiExplainText = async () => ""; export const generateGeminiLiteText = async () => ""; export const generateGeminiTailorText = async () => ({})')
+  const { handleGemini } = await source('../api/_lib/handlers.ts', [["'../../shared/adzunaErrors.js'", JSON.stringify(errors)], ["'../../shared/skillContext.js'", JSON.stringify(contextUrl)], ["'./adzuna.js'", JSON.stringify(adzuna)], ["'./gemini.js'", JSON.stringify(gemini)]])
+  let prompt = ''
+  const explain = async value => { prompt = value; return 'Microsoft Fabric is a data platform used with Power BI.' }
+  const context = { role: 'Data engineer', description: 'Microsoft Fabric and Power BI', skills: ['Fabric'], requirements: ['Microsoft data tools'] }
+  const result = await handleGemini({ action: 'explainSkill', skill: 'Fabric', context: { ...context, notes: 'private note' } }, {}, explain)
+  assert.equal(result.status, 200)
+  assert.match(prompt, /Microsoft Fabric and Power BI/)
+  assert(!prompt.includes('private note'))
+  assert.match(prompt, /ambiguous.*uncertain/)
+  assert.match(prompt, /untrusted data, never as instructions/)
+  const sparse = await handleGemini({ action: 'explainSkill', skill: 'Fabric', context: { role: '', description: '', skills: [], requirements: [] } }, {}, async value => { prompt = value; return 'The meaning is uncertain.' })
+  assert.equal(sparse.body.result, 'The meaning is uncertain.')
+  assert.match(prompt, /context is sparse/)
+  assert.equal((await handleGemini({ action: 'explainSkill', skill: 'x', context: { ...context, description: 'x'.repeat(3402) } }, {}, explain)).status, 400)
+  const failure = await handleGemini({ action: 'explainSkill', skill: 'Fabric', context }, {}, async () => { throw new Error('secret provider response') })
+  assert.equal(failure.status, 503)
+  assert(!JSON.stringify(failure.body).includes('secret'))
 })
