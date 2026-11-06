@@ -288,6 +288,8 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 @container cv-entry (min-width: 480px) {
   .cv-experience-fields, .cv-project-fields, .cv-education-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cv-experience-location, .cv-experience-dates, .cv-full-row { grid-column: 1 / -1; }
+}
+@container cv-entry (min-width: 520px) {
   .cv-experience-dates { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; }
   .cv-experience-dates > .ui-check-label { align-self: end; transform: translateY(5px); }
 }
