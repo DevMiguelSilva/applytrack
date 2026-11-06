@@ -44,12 +44,13 @@ export async function inboxSaveStep(operation: InboxSaveOperation, run: () => un
   }
 }
 /** Reconcile with persisted identities, never upsert a fetched 'new' status over history. */
-export async function saveCloudInboxResults(client: SupabaseClient, userId: string, transform: (items: InboxJob[]) => InboxJob[], check: () => void): Promise<InboxJob[]> {
+export async function saveCloudInboxResults(client: SupabaseClient, userId: string, transform: (items: InboxJob[]) => InboxJob[], check: () => void, phase: (value: 'read' | 'write') => void = () => {}): Promise<InboxJob[]> {
   const read = async () => {
     const rows: InboxJob[] = []
     // Supabase caps select responses. Read every page so hidden history is included.
     for (let offset = 0; ; offset += 500) {
       check()
+      phase('read')
       const { data, error } = await client.from('job_inbox').select('*').eq('user_id', userId).order('id').range(offset, offset + 499)
       if (error) throw error
       check()
@@ -66,6 +67,7 @@ export async function saveCloudInboxResults(client: SupabaseClient, userId: stri
     check()
     if (fresh.length) {
       // Another session may insert between read and write. DO NOTHING preserves its history.
+      phase('write')
       const { error } = await client.from('job_inbox').upsert(fresh.map(item => inboxJobToRow(item, userId)), { onConflict: 'user_id,external_id', ignoreDuplicates: true })
       if (error) throw error
     }
@@ -75,6 +77,7 @@ export async function saveCloudInboxResults(client: SupabaseClient, userId: stri
       check()
       const { id: _id, user_id: _owner, ...patch } = inboxJobToRow({ ...item, id: old.id }, userId)
       void _id; void _owner
+      phase('write')
       const { error } = await client.from('job_inbox').update(patch).eq('user_id', userId).eq('id', old.id).eq('status', 'new')
       if (error) throw error
     }
@@ -83,6 +86,7 @@ export async function saveCloudInboxResults(client: SupabaseClient, userId: stri
     await inboxSaveStep('prune', async () => {
       check()
       if (removed.length) {
+        phase('write')
         const { error } = await client.from('job_inbox').delete().eq('user_id', userId).eq('status', 'new').in('id', removed)
         if (error) throw error
       }
