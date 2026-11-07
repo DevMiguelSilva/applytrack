@@ -78,7 +78,7 @@ function cvItemRemovalCopy(kind: CvItemKind, item: CvItem) {
   }
 }
 
-function MonthField({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) {
+function MonthField({ label, value, onChange, disabled = false, className = '' }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; className?: string }) {
   const monthValue = /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : ''
   return <label className="cv-entry-field"><span>{label}</span><input
     type="month"
@@ -86,7 +86,7 @@ function MonthField({ label, value, onChange, disabled = false }: { label: strin
     aria-label={label}
     disabled={disabled}
     onChange={(event) => onChange(event.target.value)}
-    className="min-w-0 w-full ui-field"
+    className={`min-w-0 w-full ui-field ${className}`}
   />{value && !monthValue && <small className="cv-legacy-date">Saved value: {value}. Choose a month to replace it.</small>}</label>
 }
 
@@ -850,10 +850,10 @@ function ExperienceEditor({
               className="min-w-0 ui-field"
             /></label>
             <div className="cv-experience-dates cv-full-row">
-              <MonthField label="Start month" value={exp.start} onChange={(value) => {
+              <MonthField label="Start month" value={exp.start} className="cv-experience-date-input" onChange={(value) => {
                   onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, start: value })))
                 }} />
-              <MonthField label="End month" value={exp.end} disabled={exp.current} onChange={(value) => {
+              <MonthField label="End month" value={exp.end} disabled={exp.current} className="cv-experience-date-input" onChange={(value) => {
                   onChange(updateCvExperienceById(experience, exp.id, (item) => ({ ...item, end: value })))
                 }} />
               <label className="ui-label ui-check-label legacy-size-text_sm">

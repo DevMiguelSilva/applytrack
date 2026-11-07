@@ -270,6 +270,10 @@ body:has(aside[aria-label="Document generation"] > *) .ui-back-to-top { bottom: 
 .cv-read-item p { margin: 5px 0 0; color: var(--ui-muted); font: 400 13px/20px Inter, system-ui, sans-serif; white-space: pre-line; overflow-wrap: anywhere; }
 .cv-read-bullets { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 20px; color: var(--ui-ink); font: 400 13px/19px Inter, system-ui, sans-serif; }
 .cv-experience-dates > .ui-check-label { align-self: start; margin: 0; }
+.cv-experience-date-input { box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: 44px; }
+@supports (-webkit-touch-callout: none) {
+  .cv-experience-date-input { -webkit-appearance: none; appearance: none; }
+}
 .cv-empty-state { margin-top: 4px; padding: 13px 16px; border: 1px dashed #d8e6df; border-radius: 12px; background: #fbfdfc; color: var(--ui-muted); font: 400 14px/20px Inter, system-ui, sans-serif; }
 .cv-save-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 16px 20px; border: 1px solid #d8e8df; border-radius: 16px; background: #f1f8f4; }
 .cv-save-row > .ui-meta { min-width: 0; }

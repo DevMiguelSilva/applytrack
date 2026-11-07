@@ -16,6 +16,8 @@ test('experience date fields stay stacked until a wide card can fit native month
 
 test('date fields retain native month inputs, accessible labels, and current-role disabling', () => {
   assert.match(page, /type="month"[\s\S]{0,100}aria-label=\{label\}/)
-  assert.match(page, /<MonthField label="Start month"/)
-  assert.match(page, /<MonthField label="End month" value=\{exp\.end\} disabled=\{exp\.current\}/)
+  assert.match(page, /<MonthField label="Start month"[^>]*className="cv-experience-date-input"/)
+  assert.match(page, /<MonthField label="End month" value=\{exp\.end\} disabled=\{exp\.current\} className="cv-experience-date-input"/)
+  assert.match(css, /\.cv-experience-date-input \{ box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: 44px; \}/)
+  assert.match(css, /@supports \(-webkit-touch-callout: none\) \{\s+\.cv-experience-date-input \{ -webkit-appearance: none; appearance: none; \}/)
 })
