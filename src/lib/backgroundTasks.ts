@@ -38,11 +38,11 @@ export class BackgroundTasks<T> {
     this.restoreNotificationsOnFailure.delete(id)
     delete this.tasks[id]; this.notify()
   }
-  invalidate(id: string) {
+  invalidate(id: string, error = 'This job or its CV changed. Restart tailoring to use the latest information.') {
     const task = this.tasks[id]
     if (!task || (task.phase !== 'running' && task.phase !== 'saving' && !task.output)) return
     this.versions.set(id, (this.versions.get(id) ?? 0) + 1)
-    this.fail({ ...task, output: undefined }, 'This job or its CV changed. Restart tailoring to use the latest information.')
+    this.fail({ ...task, output: undefined }, error)
   }
   private publish(task: BackgroundTask<T>) { this.tasks = { ...this.tasks, [task.jobId]: { ...task, notificationHidden: this.hiddenNotifications.has(task.jobId) } }; this.notify() }
   private fail(task: BackgroundTask<T>, error: string) {
@@ -66,7 +66,7 @@ export class BackgroundTasks<T> {
       await this.persist(task, epoch, version, validate, save)
     } catch (error) {
       if (epoch !== this.epoch || this.versions.get(jobId) !== version) return
-      this.fail(task, error instanceof Error ? error.message : 'Tailoring failed. Please retry.')
+      this.fail(task, error instanceof Error ? error.message : 'Background task failed. Please retry.')
     }
   }
   async retry(jobId: string, validate: () => boolean, save: (output: T, valid: () => boolean) => Promise<void>) {
@@ -91,7 +91,7 @@ export class BackgroundTasks<T> {
       this.publish({ ...task, phase: 'completed', output: undefined, error: undefined })
     } catch (error) {
       if (epoch !== this.epoch || this.versions.get(task.jobId) !== version) return
-      this.fail(task, error instanceof Error ? error.message : 'Could not save. Retry saving your generated files.')
+      this.fail(task, error instanceof Error ? error.message : 'Could not save the result. Please retry.')
     }
   }
 }

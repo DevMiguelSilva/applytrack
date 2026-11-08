@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { TailoringProvider } from './hooks/useTailoring'
+import { JobRescoreProvider } from './hooks/useJobRescore'
 import { SkillExplanationsProvider } from './hooks/useSkillExplanations'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -39,21 +40,23 @@ function AppRoutes() {
               <InboxProvider>
                 <BrowserRouter>
                   <TailoringProvider>
-                    <SkillExplanationsProvider>
-                      <Routes>
-                        <Route element={<Layout />}>
-                          <Route path="login" element={<LoginRoute />} />
-                          <Route element={<ProtectedRoute />}>
-                            <Route index element={<DashboardPage />} />
-                            <Route path="inbox" element={<InboxPage />} />
-                            <Route path="portals" element={<PortalsPage />} />
-                            <Route path="add" element={<AddJobPage />} />
-                            <Route path="job/:id" element={<Suspense fallback={<p className="text-sm text-brand-muted">Loading application…</p>}><JobDetailPage /></Suspense>} />
-                            <Route path="cv" element={<MasterCvPage />} />
+                    <JobRescoreProvider>
+                      <SkillExplanationsProvider>
+                        <Routes>
+                          <Route element={<Layout />}>
+                            <Route path="login" element={<LoginRoute />} />
+                            <Route element={<ProtectedRoute />}>
+                              <Route index element={<DashboardPage />} />
+                              <Route path="inbox" element={<InboxPage />} />
+                              <Route path="portals" element={<PortalsPage />} />
+                              <Route path="add" element={<AddJobPage />} />
+                              <Route path="job/:id" element={<Suspense fallback={<p className="text-sm text-brand-muted">Loading application…</p>}><JobDetailPage /></Suspense>} />
+                              <Route path="cv" element={<MasterCvPage />} />
+                            </Route>
                           </Route>
-                        </Route>
-                      </Routes>
-                    </SkillExplanationsProvider>
+                        </Routes>
+                      </SkillExplanationsProvider>
+                    </JobRescoreProvider>
                   </TailoringProvider>
                 </BrowserRouter>
               </InboxProvider>

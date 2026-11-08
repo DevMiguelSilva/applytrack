@@ -34,7 +34,7 @@ interface JobsContextValue {
   trashedJobs: JobApplication[]
   loading: boolean
   addJob: (job: JobApplication) => Promise<void>
-  updateJob: (id: string, updates: Partial<JobApplication>, validate?: () => boolean) => Promise<void>
+  updateJob: (id: string, updates: Partial<JobApplication>, validate?: (currentJob: JobApplication) => boolean) => Promise<void>
   /** Soft-delete → Trash (recoverable). */
   deleteJob: (id: string, validate?: (deletedAt: string) => boolean) => Promise<string>
   restoreJob: (id: string) => Promise<void>
@@ -213,16 +213,16 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     updatesQueue.current=operation;return operation
   },[owner,isCloudSync,userId])
   const updateJob = useCallback(
-    (id: string, updates: Partial<JobApplication>, validate: () => boolean = () => true) => {
+    (id: string, updates: Partial<JobApplication>, validate: (currentJob: JobApplication) => boolean = () => true) => {
       const account = owner
       const operation = updatesQueue.current.catch(() => {}).then(() => {
         const write = async () => {
         revision.current++;setLoading(false)
         if (ownerRef.current !== account) throw new Error('Account changed')
-        if (!validate()) throw new Error('This job or its CV changed. Restart tailoring.')
         if (!isCloudSync) jobsRef.current = readLocalJobs()
         const current = jobsRef.current.find((job) => job.id === id)
         if (!current) throw new Error('Application no longer exists')
+        if (!validate(current)) throw new Error('The job or its CV changed while this task was running.')
         const updatedAt = new Date().toISOString()
         const updated = normalizeJob({ ...current, ...updates, updatedAt })
         if (!isCloudSync) {
