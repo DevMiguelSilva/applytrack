@@ -9,6 +9,7 @@ import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { TailorPanel } from '../components/TailorPanel'
 import { useAuth } from '../hooks/useAuth'
 import { useJobs } from '../hooks/useJobs'
+import { useJobRescore } from '../hooks/useJobRescore'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { BOARD_TONE } from '../lib/boardTone'
@@ -24,8 +25,10 @@ export function JobDetailPage() {
   const { getCv, activeTrack, library, getLabel } = useMasterCv()
   const { getForJob } = useTailoredDocs()
   const { user, isCloudEnabled } = useAuth()
+  const { tasks: rescoreTasks, start: startRescore, retrySave: retryRescoreSave, canStart: canRescore, dismiss: dismissRescore } = useJobRescore()
   const account = isCloudEnabled ? user?.id ?? 'signed-out' : 'local'
   const job = id ? getJob(id) : undefined
+  const rescoreTask = id ? rescoreTasks[id] : undefined
   const hasResume = Boolean(id && getForJob(id)?.tailoredCv)
   const [showFullJd, setShowFullJd] = useState(false)
   const [editingJd, setEditingJd] = useState(false)
@@ -445,27 +448,32 @@ export function JobDetailPage() {
         )}
       </section>
 
-      {job.status === 'saved' && !job.deletedAt && (jdIncomplete || editingJd) && (
+      {job.status === 'saved' && !job.deletedAt && (jdIncomplete || editingJd || job.needsRescore || rescoreTask) && (
         <section className={`${panel} space-y-4`}>
           <h2 className=" ui-section-title legacy-size-text_base">Job description</h2>
 
           {!editingJd ? (
-            job.needsRescore ? (
+            rescoreTask ? (
+              <div className="space-y-3">
+                <p role={rescoreTask.phase === 'failed' ? 'alert' : 'status'} className={`ui-helper legacy-size-text_sm ${rescoreTask.phase === 'failed' ? '!text-[#8a6230]' : 'text-brand-muted'}`}>
+                  {rescoreTask.phase === 'running' ? 'Rescoring job description…' : rescoreTask.phase === 'saving' ? 'Saving the updated match…' : rescoreTask.phase === 'completed' ? `Rescore complete. Current match: ${matchPercent == null ? 'updated' : `${matchPercent}%`}.` : rescoreTask.output ? `Match calculated (${rescoreTask.output.score}%), but the save failed: ${rescoreTask.error}` : rescoreTask.error}
+                </p>
+                <div className="m-actions flex flex-wrap gap-2">
+                  {rescoreTask.phase === 'failed' && canRescore(job.id) && <button type="button" className="ui-button ui-primary m-action" onClick={() => void (rescoreTask.output ? retryRescoreSave(job.id) : startRescore(job.id))}>{rescoreTask.output ? 'Retry save' : 'Retry rescore'}</button>}
+                  {rescoreTask.phase === 'completed' && <button type="button" className="ui-button ui-secondary m-action" onClick={() => dismissRescore(job.id)}>Dismiss</button>}
+                </div>
+              </div>
+            ) : job.needsRescore ? (
               <div className="space-y-3">
                 <button
                   type="button"
                   data-role="primary"
-                  disabled={savingJd || parsingJd} aria-busy={savingJd || parsingJd}
-                  onClick={() => void saveJd(job.jobDescription)}
+                  disabled={!canRescore(job.id)}
+                  onClick={() => void startRescore(job.id)}
                   className="ui-button ui-primary m-action"
                 >
-                  {parsingJd || savingJd ? 'Rescoring…' : 'Rescore'}
+                  Rescore
                 </button>
-                {jdError && (
-                  <p className="ui-helper !text-[#8a6230] legacy-size-text_sm" role="alert">
-                    {jdError}
-                  </p>
-                )}
               </div>
             ) : (
               <button type="button" data-role="primary" onClick={openJdEditor} className="ui-button ui-secondary m-action">
