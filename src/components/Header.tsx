@@ -7,7 +7,8 @@ export function Brand({ compact = false, appearance = 'standard' }: { compact?: 
   </Link>
 }
 export function Header({ login = false }: { login?: boolean }) {
-  return <header className={`mobile-brand-header sticky top-0 z-30 border-b border-brand-line bg-white/95 backdrop-blur-md ${login ? '' : 'lg:hidden'}`}>
-    <div className="mx-auto flex max-w-6xl items-center px-5 py-2.5 sm:px-6"><Brand appearance="header" /></div>
+  const headerTheme = login ? 'border-[#294d3d] bg-[#183c2f]/95' : 'border-brand-line bg-white/95'
+  return <header className={`mobile-brand-header sticky top-0 z-30 border-b ${headerTheme} backdrop-blur-md ${login ? '' : 'lg:hidden'}`}>
+    <div className="mx-auto flex max-w-6xl items-center px-5 py-2.5 sm:px-6"><Brand appearance={login ? 'navigation' : 'header'} /></div>
   </header>
 }
