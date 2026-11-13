@@ -373,16 +373,10 @@ html { scrollbar-gutter: stable; }
 .sidebar-divider { padding-top: 25px; }
 .sidebar-divider .sidebar-group-label { display: block; margin-bottom: 12px; }
 .sidebar-inbox-badge { margin-left: auto; min-width: 21px; padding: 2px 5px; border-radius: 7px; background: #a8d9b7; color: #193d2c; font-size: 10px; line-height: 15px; text-align: center; }
-.sidebar-inbox-badge-compact { position: absolute; top: 0; right: 0; min-width: 16px; margin: 0; padding: 0 3px; font-size: 9px; }
 .sidebar-footer { margin-top: auto; padding-top: 28px; padding-bottom: 6px; }
 .desktop-sidebar .sidebar-control { padding: 10px 12px; color: #c1d4c7; background: transparent; font-size: 12px; font-weight: 500; }
 .desktop-sidebar .sidebar-control svg { width: 19px; height: 19px; }
 .desktop-sidebar .sidebar-control:hover { background: #244b39; color: #f4fbf6; }
-.desktop-sidebar .sidebar-control:has(svg + span.sr-only) { justify-content: center; padding-inline: 0; }
-.desktop-sidebar[data-collapsed='true'] .sidebar-brand { padding-inline: 0; padding-bottom: 26px; }
-.desktop-sidebar[data-collapsed='true'] .sidebar-brand [aria-label='ApplyTrack'] { justify-content: center; }
-.desktop-sidebar[data-collapsed='true'] .sidebar-link { justify-content: center; padding-inline: 0; }
-.desktop-sidebar[data-collapsed='true'] .sidebar-divider { margin: 18px 8px 10px; padding-top: 0; border-top: 1px solid #3c5d4b; }
 .desktop-workspace-bar { border-bottom: 1px solid #e4ebe4; background: #fcfefd; }
 .desktop-workspace-bar > div { min-height: 84px; }
 .workspace-breadcrumb { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #5f7365; }
@@ -417,11 +411,8 @@ html { scrollbar-gutter: stable; }
 .desktop-sidebar .sidebar-sign-out:hover { background: #643b34; color: #ffe2db; }
 .sidebar-footer [role='alert'] { color: #ffc4b8; }
 
-/* Dedicated sidebar preference control and balanced mobile account cells. */
+/* Sidebar branding and balanced mobile account cells. */
 .desktop-sidebar .sidebar-brand { padding-bottom: 0; }
-.desktop-sidebar[data-collapsed="true"] .sidebar-brand { padding-bottom: 0; }
-.sidebar-toggle-row { margin-block: 12px; flex-shrink: 0; }
-.sidebar-toggle-row .sidebar-control { min-height: 44px; }
 .mobile-account-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 8px; }
 .mobile-account-panel > .ui-button { min-width: 0; width: 100%; min-height: 44px; }
 .mobile-account-panel-single > :not(.mobile-account-error), .mobile-account-error { grid-column: 1 / -1; }
